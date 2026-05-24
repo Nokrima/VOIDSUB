@@ -1,0 +1,32 @@
+# =========================================
+# TERCUMAN'T V2 - GITHUB GÜVENLİK DUVARI
+# =========================================
+
+# 🐍 PYTHON (Arka Plan)
+**/.venv/
+**/venv/
+**/env/
+**/__pycache__/
+**/*.pyc
+**/app.log
+**/logs/
+
+# 🦀 RUST & TAURI (Arayüz Motoru)
+**/target/
+**/*.rs.bk
+
+# ⚛️ REACT & NODE (Arayüz Kütüphaneleri)
+**/node_modules/
+**/dist/
+**/build/
+
+# 🤖 YAPAY ZEKA & OCR (Ağır Modeller)
+**/models/
+**/*.pt
+**/*.pth
+**/*.onnx
+
+# 💻 İŞLETİM SİSTEMİ ÇÖPLERİ
+**/.DS_Store
+**/Thumbs.db
+**/.vscode/
