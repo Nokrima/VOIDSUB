@@ -19,3 +19,4 @@ winrt-Windows.Graphics.DirectX.Direct3d11.Interop
 winrt-Windows.Media.Ocr
 winrt-Windows.Globalization
 winrt-Windows.Foundation.Collections
+winrt-Windows.Graphics

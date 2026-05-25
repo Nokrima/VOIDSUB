@@ -255,6 +255,8 @@ const ShortcutRow = ({ label, value, onChange }: { label: string, value: string,
   );
 };
 
+import { getVersion } from '@tauri-apps/api/app';
+
 const VersionStatusBlock = () => {
   const { send, isConnected } = useWebSocket();
   const { notify } = useAppContext();
@@ -264,8 +266,10 @@ const VersionStatusBlock = () => {
   const [progress, setProgress] = React.useState(0);
   const [updateInfo, setUpdateInfo] = React.useState<any>(null);
   const [hovered, setHovered] = React.useState(false);
+  const [appVersion, setAppVersion] = React.useState('...');
 
   React.useEffect(() => {
+    getVersion().then(v => setAppVersion(`v${v}`)).catch(() => setAppVersion('v2.0.0'));
     const offErr = onEvent('update_error', (data: any) => {
       setChecking(false);
       setDownloading(false);
@@ -369,7 +373,7 @@ const VersionStatusBlock = () => {
               transition: 'all 0.3s ease' 
             }} />
             <span style={{ fontSize: 11, color: statusColor, fontWeight: 500, transition: 'color 0.3s ease' }}>
-              v2.4.0 • {statusText}
+              {appVersion} • {statusText}
             </span>
           </div>
         </div>

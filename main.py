@@ -9,6 +9,14 @@ import os
 import sys
 from pathlib import Path
 
+# Fix for WinError 1114 (DLL initialization failed)
+# Force load torch and ctranslate2 DLLs into process memory before PySide6/OpenCV
+try:
+    import torch
+    import ctranslate2
+except ImportError:
+    pass
+
 if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
     qt_plugin_path = os.path.join(sys._MEIPASS, 'PySide6', 'plugins')
     os.environ['QT_PLUGIN_PATH'] = qt_plugin_path

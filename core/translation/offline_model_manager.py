@@ -457,9 +457,16 @@ class OfflineModelManager:
         if missing:
             raise RuntimeError(f"Eksik runtime dosyalari: {', '.join(missing)}")
         log_event(PREFIX_TRL, "063", f"[Model Doğrulama] -> DOĞRULANDI | İstenen Dosyalar: {self.spec['ready_files']}")
-        import ctranslate2
         import hashlib
 
+        if self.spec["runtime_kind"] == "opus":
+            from transformers import MarianTokenizer
+            tokenizer = MarianTokenizer.from_pretrained(str(self.model_dir), use_fast=False)
+        else:
+            from transformers import AutoTokenizer
+            tokenizer = AutoTokenizer.from_pretrained(str(self.model_dir), src_lang="eng_Latn", use_fast=False)
+
+        import ctranslate2
         translator = ctranslate2.Translator(
             str(self.model_dir),
             device="cpu",
@@ -467,14 +474,7 @@ class OfflineModelManager:
             inter_threads=1,
             intra_threads=1,
         )
-        if self.spec["runtime_kind"] == "opus":
-            from transformers import MarianTokenizer
 
-            tokenizer = MarianTokenizer.from_pretrained(str(self.model_dir), use_fast=False)
-        else:
-            from transformers import AutoTokenizer
-
-            tokenizer = AutoTokenizer.from_pretrained(str(self.model_dir), src_lang="eng_Latn", use_fast=False)
         del translator
         del tokenizer
         
@@ -505,7 +505,7 @@ class OfflineModelManager:
 
     def _set_stage(self, state: str, percent: int, detail: str) -> None:
         self.state = state
-        self.percent = max(0, min(100, int(percent)))
+        self.percent = max(0, min(100, percent))
         self.detail = detail
         if state != "downloading":
             self.bytes_label = ""
@@ -536,11 +536,43 @@ class OfflineModelManager:
         total_bytes: int = 0,
         log_stdout: bool = False,
     ) -> None:
+        import collections
+        import threading
+        
         base_bytes = self._measure_path(watch_path) if watch_path is not None else 0
         cflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-        self.active_proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", creationflags=cflags)
-        stdout_chunks: list[str] = []
-        stderr_chunks: list[str] = []
+        
+        self.active_proc = subprocess.Popen(
+            command, 
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.PIPE, 
+            text=True, 
+            encoding="utf-8", 
+            errors="replace", 
+            creationflags=cflags
+        )
+        
+        stdout_deque = collections.deque(maxlen=30)
+        stderr_deque = collections.deque(maxlen=30)
+        
+        def _read_stream(stream, out_queue, is_stdout):
+            if not stream:
+                return
+            for line in iter(stream.readline, ""):
+                if not line:
+                    break
+                line_str = line.strip()
+                if line_str:
+                    out_queue.append(line_str)
+                    if is_stdout and log_stdout:
+                        log_event(PREFIX_TRL, "068", f"[Sistem Süreci] -> ÇIKTI (STDOUT) | {line_str}")
+            stream.close()
+
+        t_out = threading.Thread(target=_read_stream, args=(self.active_proc.stdout, stdout_deque, True), daemon=True)
+        t_err = threading.Thread(target=_read_stream, args=(self.active_proc.stderr, stderr_deque, False), daemon=True)
+        t_out.start()
+        t_err.start()
+
         while self.active_proc.poll() is None:
             if self._cancel.is_set():
                 self.active_proc.terminate()
@@ -549,11 +581,6 @@ class OfflineModelManager:
                 except subprocess.TimeoutExpired:
                     self.active_proc.kill()
                     self.active_proc.wait(timeout=5)
-                stdout, stderr = self.active_proc.communicate()
-                if stdout:
-                    stdout_chunks.append(stdout.strip())
-                if stderr:
-                    stderr_chunks.append(stderr.strip())
                 log_event(PREFIX_TRL, "072", f"[Sistem Süreci] -> DURDURULDU (İPTAL) | Komut: {' '.join(command)}", level="warning")
                 raise RuntimeError("cancelled")
             if self._pause.is_set():
@@ -570,21 +597,14 @@ class OfflineModelManager:
                 self.bytes_label = f"{self._format_bytes(current_bytes)} / {self._format_bytes(total_bytes)}"
                 self._send_progress()
             time.sleep(0.25)
-        stdout, stderr = self.active_proc.communicate()
-        if stdout:
-            stdout_chunks.append(stdout.strip())
-        if stderr:
-            stderr_chunks.append(stderr.strip())
+            
+        t_out.join(timeout=1)
+        t_err.join(timeout=1)
+        
         if self.active_proc.returncode != 0:
-            for line in self._clip_lines("\n".join(stdout_chunks), 12):
-                if log_stdout:
-                    log_event(PREFIX_TRL, "066", f"[Sistem Süreci] -> ÇIKTI (STDOUT) | {line}")
-            for line in self._clip_lines("\n".join(stderr_chunks), 18):
+            for line in list(stderr_deque):
                 log_event(PREFIX_TRL, "067", f"[Sistem Süreci] -> ÇIKTI (STDERR) | {line}", level="error")
             raise RuntimeError(f"{failure_message}: exit code {self.active_proc.returncode}")
-        if log_stdout:
-            for line in self._clip_lines("\n".join(stdout_chunks), 10):
-                log_event(PREFIX_TRL, "068", f"[Sistem Süreci] -> ÇIKTI (STDOUT) | {line}")
 
     def _packages_ready(self) -> bool:
         return (
@@ -681,7 +701,7 @@ class OfflineModelManager:
             if size < 1024.0 or unit == "GB":
                 return f"{size:.1f}{unit}" if unit != "B" else f"{int(size)}B"
             size /= 1024.0
-        return f"{int(value)}B"
+        return f"{value}B"
 
     def _clip_lines(self, text: str, limit: int) -> list[str]:
         if not text.strip():
@@ -690,13 +710,17 @@ class OfflineModelManager:
         return lines[-limit:]
 
     def _fail(self, message: str) -> None:
+        import shutil
         elapsed_ms = int((time.monotonic() - self._install_started_at) * 1000) if self._install_started_at else 0
         self.state = "failed"
         self.percent = 0
         self.detail = message
         self.bytes_label = ""
         self._log_dir_snapshot(self.tmp_dir, "failure_tmp")
-        self._log_dir_snapshot(self.model_dir, "failure_model")
+        if self.tmp_dir.exists():
+            shutil.rmtree(self.tmp_dir, ignore_errors=True)
+        # We do not delete model_dir here to preserve potentially working legacy models
+        # self._log_dir_snapshot(self.model_dir, "failure_model")
         log_error(PREFIX_TRL, "069", f"[Model Kurulumu] -> KURULUM BAŞARISIZ | Model: {self.model_key} | Süre(ms): {elapsed_ms} | Hata: {message}", "Yerel model kurulumu tamamlanamadı.")
         self._send("offline_model_error", {"message": message, "model": self.model_key, "elapsed_ms": elapsed_ms})
         self._send_status()
@@ -718,5 +742,5 @@ class OfflineModelManager:
         log_event(PREFIX_TRL, "071", f"[Sistem Temizliği] -> SİLİNDİ | İçerik: {', '.join(items) if items else 'boş'} | Etiket: {label}")
 
     def _normalize_model_key(self, model_key: str | None) -> str:
-        normalized = str(model_key or DEFAULT_MODEL_KEY).strip().lower()
+        normalized = (model_key or DEFAULT_MODEL_KEY).strip().lower()
         return normalized if normalized in MODEL_SPECS else DEFAULT_MODEL_KEY

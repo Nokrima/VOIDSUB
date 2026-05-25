@@ -86,7 +86,8 @@ Set-Content -Path "$PLUGIN_DIR\easyocr-worker.py" -Value $WORKER_CODE -Encoding 
 
 # 7. ZIP Olarak Sıkıştır
 Write-Host "7. Tüm sistem ZIP olarak sıkıştırılıyor... (Bu işlem birkaç dakika sürebilir)" -ForegroundColor Green
-Compress-Archive -Path "$PLUGIN_DIR\*" -DestinationPath $ZIP_FILE -Force
+$ZIP_BASE = "$BUILD_DIR\virel-easyocr-plugin"
+& "$PSScriptRoot\..\.venv\Scripts\python.exe" -c "import shutil; shutil.make_archive(r'$ZIP_BASE', 'zip', r'$PLUGIN_DIR')"
 
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host "TAMAMLANDI! Plugin dosyası şu adreste hazır:" -ForegroundColor Green

@@ -212,13 +212,12 @@ class EasyOCRManager:
 
     def _verify_plugin(self) -> None:
         self._set_stage("verifying", 95, "Eklenti doğrulanıyor...")
-        # Ileride gercek worker.exe adini buraya girecegiz
-        worker_exe = self.plugin_dir / "easyocr-worker.exe"
+        worker_exe = self.plugin_dir / "easyocr-worker.py"
         if not worker_exe.exists():
-            raise RuntimeError("easyocr-worker.exe bulunamadi!")
+            raise RuntimeError("easyocr-worker.py bulunamadi!")
 
     def _is_ready(self) -> bool:
-        return (self.plugin_dir / "easyocr-worker.exe").exists()
+        return (self.plugin_dir / "easyocr-worker.py").exists()
 
     def _reset_idle_state(self) -> None:
         ready = self._is_ready()
