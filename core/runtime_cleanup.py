@@ -42,13 +42,14 @@ def cleanup_startup_artifacts() -> None:
     # Ağ portunu (5678) işgal eden zombi süreçleri temizle
     try:
         import subprocess
-        output = subprocess.check_output("netstat -ano | findstr :5678", shell=True, text=True)
+        cflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        output = subprocess.check_output("netstat -ano | findstr :5678", shell=True, text=True, creationflags=cflags)
         for line in output.splitlines():
             if "LISTENING" in line:
                 parts = line.strip().split()
                 if len(parts) >= 5:
                     pid = parts[-1]
-                    subprocess.run(f"taskkill /PID {pid} /F", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    subprocess.run(f"taskkill /PID {pid} /F", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=cflags)
                     log_event(PREFIX_SYS, "012", f"[Ağ Temizliği] -> ZOMBİ İŞLEM (ZOMBIE) TEMİZLENDİ | Port: 5678 | PID: {pid}")
     except Exception:
         pass

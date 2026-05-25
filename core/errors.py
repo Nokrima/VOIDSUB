@@ -183,9 +183,10 @@ def _get_hardware_snapshot() -> str:
         
     try:
         import subprocess
+        cflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
         result = subprocess.run(
             ["nvidia-smi", "--query-gpu=utilization.gpu,memory.used", "--format=csv,noheader,nounits"],
-            capture_output=True, text=True, timeout=1.0, check=False
+            capture_output=True, text=True, timeout=1.0, check=False, creationflags=cflags
         )
         if result.returncode == 0:
             lines = result.stdout.strip().split('\n')

@@ -118,8 +118,9 @@ class HardwareDetector:
 
     def _repair_easyocr(self) -> dict:
         try:
+            cflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
             command = [sys.executable, "-m", "pip", "install", "easyocr"]
-            result = subprocess.run(command, capture_output=True, text=True, timeout=900, check=False)
+            result = subprocess.run(command, capture_output=True, text=True, timeout=900, check=False, creationflags=cflags)
             if result.returncode == 0 and find_spec("easyocr") is not None:
                 return {
                     "engine": "easy",
@@ -163,11 +164,13 @@ class HardwareDetector:
     def _scan_gpu(self) -> dict:
         gpu_info = {"available": False, "name": "Bulunamadi veya Desteklenmiyor", "vram_mb": 0}
         try:
+            cflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
             result = subprocess.run(
                 ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"],
                 capture_output=True,
                 text=True,
                 check=True,
+                creationflags=cflags,
             )
             raw_line = result.stdout.strip().split("\n")[0]
             parts = [part.strip() for part in raw_line.split(",", 1)]

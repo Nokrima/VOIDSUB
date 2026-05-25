@@ -211,9 +211,13 @@ class AutoUpdater:
                 with open(bat_path, "w") as bat_file:
                     bat_file.write(f"""@echo off
 echo Guncelleme uygulaniyor, lutfen bekleyin...
-timeout /t 3 /nobreak > NUL
+timeout /t 1 /nobreak > NUL
+taskkill /F /IM virel.exe /T > NUL 2>&1
+taskkill /F /IM virel-core.exe /T > NUL 2>&1
+timeout /t 2 /nobreak > NUL
 start /wait "" "{installer_path}" /S
 echo Guncelleme tamamlandi. Uygulama yeniden baslatiliyor...
+del /F /Q "{installer_path}" > NUL 2>&1
 timeout /t 1 /nobreak > NUL
 start "" "%LOCALAPPDATA%\\Virel V2\\virel.exe"
 del "%~f0"

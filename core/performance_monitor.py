@@ -102,12 +102,14 @@ class PerformanceMonitor:
 
     def _detect_nvidia_smi(self) -> bool:
         try:
+            cflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
             result = subprocess.run(
                 ["nvidia-smi", "--query-gpu=utilization.gpu,memory.used", "--format=csv,noheader,nounits"],
                 capture_output=True,
                 text=True,
                 timeout=1.2,
                 check=False,
+                creationflags=cflags,
             )
             return result.returncode == 0
         except Exception as exc:
@@ -122,12 +124,14 @@ class PerformanceMonitor:
             return dict(self._last_gpu_stats)
         self._last_gpu_sample_at = now
         try:
+            cflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
             result = subprocess.run(
                 ["nvidia-smi", "--query-gpu=utilization.gpu,memory.used", "--format=csv,noheader,nounits"],
                 capture_output=True,
                 text=True,
                 timeout=1.2,
                 check=False,
+                creationflags=cflags,
             )
             if result.returncode != 0:
                 return dict(self._last_gpu_stats)

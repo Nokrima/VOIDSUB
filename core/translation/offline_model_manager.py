@@ -519,7 +519,8 @@ class OfflineModelManager:
         log_stdout: bool = False,
     ) -> None:
         base_bytes = self._measure_path(watch_path) if watch_path is not None else 0
-        self.active_proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
+        cflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        self.active_proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", creationflags=cflags)
         stdout_chunks: list[str] = []
         stderr_chunks: list[str] = []
         while self.active_proc.poll() is None:

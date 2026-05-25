@@ -9,6 +9,11 @@ import os
 import sys
 from pathlib import Path
 
+if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+    qt_plugin_path = os.path.join(sys._MEIPASS, 'PySide6', 'plugins')
+    os.environ['QT_PLUGIN_PATH'] = qt_plugin_path
+    os.environ['QT_QPA_PLATFORM_PLUGIN_PATH'] = os.path.join(qt_plugin_path, 'platforms')
+
 
 def ensure_project_venv() -> None:
     project_root = Path(__file__).resolve().parent

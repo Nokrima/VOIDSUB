@@ -741,12 +741,13 @@ class BridgeServer:
                         if self.native_overlay is not None and hasattr(self.native_overlay, "clear"):
                             self.native_overlay.clear()
 
-                    elif event in ("shutdown", "shutdown_core"):
+                    elif event == "shutdown":
                         log_event(PREFIX_SYS, "099", "Arayuzden guvenli kapanis (graceful shutdown) sinyali alindi.")
                         if self.worker is not None and hasattr(self.worker, "shutdown"):
                             self.worker.shutdown()
                         # Exit the event loop gracefully
-                        asyncio.get_running_loop().stop()
+                        if self.shutdown_event is not None:
+                            self.shutdown_event.set()
                         
                     elif event == "get_settings":
                         self._emit_app_settings()
