@@ -1,10 +1,10 @@
-"""
-Windows OCR motoru.
-"""
-from __future__ import annotations
-
 import asyncio
+import json
+import multiprocessing as mp
+import queue
 import re
+import subprocess
+import sys
 import threading
 import time
 import unicodedata
@@ -17,16 +17,109 @@ from core.errors import PREFIX_OCR, get_logger
 from core.ocr.base import OCREngine
 
 
+def _get_winrt_languages() -> list[str]:
+    code = """
+import json, sys
+try:
+    from winrt.windows.media.ocr import OcrEngine
+    langs = [lang.language_tag for lang in OcrEngine.available_recognizer_languages]
+    print(json.dumps(langs))
+except Exception:
+    print("[]")
+"""
+    try:
+        cflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        res = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+            timeout=5.0,
+            creationflags=cflags,
+        )
+        if res.returncode == 0:
+            return json.loads(res.stdout.strip())
+    except Exception:
+        pass
+    return []
+
+
+def _winocr_worker(
+    task_queue: mp.Queue,
+    result_queue: mp.Queue,
+    error_queue: mp.Queue,
+    ready_event: Any,
+    language_tag: str,
+) -> None:
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        from winrt.windows.globalization import Language
+        import winrt.windows.foundation  # noqa: F401
+        import winrt.windows.foundation.collections  # noqa: F401
+        import winrt.windows.storage.streams  # noqa: F401
+        from winrt.windows.media.ocr import OcrEngine
+
+        engine = OcrEngine.try_create_from_language(Language(language_tag))
+        if not engine:
+            error_queue.put(f"[{PREFIX_OCR}-001] Windows OCR dil paketi eksik: {language_tag}")
+            ready_event.set()
+            return
+
+        ready_event.set()
+
+        async def process_tasks():
+            from winrt.windows.graphics.imaging import BitmapPixelFormat, SoftwareBitmap
+
+            while True:
+                task = await asyncio.to_thread(task_queue.get)
+                if task is None:
+                    break
+
+                try:
+                    image = task
+                    bgra_image = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA)
+                    height, width = bgra_image.shape[:2]
+
+                    bitmap = SoftwareBitmap(BitmapPixelFormat.BGRA8, width, height)
+                    bitmap.copy_from_buffer(bgra_image.tobytes())  # type: ignore[arg-type]
+
+                    result = await engine.recognize_async(bitmap)  # type: ignore[union-attr]
+
+                    lines = []
+                    if result and result.lines:
+                        for line in result.lines:
+                            lines.append(str(line.text))
+                    result_queue.put({"success": True, "lines": lines})
+                except Exception as e:
+                    result_queue.put({"success": False, "error": str(e)})
+
+        loop.run_until_complete(process_tasks())
+    except ImportError:
+        error_queue.put(f"[{PREFIX_OCR}-002] WinRT (Windows API) paketi bulunamadi.")
+        ready_event.set()
+    except Exception as exc:
+        error_queue.put(f"[{PREFIX_OCR}-046] Windows OCR worker failed: {type(exc).__name__}: {exc}")
+        ready_event.set()
+    finally:
+        pending = asyncio.all_tasks(loop)
+        for task in pending:
+            task.cancel()
+        if pending:
+            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+        loop.close()
+
+
 class WindowsOCREngine(OCREngine):
     def __init__(self):
         super().__init__()
         self.logger = get_logger()
-        self.engine: Any = None
         self.source_language = "auto"
         self.language_tag = "en-US"
-        self.loop: asyncio.AbstractEventLoop | None = None
-        self.thread: threading.Thread | None = None
-        self.ready_event = threading.Event()
+        self.process: mp.Process | None = None
+        self.task_queue: mp.Queue | None = None
+        self.result_queue: mp.Queue | None = None
+        self.error_queue: mp.Queue | None = None
+        self.ready_event: Any = None
         self.read_lock = threading.Lock()
         self.start_error: str | None = None
         self.last_error_message = ""
@@ -37,103 +130,85 @@ class WindowsOCREngine(OCREngine):
         return "Windows OCR"
 
     def start(self) -> bool:
-        if self.thread and self.thread.is_alive() and self.loop and self.engine is not None:
+        if self.process and self.process.is_alive():
             self._is_ready = True
             return True
 
         self.logger.info(
             f"[{PREFIX_OCR}-043] Windows OCR start requested: source_language={self.source_language}, language_tag={self.language_tag}"
         )
-        self.ready_event.clear()
         self.start_error = None
-        self.thread = threading.Thread(target=self._worker_main, name="winocr-loop", daemon=True)
-        self.thread.start()
-        self.ready_event.wait(timeout=3.0)
+        self.task_queue = mp.Queue()
+        self.result_queue = mp.Queue()
+        self.error_queue = mp.Queue()
+        self.ready_event = mp.Event()
 
-        if self.engine is None:
-            if self.start_error:
-                self.logger.error(self.start_error)
-            else:
-                self.logger.error(f"[{PREFIX_OCR}-043] Windows OCR start failed: engine=None, start_error=None")
+        self.process = mp.Process(
+            target=_winocr_worker,
+            args=(self.task_queue, self.result_queue, self.error_queue, self.ready_event, self.language_tag),
+            name="winocr-worker",
+            daemon=True,
+        )
+        self.process.start()
+        self.ready_event.wait(timeout=5.0)
+
+        if not self.error_queue.empty():
+            self.start_error = self.error_queue.get()
+            self.logger.error(self.start_error)
+            self.stop()
+            return False
+
+        if not self.process.is_alive():
+            self.logger.error(f"[{PREFIX_OCR}-043] Windows OCR start failed: worker process died silently")
+            self.stop()
             return False
 
         self._is_ready = True
         self.logger.info(f"[{PREFIX_OCR}-044] Windows OCR ready: language_tag={self.language_tag}")
         return True
 
-    def _worker_main(self) -> None:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        self.loop = loop
-        language_tag = self.language_tag
-        try:
-            from winrt.windows.globalization import Language
-            import winrt.windows.foundation  # noqa: F401
-            import winrt.windows.foundation.collections  # noqa: F401
-            import winrt.windows.storage.streams  # noqa: F401
-            from winrt.windows.media.ocr import OcrEngine
-
-            available = [lang.language_tag for lang in OcrEngine.available_recognizer_languages]
-            self.logger.info(
-                f"[{PREFIX_OCR}-045] Windows OCR language probe: requested={language_tag}, available={available}"
-            )
-            self.engine = OcrEngine.try_create_from_language(Language(language_tag))
-            if not self.engine:
-                self.start_error = f"[{PREFIX_OCR}-001] Windows OCR dil paketi eksik: {language_tag}"
-                return
-            self.ready_event.set()
-            loop.run_forever()
-        except ImportError:
-            self.start_error = f"[{PREFIX_OCR}-002] WinRT (Windows API) paketi bulunamadi."
-        except Exception as exc:
-            self.start_error = f"[{PREFIX_OCR}-046] Windows OCR worker failed: {type(exc).__name__}: {exc}"
-        finally:
-            self.ready_event.set()
-            pending = asyncio.all_tasks(loop)
-            for task in pending:
-                task.cancel()
-            if pending:
-                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-            loop.close()
-
     def read(self, image: np.ndarray) -> list[tuple]:
-        if not self._is_ready or self.engine is None or self.loop is None:
+        if not self._is_ready or self.process is None or self.task_queue is None or self.result_queue is None:
             return []
 
         if not self.read_lock.acquire(timeout=2.6):
             return []
         try:
-            future = asyncio.run_coroutine_threadsafe(self._async_read(image.copy()), self.loop)
-            return future.result(timeout=2.5)
+            while not self.result_queue.empty():
+                self.result_queue.get_nowait()
+
+            self.task_queue.put(image.copy())
+
+            result = self.result_queue.get(timeout=2.5)
+            if not result.get("success"):
+                message = result.get("error")
+                now = time.monotonic()
+                if message != self.last_error_message or now - self.last_error_time >= 2.0:
+                    self.logger.error(f"[{PREFIX_OCR}-003] Okuma sırasında hata: {message}")
+                    self.last_error_message = message
+                    self.last_error_time = now
+                return []
+
+            raw_lines = result.get("lines", [])
+            lines: list[tuple] = []
+            for text in raw_lines:
+                normalized = self._normalize_line(text)
+                if normalized:
+                    lines.append((None, normalized, 100))
+            return self._filter_lines(lines)
+
+        except queue.Empty:
+            return []
         except Exception as exc:
             message = str(exc)
             now = time.monotonic()
             if message != self.last_error_message or now - self.last_error_time >= 2.0:
-                self.logger.error(f"[{PREFIX_OCR}-003] Okuma sırasında hata: {message}")
+                self.logger.error(f"[{PREFIX_OCR}-003] Okuma sırasında IPC hatası: {message}")
                 self.last_error_message = message
                 self.last_error_time = now
             return []
         finally:
             self.read_lock.release()
-
-    async def _async_read(self, image: np.ndarray) -> list[tuple]:
-        from winrt.windows.graphics.imaging import BitmapPixelFormat, SoftwareBitmap
-
-        bgra_image = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA)
-        height, width = bgra_image.shape[:2]
-
-        bitmap = SoftwareBitmap(BitmapPixelFormat.BGRA8, width, height)
-        bitmap.copy_from_buffer(bgra_image.tobytes())  # type: ignore[arg-type]
-
-        result = await self.engine.recognize_async(bitmap)  # type: ignore[union-attr]
-
-        lines: list[tuple] = []
-        if result and result.lines:
-            for line in result.lines:
-                normalized = self._normalize_line(str(line.text))
-                if normalized:
-                    lines.append((None, normalized, 100))
-        return self._filter_lines(lines)
 
     def _normalize_line(self, text: str) -> str:
         cleaned = unicodedata.normalize("NFKC", text).strip()
@@ -178,59 +253,60 @@ class WindowsOCREngine(OCREngine):
         return kanji == 0 and punctuation == 0 and total <= 14 and kana_ratio >= 0.85
 
     def stop(self) -> None:
-        if self.loop and self.loop.is_running():
-            self.loop.call_soon_threadsafe(self.loop.stop)
-        if self.thread and self.thread.is_alive():
-            self.thread.join(timeout=1.0)
-        self.thread = None
-        self.loop = None
+        if self.task_queue is not None:
+            try:
+                self.task_queue.put(None)
+            except Exception:
+                pass
+        if self.process and self.process.is_alive():
+            self.process.join(timeout=1.0)
+            if self.process.is_alive():
+                self.process.terminate()
+        self.process = None
+        self.task_queue = None
+        self.result_queue = None
+        self.error_queue = None
         self.engine = None
         self._is_ready = False
 
     def _find_best_language(self, requested: str) -> str:
-        try:
-            from winrt.windows.media.ocr import OcrEngine
-            available = [lang.language_tag for lang in OcrEngine.available_recognizer_languages]
-            if not available:
-                return "en-US"
-            
-            available_lower = [t.lower() for t in available]
-            
-            if requested == "en":
-                for idx, t in enumerate(available_lower):
-                    if t.startswith("en"):
-                        return available[idx]
-            if requested == "ru":
-                for idx, t in enumerate(available_lower):
-                    if t.startswith("ru"):
-                        return available[idx]
-                        
-            # Auto fallback priority: English -> Russian -> Japanese -> System Default
+        available = _get_winrt_languages()
+        if not available:
+            return "en-US"
+
+        available_lower = [t.lower() for t in available]
+
+        if requested == "en":
             for idx, t in enumerate(available_lower):
                 if t.startswith("en"):
                     return available[idx]
+        if requested == "ru":
             for idx, t in enumerate(available_lower):
                 if t.startswith("ru"):
                     return available[idx]
-            for idx, t in enumerate(available_lower):
-                if t.startswith("ja"):
-                    return available[idx]
-            
-            return available[0] # WHATEVER is available
-        except Exception:
-            return "en-US"
+
+        for idx, t in enumerate(available_lower):
+            if t.startswith("en"):
+                return available[idx]
+        for idx, t in enumerate(available_lower):
+            if t.startswith("ru"):
+                return available[idx]
+        for idx, t in enumerate(available_lower):
+            if t.startswith("ja"):
+                return available[idx]
+
+        return available[0]
 
     def configure_source_language(self, source_language: str) -> None:
         next_tag = self._find_best_language(source_language)
         if source_language == self.source_language and next_tag == self.language_tag:
             return
-        
+
         self.source_language = source_language
         self.language_tag = next_tag
-        if self.thread and self.thread.is_alive():
+        if self.process and self.process.is_alive():
             self.stop()
         else:
-            self.engine = None
             self._is_ready = False
 
     def system_check(self) -> dict:
@@ -243,23 +319,41 @@ class WindowsOCREngine(OCREngine):
             "gpu_ok": True,
             "ram_ok": True,
         }
+        
+        available = _get_winrt_languages()
+        if not available:
+            status["available"] = False
+            status["reason"] = "Sistemde hiçbir Windows OCR dil paketi kurulu değil!"
+            return status
+
+        check_tag = self.language_tag if self.language_tag else available[0]
+        
+        code = f"""
+import sys
+try:
+    from winrt.windows.globalization import Language
+    from winrt.windows.media.ocr import OcrEngine
+    engine = OcrEngine.try_create_from_language(Language("{check_tag}"))
+    sys.exit(0 if engine is not None else 1)
+except Exception:
+    sys.exit(2)
+"""
         try:
-            from winrt.windows.globalization import Language
-            import winrt.windows.foundation  # noqa: F401
-            import winrt.windows.foundation.collections  # noqa: F401
-            import winrt.windows.storage.streams  # noqa: F401
-            from winrt.windows.media.ocr import OcrEngine
-
-            available = [lang.language_tag for lang in OcrEngine.available_recognizer_languages]
-            if not available:
-                status["available"] = False
-                status["reason"] = "Sistemde hiçbir Windows OCR dil paketi kurulu değil!"
-                return status
-
-            check_tag = self.language_tag if self.language_tag else available[0]
-            status["available"] = OcrEngine.try_create_from_language(Language(check_tag)) is not None
-            if not status["available"]:
+            cflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+            res = subprocess.run(
+                [sys.executable, "-c", code],
+                capture_output=True,
+                timeout=5.0,
+                creationflags=cflags,
+            )
+            if res.returncode == 0:
+                status["available"] = True
+            elif res.returncode == 1:
                 status["reason"] = f"Windows OCR paketi başlatılamadı: {check_tag}"
-        except ImportError:
-            status["reason"] = "Windows API (WinRT) eksik veya uyumsuz."
+            else:
+                status["reason"] = "Windows API (WinRT) eksik veya uyumsuz."
+        except Exception as e:
+            status["reason"] = f"Kontrol sırasında IPC hatası: {e}"
+
         return status
+

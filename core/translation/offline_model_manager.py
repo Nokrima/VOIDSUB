@@ -108,6 +108,7 @@ class OfflineModelManager:
         self.bytes_label = ""
         self.active_proc: subprocess.Popen | None = None
         self._cancel = threading.Event()
+        self._pause = threading.Event()
         self._thread: threading.Thread | None = None
         self._install_started_at = 0.0
 
@@ -137,7 +138,7 @@ class OfflineModelManager:
             "model_dir": str(self.model_dir),
             "state": "ready" if ready and not busy else self.state,
             "percent": 100 if ready and not busy else self.percent,
-            "detail": "Model hazir." if ready and not busy else self.detail,
+            "detail": "Model hazır." if ready and not busy else self.detail,
             "bytes_label": self.bytes_label,
         }
 
@@ -188,9 +189,9 @@ class OfflineModelManager:
     def recover(self) -> None:
         self.models_dir.mkdir(parents=True, exist_ok=True)
         self._delete_legacy_artifacts()
-        if self.tmp_dir.exists():
-            shutil.rmtree(self.tmp_dir, ignore_errors=True)
-            log_event(PREFIX_TRL, "060", f"[Sistem Temizliği] -> TEMİZLENDİ | Yarım kalan geçici klasör: {self.tmp_dir}", level="warning")
+        # if self.tmp_dir.exists():
+        #     shutil.rmtree(self.tmp_dir, ignore_errors=True)
+        #     log_event(PREFIX_TRL, "060", f"[Sistem Temizliği] -> TEMİZLENDİ | Yarım kalan geçici klasör: {self.tmp_dir}", level="warning")
         if self.model_dir.exists() and not self._is_ready():
             shutil.rmtree(self.model_dir, ignore_errors=True)
             log_event(PREFIX_TRL, "061", f"[Sistem Temizliği] -> TEMİZLENDİ | Eksik runtime klasörü: {self.model_dir}", level="warning")
@@ -209,6 +210,7 @@ class OfflineModelManager:
             self._send_status()
             return
         self._cancel.clear()
+        self._pause.clear()
         self._thread = threading.Thread(target=self._install_worker, name=f"offline-model-install-{self.model_key}", daemon=True)
         self._thread.start()
 
@@ -224,15 +226,26 @@ class OfflineModelManager:
         self._send("offline_model_cancelled", {"message": f"{self.spec['label']} kurulumu iptal edildi.", "model": self.model_key})
         self._send_status()
 
+    def pause(self) -> None:
+        self._pause.set()
+        if self.active_proc and self.active_proc.poll() is None:
+            self.active_proc.terminate()
+        self.state = "paused"
+        self.detail = "İndirme duraklatıldı."
+        log_event(PREFIX_TRL, "056", f"[Model Kurulumu] -> DURAKLATILDI | Model: {self.model_key}", level="info")
+        self._send("offline_model_paused", {"message": f"{self.spec['label']} kurulumu duraklatıldı.", "model": self.model_key})
+        self._send_status()
+
     def remove(self) -> None:
         started_at = time.monotonic()
         log_event(PREFIX_TRL, "054", f"[Model Kaldırma] -> BAŞLADI | Model: {self.model_key} | Klasör: {self.model_dir}")
         self._cancel.set()
+        self._pause.clear()
         if self.active_proc and self.active_proc.poll() is None:
             self.active_proc.terminate()
         self.state = "remove"
         self.percent = 0
-        self.detail = "Model kaldiriliyor."
+        self.detail = "Model kaldırılıyor."
         self.bytes_label = ""
         self._send_progress()
         self._delete_legacy_artifacts()
@@ -279,13 +292,18 @@ class OfflineModelManager:
             self._delete_path(self.tmp_dir)
             self.state = "ready"
             self.percent = 100
-            self.detail = "Model hazir."
+            self.detail = "Model hazır."
             self.bytes_label = ""
             elapsed_ms = int((time.monotonic() - self._install_started_at) * 1000)
             log_event(PREFIX_TRL, "059", f"[Model Kurulumu] -> TAMAMLANDI | Model: {self.model_key} | Süre(ms): {elapsed_ms}")
             self._send_status()
             self._send("offline_model_complete", {"percent": 100, "model": self.model_key, "elapsed_ms": elapsed_ms})
         except RuntimeError as exc:
+            if str(exc) == "paused" or self._pause.is_set():
+                self.state = "paused"
+                self.detail = "İndirme duraklatıldı."
+                self._send_status()
+                return
             if str(exc) == "cancelled" or self._cancel.is_set():
                 self._delete_path(self.tmp_dir)
                 self._reset_idle_state()
@@ -303,9 +321,9 @@ class OfflineModelManager:
         torch_ready = importlib.util.find_spec("torch") is not None and self._torch_version_ready()
         log_event(PREFIX_TRL, "043", f"[Paket Yöneticisi] -> KONTROL EDİLDİ | Model: {self.model_key} | Eksik: {missing} | Torch: {torch_ready}")
         if missing:
-            self._install_package_args([*missing], "Temel Python paketleri kurulamadi")
+            self._install_package_args([*missing], "Temel Python paketleri kurulamadı")
         if not torch_ready:
-            self._install_package_args(["torch>=2.6"], "PyTorch kurulumu/guncellemesi tamamlanamadi")
+            self._install_package_args(["torch>=2.6"], "PyTorch kurulumu/güncellemesi tamamlanamadı")
 
     def _install_package_args(self, packages: list[str], failure_message: str) -> None:
         log_event(PREFIX_TRL, "044", f"[Paket Yöneticisi] -> KURULUM BAŞLADI | Paketler: {packages}")
@@ -314,10 +332,10 @@ class OfflineModelManager:
         log_event(PREFIX_TRL, "045", f"[Paket Yöneticisi] -> KURULUM TAMAMLANDI | Paketler: {packages}")
 
     def _prepare_workspace(self) -> None:
-        self._delete_path(self.tmp_dir)
+        # self._delete_path(self.tmp_dir)
         self._delete_path(self.model_dir)
         self.tmp_dir.mkdir(parents=True, exist_ok=True)
-        self._set_stage("planning", 8, "Dosya plani hazirlaniyor")
+        self._set_stage("planning", 8, "Dosya planı hazırlanıyor")
         log_event(PREFIX_TRL, "046", f"[Çalışma Alanı] -> HAZIRLANDI | Geçici Klasör: {self.tmp_dir}")
 
     def _build_download_plan(self) -> list[dict]:
@@ -377,7 +395,7 @@ class OfflineModelManager:
         watch_path = self.tmp_dir / ".cache" / "huggingface" / "download"
         while True:
             try:
-                self._run_process(command, f"Model dosyasi indirilemedi: {filename}", watch_path=watch_path, total_bytes=total_bytes)
+                self._run_process(command, f"Model dosyası indirilemedi: {filename}", watch_path=watch_path, total_bytes=total_bytes)
                 return
             except RuntimeError:
                 if self._cancel.is_set():
@@ -385,7 +403,7 @@ class OfflineModelManager:
                 if self._internet_available():
                     raise
                 log_event(PREFIX_TRL, "051", f"[Ağ Bağlantısı] -> BEKLENİYOR | İnternet koptu, yeniden deneniyor...", level="warning")
-                self.detail = f"Baglanti bekleniyor: {filename}"
+                self.detail = f"Bağlantı bekleniyor: {filename}"
                 self.bytes_label = ""
                 self._send_progress()
                 self._wait_for_internet()
@@ -397,7 +415,7 @@ class OfflineModelManager:
         log_event(PREFIX_TRL, "052", f"[Model İndirme] -> DOĞRULANDI | Toplam Dosya: {len(files)}")
 
     def _convert_model(self) -> None:
-        self._set_stage("converting", 68, "CTranslate2 donusumu")
+        self._set_stage("converting", 68, "CTranslate2 dönüşümü")
         copy_files = [name for name in self.spec["tokenizer_files"] if (self.tmp_dir / name).exists()]
         command = [
             str(self._converter_path()),
@@ -415,7 +433,7 @@ class OfflineModelManager:
         log_event(PREFIX_TRL, "053", f"[Model Dönüşümü] -> BAŞLADI | Model: {self.model_key} | Komut: {' '.join(command)}")
         started_at = time.monotonic()
         try:
-            self._run_process(command, "Model donusumu tamamlanamadi", log_stdout=True)
+            self._run_process(command, "Model dönüşümü tamamlanamadı", log_stdout=True)
         except Exception as exc:
             self._log_dir_snapshot(self.tmp_dir, "convert_failure_tmp")
             self._log_dir_snapshot(self.model_dir, "convert_failure_model")
@@ -434,7 +452,7 @@ class OfflineModelManager:
                 log_event(PREFIX_TRL, "062", f"[Model Dönüşümü] -> KOPYALANDI | Dosya: {name}")
 
     def _verify_model(self) -> None:
-        self._set_stage("verifying", 92, "Runtime dogrulamasi")
+        self._set_stage("verifying", 92, "Runtime doğrulaması")
         missing = [name for name in tuple(self.spec["ready_files"]) if not (self.model_dir / name).exists()]
         if missing:
             raise RuntimeError(f"Eksik runtime dosyalari: {', '.join(missing)}")
@@ -538,6 +556,14 @@ class OfflineModelManager:
                     stderr_chunks.append(stderr.strip())
                 log_event(PREFIX_TRL, "072", f"[Sistem Süreci] -> DURDURULDU (İPTAL) | Komut: {' '.join(command)}", level="warning")
                 raise RuntimeError("cancelled")
+            if self._pause.is_set():
+                self.active_proc.terminate()
+                try:
+                    self.active_proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    self.active_proc.kill()
+                    self.active_proc.wait(timeout=5)
+                raise RuntimeError("paused")
             if watch_path is not None and total_bytes > 0:
                 current_bytes = max(0, self._measure_path(watch_path) - base_bytes)
                 current_bytes = min(current_bytes, total_bytes)
@@ -599,12 +625,14 @@ class OfflineModelManager:
         ready = self._is_ready()
         self.state = "ready" if ready else "idle"
         self.percent = 100 if ready else 0
-        self.detail = "Model hazir." if ready else "Yerel model kurulumu bekleniyor."
+        self.detail = "Model hazır." if ready else "Yerel model kurulumu bekleniyor."
         self.bytes_label = ""
 
     def _raise_if_cancelled(self) -> None:
         if self._cancel.is_set():
             raise RuntimeError("cancelled")
+        if self._pause.is_set():
+            raise RuntimeError("paused")
 
     def _delete_legacy_artifacts(self) -> None:
         for folder_name in LEGACY_MODEL_FOLDERS:
@@ -669,7 +697,7 @@ class OfflineModelManager:
         self.bytes_label = ""
         self._log_dir_snapshot(self.tmp_dir, "failure_tmp")
         self._log_dir_snapshot(self.model_dir, "failure_model")
-        log_error(PREFIX_TRL, "069", f"[Model Kurulumu] -> KURULUM BAŞARISIZ | Model: {self.model_key} | Süre(ms): {elapsed_ms} | Hata: {message}", "Yerel model kurulumu tamamlanamadi.")
+        log_error(PREFIX_TRL, "069", f"[Model Kurulumu] -> KURULUM BAŞARISIZ | Model: {self.model_key} | Süre(ms): {elapsed_ms} | Hata: {message}", "Yerel model kurulumu tamamlanamadı.")
         self._send("offline_model_error", {"message": message, "model": self.model_key, "elapsed_ms": elapsed_ms})
         self._send_status()
 

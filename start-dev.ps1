@@ -73,6 +73,13 @@ try {
     # Çakışmaları önlemek için Rust hedef klasörünü geçici bir yere yönlendiriyoruz.
     $env:CARGO_TARGET_DIR = Join-Path $env:LOCALAPPDATA "Virel\cargo-target"
     
+    # Tauri dev modunda "externalBin" dosyalarini fiziksel olarak arar (kullanmasa bile).
+    # Hizli gelistirme icin saniyesinde bos/sahte exe uretip Tauri'yi kandiriyoruz.
+    $dummySidecar = Join-Path $repoRoot "ui-tauri\src-tauri\virel-core-x86_64-pc-windows-msvc.exe"
+    $dummyRedist = Join-Path $repoRoot "ui-tauri\src-tauri\bin\vc_redist.x64.exe"
+    if (-not (Test-Path $dummySidecar)) { New-Item -Path $dummySidecar -ItemType File -Force | Out-Null }
+    if (-not (Test-Path $dummyRedist)) { New-Item -Path $dummyRedist -ItemType File -Force | Out-Null }
+
     # Tauri uygulamasını çalıştır
     npm run tauri dev
 }

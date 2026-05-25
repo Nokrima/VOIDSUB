@@ -14,6 +14,9 @@ if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
     os.environ['QT_PLUGIN_PATH'] = qt_plugin_path
     os.environ['QT_QPA_PLATFORM_PLUGIN_PATH'] = os.path.join(qt_plugin_path, 'platforms')
 
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 
 def ensure_project_venv() -> None:
     project_root = Path(__file__).resolve().parent
@@ -96,6 +99,14 @@ async def main() -> None:
         log_error(PREFIX_SYS, "073", f"[Sistem Köprüsü] -> BAŞLATILAMADI | Hata: {type(exc).__name__}: {exc}", "Sunucu baslatilamadi.")
     finally:
         logger.info(f"[{PREFIX_SYS}-074] [Sistem Çekirdeği] -> KAPANIŞ İSTENDİ | Temizlik başlıyor...")
+        # Öksüz kalan tüm alt işlemleri (child processes) temizle (MEI klasör kilitlenmesini çözer)
+        import psutil
+        current_proc = psutil.Process()
+        for child in current_proc.children(recursive=True):
+            try:
+                child.kill()
+            except psutil.NoSuchProcess:
+                pass
         cleanup_runtime_artifacts()
 
 

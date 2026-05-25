@@ -35,6 +35,7 @@ interface OfflineStatusPayload {
   percent?: number;
   detail?: string;
   bytes_label?: string;
+  model_details?: Record<string, any>;
 }
 
 type OfflineModelAction = {
@@ -79,16 +80,49 @@ const normalizeOfflineStatus = (status: OfflineStatusPayload | null): OfflineSta
 };
 
 const buildOfflineActionMap = (status: OfflineStatusPayload | null): Record<string, OfflineModelAction> => {
-  if (!status?.busy || !status.active_model || !status.active_action) return {};
-  return {
-    [status.active_model]: {
+  if (!status) return {};
+  const map: Record<string, OfflineModelAction> = {};
+  
+  if (status.model_details) {
+    for (const [modelId, details] of Object.entries(status.model_details)) {
+      if (details.state === 'paused') {
+        map[modelId] = {
+          type: 'install',
+          progress: Math.max(0, Math.min(100, Number(details.percent ?? 0))),
+          detail: 'İndirme duraklatıldı.',
+          stage: 'paused',
+          bytes_label: details.bytes_label || '',
+        };
+      }
+    }
+  }
+
+  if (status.queued_models && status.queued_models.length > 0) {
+    status.queued_models.forEach(modelId => {
+      if (!map[modelId]) {
+        const details = status.model_details?.[modelId] || {};
+        map[modelId] = {
+          type: 'install',
+          progress: Math.max(0, Math.min(100, Number(details.percent ?? 0))),
+          detail: 'Sırada bekliyor...',
+          stage: 'queued',
+          bytes_label: details.bytes_label || '',
+        };
+      }
+    });
+  }
+
+  if (status.active_model && status.active_action) {
+    map[status.active_model] = {
       type: status.active_action,
       progress: Math.max(0, Math.min(100, Number(status.percent ?? 0))),
       detail: status.detail || (status.active_action === 'remove' ? 'Kaldırılıyor...' : 'Kurulum sürüyor...'),
       stage: status.state || (status.active_action === 'remove' ? 'remove' : 'downloading'),
       bytes_label: status.bytes_label || '',
-    },
-  };
+    };
+  }
+  
+  return map;
 };
 
 // --- Style Tokens ---
@@ -140,6 +174,8 @@ interface MotorDurumuProps {
   onEasyocrDownload: () => void;
   onEasyocrCancel: () => void;
   onEasyocrRemove: () => void;
+  onRefreshHardware?: () => void;
+  isScanning?: boolean;
   easyocrAction: OfflineModelAction | null;
   easyocrCompleted: boolean;
 }
@@ -274,7 +310,7 @@ const InfoButton = ({ enabled, onToggle }: { enabled: boolean; onToggle: () => v
   </button>
 );
 
-const MotorDurumu: React.FC<MotorDurumuProps> = ({ height = '100%', hardwareInfo, healthChecks, models, perfEstimate, onEngineSelect, selectedEngineId, isAvailable, offlineLangModels, offlineBusy, modelActions, completedModelId, onLangDownload, onLangCancelDownload, onLangRequestRemove, onEasyocrDownload, onEasyocrCancel, easyocrAction, easyocrCompleted }) => {
+const MotorDurumu: React.FC<MotorDurumuProps> = ({ height = '100%', hardwareInfo, healthChecks, models, perfEstimate, onEngineSelect, selectedEngineId, isAvailable, offlineLangModels, offlineBusy, modelActions, completedModelId, onLangDownload, onLangCancelDownload, onLangRequestRemove, onEasyocrDownload, onEasyocrCancel, onEasyocrRemove, onRefreshHardware, isScanning, easyocrAction, easyocrCompleted }) => {
   const currentEngineId = selectedEngineId;
   const currentChecks = healthChecks[currentEngineId] || [];
   const currentModels = models[currentEngineId] || [];
@@ -386,7 +422,7 @@ const MotorDurumu: React.FC<MotorDurumuProps> = ({ height = '100%', hardwareInfo
       <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 14, minHeight: 0, marginTop: -6 }}>
         
         {/* Left Column - Engine List */}
-        <div data-info-hotspot="true" onMouseEnter={() => focusInfo('engine_selection')} style={{ flex: 1, background: colors.bgGlass, border: colors.borderGlass, borderRadius: 20, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div data-info-hotspot="true" onMouseEnter={() => focusInfo('engine_selection')} style={{ flex: 1, background: colors.bgGlass, border: colors.borderGlass, borderRadius: 20, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8, opacity: isScanning ? 0.6 : 1, pointerEvents: isScanning ? 'none' : 'auto', transition: 'opacity 200ms ease' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 2 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 22 }}>
               <div style={TS.boxTitle}>MOTOR SEÇİMİ</div>
@@ -444,7 +480,7 @@ const MotorDurumu: React.FC<MotorDurumuProps> = ({ height = '100%', hardwareInfo
           
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', columnGap: 8, flex: 1, minHeight: 0 }}>
             {/* Panel A1: Sistem Sağlığı */}
-            <div style={{ width: '100%', minWidth: 0, background: colors.bgGlass, border: colors.borderGlass, borderRadius: 20, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ width: '100%', minWidth: 0, background: colors.bgGlass, border: colors.borderGlass, borderRadius: 20, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8, opacity: isScanning ? 0.6 : 1, transition: 'opacity 200ms ease' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 2 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 22 }}>
                   <div style={TS.boxTitle}>SİSTEM SAĞLIĞI</div>
@@ -470,7 +506,7 @@ const MotorDurumu: React.FC<MotorDurumuProps> = ({ height = '100%', hardwareInfo
             </div>
 
             {/* Panel A2: Motor Modelleri */}
-            <div className="engine-block" data-info-hotspot="true" onMouseEnter={() => focusInfo('engine_models')} style={{ width: '100%', minWidth: 0, background: colors.bgGlass, border: colors.borderGlass, borderRadius: 20, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="engine-block" data-info-hotspot="true" onMouseEnter={() => focusInfo('engine_models')} style={{ width: '100%', minWidth: 0, background: colors.bgGlass, border: colors.borderGlass, borderRadius: 20, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8, opacity: isScanning ? 0.6 : 1, pointerEvents: isScanning ? 'none' : 'auto', transition: 'opacity 200ms ease' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 2 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 22 }}>
                   <div style={TS.boxTitle}>MOTOR MODELLERİ</div>
@@ -493,8 +529,13 @@ const MotorDurumu: React.FC<MotorDurumuProps> = ({ height = '100%', hardwareInfo
                      isCompleted = easyocrCompleted;
                   }
 
+                  const hasActionButton = !!action || 
+                    (mdl.id === 'm1') || // m1 always has either download or remove
+                    (mdl.id === 'w1' && currentEngineId === 'winonly' && mdl.status === 'available') || 
+                    (mdl.id === 'w2' && currentEngineId === 'winonly');
+
                   return (
-                  <div key={mdl.id} className="item-feedback" data-info-hotspot="true" onMouseEnter={(e) => { e.stopPropagation(); focusInfo(mdl.id as EngineInfoKey); }} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: '6px 8px', margin: '0 -8px', borderRadius: 10, position: 'relative', overflow: 'hidden' }}>
+                  <div key={mdl.id} className={`item-feedback ${hasActionButton ? 'has-action' : ''}`} data-info-hotspot="true" onMouseEnter={(e) => { e.stopPropagation(); focusInfo(mdl.id as EngineInfoKey); }} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: '6px 8px', margin: '0 -8px', borderRadius: 10, position: 'relative', overflow: 'hidden' }}>
                     {action && (
                       <div style={{ position: 'absolute', inset: '0 auto 0 0', width: `${action.progress}%`, background: action.type === 'install' ? 'rgba(56, 189, 248, 0.12)' : 'rgba(239, 68, 68, 0.12)', transition: 'width 200ms ease', zIndex: 0, borderRight: `1px solid ${action.type === 'install' ? 'rgba(56, 189, 248, 0.4)' : 'rgba(239, 68, 68, 0.4)'}` }} />
                     )}
@@ -513,7 +554,7 @@ const MotorDurumu: React.FC<MotorDurumuProps> = ({ height = '100%', hardwareInfo
                           )}
                         </div>
                       </div>
-                      <div style={{ marginLeft: 'auto', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ marginLeft: 'auto', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, position: 'relative', minWidth: 28, minHeight: 28, justifyContent: 'center' }}>
                         {action ? (
                            <>
                              <span style={{ fontSize: 9, fontWeight: 700, color: action.type === 'install' ? colors.accent : colors.error }}>%{action.progress}</span>
@@ -523,13 +564,12 @@ const MotorDurumu: React.FC<MotorDurumuProps> = ({ height = '100%', hardwareInfo
                                </button>
                              )}
                            </>
-                        ) : mdl.status === 'active' ? (
-                          <span style={{ fontSize: 9, fontWeight: 700, color: colors.success }}>AKTİF</span>
-                        ) : mdl.status === 'installed' ? (
-                          <span style={{ fontSize: 9, fontWeight: 700, color: colors.muted }}>KURULU</span>
                         ) : (
                           <>
-                            {mdl.id === 'm1' && (
+                            {mdl.status === 'active' && <span className="model-state-text" style={{ position: 'absolute', right: 8, fontSize: 9, fontWeight: 700, color: colors.success }}>AKTİF</span>}
+                            {mdl.status === 'installed' && <span className="model-state-text" style={{ position: 'absolute', right: 8, fontSize: 9, fontWeight: 700, color: colors.muted }}>KURULU</span>}
+                            
+                            {mdl.id === 'm1' && mdl.status === 'available' && (
                               <button 
                                 className="model-action-icon action-download" 
                                 title="EasyOCR Eklentisini İndir" 
@@ -549,7 +589,16 @@ const MotorDurumu: React.FC<MotorDurumuProps> = ({ height = '100%', hardwareInfo
                                 <G p="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-3 3m0 0l-3-3m3 3V4" stroke="currentColor" />
                               </button>
                             )}
-                            {mdl.id === 'w1' && currentEngineId === 'winonly' && (
+                            {mdl.id === 'm1' && (mdl.status === 'installed' || mdl.status === 'active') && (
+                              <button 
+                                className="model-action-icon action-remove" 
+                                title="EasyOCR Eklentisini Kaldır"
+                                onClick={(e) => { e.stopPropagation(); onEasyocrRemove(); }}
+                              >
+                                <G p="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke="currentColor" />
+                              </button>
+                            )}
+                            {mdl.id === 'w1' && currentEngineId === 'winonly' && mdl.status === 'available' && (
                               <button 
                                 className="model-action-icon action-download" 
                                 title="Dil Paketini Kur (Ayarlar)" 
@@ -567,6 +616,33 @@ const MotorDurumu: React.FC<MotorDurumuProps> = ({ height = '100%', hardwareInfo
                                 onClick={(e) => { e.stopPropagation(); wsClient.send('repair_engine', { engine: 'winonly' }); }}
                               >
                                 <G p="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" stroke="currentColor" />
+                              </button>
+                            )}
+                            {mdl.id === 'w2' && currentEngineId === 'winonly' && (
+                              <button 
+                                className="model-action-icon action-download" 
+                                title="Dili Kurdum, Tekrar Dene" 
+                                data-info-hotspot="true"
+                                onMouseEnter={(e) => { 
+                                  e.stopPropagation(); 
+                                  focusInfo({
+                                    title: 'Motorları Yeniden Tara',
+                                    desc: 'Windows OCR paketini kurduktan sonra değişiklikleri algılar.',
+                                    detail1: 'Kurulumu tamamladıysanız bu tuş ile sistemi taratın.',
+                                    detail2: 'Uygulamayı yeniden başlatmanıza gerek kalmaz.',
+                                    detail3: 'Sorun çözüldüyse uyarılar kalkacaktır.'
+                                  }); 
+                                }}
+                                onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  if (onRefreshHardware) {
+                                    onRefreshHardware();
+                                  } else {
+                                    wsClient.send('get_hardware'); 
+                                  }
+                                }}
+                              >
+                                <G p="M23 4v6h-6 M1 20v-6h6 M3.51 9a9 9 0 0 1 14.85-3.36L23 10 M1 14l4.64 4.36A9 9 0 0 0 20.49 15" stroke="currentColor" />
                               </button>
                             )}
                           </>
@@ -647,11 +723,11 @@ const MotorDurumu: React.FC<MotorDurumuProps> = ({ height = '100%', hardwareInfo
                           {action && action.detail ? (
                             <>
                               <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.18)', flexShrink: 0 }}>·</span>
-                              <span style={{ fontSize: 9, fontWeight: 700, color: action.type === 'install' ? colors.warning : colors.error, flexShrink: 0, textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>
-                                {action.stage === 'packages' ? 'Paket' : action.stage === 'converting' ? 'Dönüştürme' : action.stage === 'verifying' ? 'Doğrulama' : action.stage === 'remove' ? 'Siliniyor' : 'İndir'}
+                              <span style={{ fontSize: 9, fontWeight: 700, color: action.type === 'install' ? (action.stage === 'paused' || action.stage === 'queued' ? colors.muted : colors.warning) : colors.error, flexShrink: 0, textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>
+                                {action.stage === 'packages' ? 'Paket' : action.stage === 'converting' ? 'Dönüştürme' : action.stage === 'verifying' ? 'Doğrulama' : action.stage === 'remove' ? 'Siliniyor' : action.stage === 'paused' ? 'Duraklatıldı' : action.stage === 'queued' ? 'Sırada' : 'İndir'}
                               </span>
                               <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.18)', flexShrink: 0 }}>›</span>
-                              <span style={{ fontSize: 10, color: 'rgba(191,215,242,0.72)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{action.detail}</span>
+                              <span style={{ fontSize: 10, color: action.stage === 'paused' || action.stage === 'queued' ? 'rgba(159,183,207,0.55)' : 'rgba(191,215,242,0.72)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{action.detail}</span>
                             </>
                           ) : (
                             <>
@@ -667,10 +743,16 @@ const MotorDurumu: React.FC<MotorDurumuProps> = ({ height = '100%', hardwareInfo
                         {action?.type === 'install' ? (
                           <>
                             {action.bytes_label && <span style={{ fontSize: 10, color: 'rgba(191,215,242,0.55)', whiteSpace: 'nowrap' as const }}>{action.bytes_label}</span>}
-                            <span style={{ fontSize: 10, fontWeight: 700, color: colors.warning }}>%{action.progress}</span>
-                            <button className="model-action-icon action-stop" title="İndirmeyi durdur" aria-label="İndirmeyi durdur" onClick={(e) => { e.stopPropagation(); onLangCancelDownload(lang.id); }}>
-                              <G p="M6 6h12v12H6z" stroke="currentColor" />
-                            </button>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: action.stage === 'paused' || action.stage === 'queued' ? colors.muted : colors.warning }}>%{action.progress}</span>
+                            {action.stage === 'paused' || action.stage === 'queued' ? (
+                              <button className="model-action-icon action-download" title="Öncelikli olarak indir" aria-label="Modeli indir" onClick={(e) => { e.stopPropagation(); onLangDownload(lang.id); }}>
+                                <G p="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-3 3m0 0l-3-3m3 3V4" stroke="currentColor" />
+                              </button>
+                            ) : (
+                              <button className="model-action-icon action-stop" title="İndirmeyi durdur" aria-label="İndirmeyi durdur" onClick={(e) => { e.stopPropagation(); onLangCancelDownload(lang.id); }}>
+                                <G p="M6 6h12v12H6z" stroke="currentColor" />
+                              </button>
+                            )}
                           </>
                         ) : action?.type === 'remove' ? (
                           <span className="model-state-icon model-state-removing" title="Kaldırılıyor"><G p="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke="currentColor" /></span>
@@ -681,7 +763,7 @@ const MotorDurumu: React.FC<MotorDurumuProps> = ({ height = '100%', hardwareInfo
                             </button>
                           </>
                         ) : (
-                          <button className="model-action-icon action-download" disabled={offlineBusy} title="Modeli indir" aria-label="Modeli indir" onClick={(e) => { e.stopPropagation(); onLangDownload(lang.id); }}>
+                          <button className="model-action-icon action-download" title={offlineBusy ? "Öncelikli olarak indir" : "Modeli indir"} aria-label="Modeli indir" onClick={(e) => { e.stopPropagation(); onLangDownload(lang.id); }}>
                             <G p="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-3 3m0 0l-3-3m3 3V4" stroke="currentColor" />
                           </button>
                         )}
@@ -744,6 +826,7 @@ export const EnginesPanel: React.FC = () => {
   
   // EasyOCR Plugin State
   const [easyocrAction, setEasyocrAction] = useState<OfflineModelAction | null>(null);
+  const [isHardwareScanning, setIsHardwareScanning] = useState(false);
   const [easyocrCompleted, setEasyocrCompleted] = useState(false);
 
 
@@ -762,7 +845,10 @@ export const EnginesPanel: React.FC = () => {
   useEffect(() => {
     if (isConnected && !lastHardware()) send('get_hardware');
     if (isConnected && !lastOfflineStatus()) send('get_offline_status');
-    const offHardware = onEvent('hardware_result', (data) => setHardware(data as HardwareResult));
+    const offHardware = onEvent('hardware_result', (data) => {
+      setHardware(data as HardwareResult);
+      setIsHardwareScanning(false);
+    });
     const offSettings = onEvent('app_settings_loaded', (data) => {
       const payload = data as AppSettingsPayload;
       if (payload.ocr_engine) setSelectedEngine(payload.ocr_engine);
@@ -1149,6 +1235,17 @@ export const EnginesPanel: React.FC = () => {
         .engine-card:active {
           transform: scale(0.97);
         }
+        .model-state-text {
+          transition: opacity 150ms ease, filter 150ms ease;
+          opacity: 1;
+        }
+        .item-feedback.has-action:hover .model-state-text,
+        .item-feedback.has-action:focus-within .model-state-text,
+        .engine-card:hover .model-state-text,
+        .engine-card:focus-within .model-state-text {
+          opacity: 0 !important;
+          pointer-events: none;
+        }
         .block-action-btn {
           transition: opacity 160ms ease, filter 160ms ease;
           opacity: 0.72;
@@ -1202,6 +1299,7 @@ export const EnginesPanel: React.FC = () => {
         perfEstimate={realPerfEstimate}
         selectedEngineId={selectedEngine}
         isAvailable={(id) => hardware?.available_engines.includes(id) ?? false}
+        isScanning={isHardwareScanning}
         onEngineSelect={(id) => { setSelectedEngine(id); send('change_engine', { engine: id }); send('get_hardware'); }}
         onLangDownload={handleLangDownload}
         onLangCancelDownload={handleLangCancelDownload}
@@ -1209,6 +1307,12 @@ export const EnginesPanel: React.FC = () => {
         onEasyocrDownload={handleEasyocrDownload}
         onEasyocrCancel={handleEasyocrCancel}
         onEasyocrRemove={handleEasyocrRemove}
+        onRefreshHardware={() => {
+          setIsHardwareScanning(true);
+          injectInfoLog('UI-015', 'Motorları yeniden tarama isteği gönderildi.');
+          notify('info', 'Donanım ve motorlar yeniden taranıyor...');
+          send('get_hardware');
+        }}
         easyocrAction={easyocrAction}
         easyocrCompleted={easyocrCompleted}
       />

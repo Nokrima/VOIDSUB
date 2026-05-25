@@ -93,7 +93,7 @@ class OfflineTranslationEngine(TranslationEngine):
         return self._managers[self._model_key]
 
     def set_model_key(self, model_key: str | None) -> None:
-        normalized = str(model_key or DEFAULT_MODEL_KEY).strip().lower()
+        normalized = (model_key or DEFAULT_MODEL_KEY).strip().lower()
         if normalized not in MODEL_SPECS:
             normalized = DEFAULT_MODEL_KEY
         if normalized == self._model_key:
@@ -121,7 +121,7 @@ class OfflineTranslationEngine(TranslationEngine):
         def _attempt() -> tuple[str, str]:
             self._load_runtime()
             if self._model_key == "opus_mt_en_tr":
-                if tgt != "tr" or str(src or "").strip().lower() not in {"en", "auto"}:
+                if tgt != "tr" or (src or "").strip().lower() not in {"en", "auto"}:
                     return text, "offline_unsupported"
                 return self._run_opus_model(clean_text), "offline"
             if tgt != "tr" or effective_src not in {"en", "ru"}:
@@ -159,16 +159,43 @@ class OfflineTranslationEngine(TranslationEngine):
             if self.bridge is not None:
                 self.bridge.send("offline_model_status", self.get_status())
             return
+            
         busy_model = self._busy_model_key()
-        if busy_model:
-            message = f"[Model İndirme] -> REDDEDİLDİ | Meşgul: {MODEL_SPECS[busy_model]['label']}"
-            self.logger.warning(f"[{PREFIX_TRL}-015] {message}")
-            if self.bridge is not None:
-                self.bridge.send("offline_model_error", {"message": message, "model": busy_model})
-            return
         install_order = sorted(requested, key=self._install_priority)
-        self._install_queue = install_order[1:]
-        self._active_install_model = install_order[0]
+        target_model = install_order[0]
+        
+        if busy_model:
+            if busy_model == target_model:
+                return
+            
+            busy_state = self._managers[busy_model].state
+            if busy_state in {"converting", "verifying", "remove"}:
+                message = f"[Model İndirme] -> REDDEDİLDİ | {MODEL_SPECS[busy_model]['label']} şu an kritik kurulum aşamasında."
+                self.logger.warning(f"[{PREFIX_TRL}-015] {message}")
+                if self.bridge is not None:
+                    self.bridge.send("offline_model_error", {"message": message, "model": busy_model})
+                return
+            else:
+                message = f"[Model İndirme] -> DURAKLATILDI | {MODEL_SPECS[busy_model]['label']} öncelikli işlem için duraklatıldı."
+                self.logger.info(f"[{PREFIX_TRL}-016] {message}")
+                self._managers[busy_model].pause()
+                
+                if busy_model not in self._install_queue:
+                    self._install_queue.insert(0, busy_model)
+                for key in install_order[1:]:
+                    if key not in self._install_queue and key != busy_model:
+                        self._install_queue.append(key)
+                
+                self._active_install_model = target_model
+                threading.Timer(1.0, self._managers[target_model].start, args=[self]).start()
+                return
+
+        # Kuyruğa yeni eklenenleri sıraya al
+        for key in install_order[1:]:
+            if key not in self._install_queue:
+                self._install_queue.append(key)
+                
+        self._active_install_model = target_model
         self._managers[self._active_install_model].start(self)
 
     def cancel_download(self) -> None:
@@ -209,7 +236,7 @@ class OfflineTranslationEngine(TranslationEngine):
         }
 
     def set_runtime_profile(self, performance_tier: str | None = None) -> None:
-        normalized = str(performance_tier or "standard").strip().lower()
+        normalized = (performance_tier or "standard").strip().lower()
         if normalized not in OFFLINE_RUNTIME_PROFILES:
             normalized = "standard"
         self._runtime_profile_name = normalized
@@ -244,11 +271,12 @@ class OfflineTranslationEngine(TranslationEngine):
     def unload_runtime(self, model_key: str | None = None) -> None:
         target_key = model_key or self._model_key
         with self._load_lock:
-            if self._translator_map.get(target_key) is not None:
+            translator = self._translator_map.get(target_key)
+            if translator is not None:
                 self.logger.info(f"[{PREFIX_TRL}-045] Offline translator bellekten temizleniyor: {target_key}")
-                if hasattr(self._translator_map[target_key], "unload_model"):
+                if hasattr(translator, "unload_model"):
                     try:
-                        self._translator_map[target_key].unload_model()
+                        translator.unload_model()  # type: ignore
                     except Exception:
                         pass
                 self._translator_map[target_key] = None
@@ -353,11 +381,11 @@ class OfflineTranslationEngine(TranslationEngine):
         if prefix_match:
             prefix = prefix_match.group(1).strip()
             text = prefix_match.group(2).strip()
-        source_ids = tokenizer.encode(text, add_special_tokens=True, truncation=True, max_length=self.MAX_INPUT_TOKENS)
-        batch = [tokenizer.convert_ids_to_tokens(source_ids)]
+        source_ids = tokenizer.encode(text, add_special_tokens=True, truncation=True, max_length=self.MAX_INPUT_TOKENS)  # type: ignore
+        batch = [tokenizer.convert_ids_to_tokens(source_ids)]  # type: ignore
         profile = self._runtime_profile
         try:
-            results = translator.translate_batch(
+            results = translator.translate_batch(  # type: ignore
                 batch,
                 beam_size=int(profile["beam_size"]),
                 repetition_penalty=float(profile["repetition_penalty"]),
@@ -376,7 +404,7 @@ class OfflineTranslationEngine(TranslationEngine):
                 self._runtime_advice_map[self._model_key] = {"device": "cpu", "compute_type": "int8", "inter_threads": 1, "intra_threads": 4, "reason": "oom fallback"}
                 self._load_runtime()
                 translator = self._translator_map[self._model_key]
-                results = translator.translate_batch(
+                results = translator.translate_batch(  # type: ignore
                     batch,
                     beam_size=int(profile["beam_size"]),
                     repetition_penalty=float(profile["repetition_penalty"]),
@@ -389,9 +417,9 @@ class OfflineTranslationEngine(TranslationEngine):
                 )
             else:
                 raise
-        target_tokens = results[0].hypotheses[0]
-        target_ids = tokenizer.convert_tokens_to_ids(target_tokens)
-        translated = tokenizer.decode(target_ids, skip_special_tokens=True).strip()
+        target_tokens = results[0].hypotheses[0]  # type: ignore
+        target_ids = tokenizer.convert_tokens_to_ids(target_tokens)  # type: ignore
+        translated = tokenizer.decode(target_ids, skip_special_tokens=True).strip()  # type: ignore
         return f"{prefix} {translated}".strip() if prefix else translated
 
     def _run_nllb_model(self, text: str, source_lang: str, target_lang: str) -> str:
@@ -404,12 +432,12 @@ class OfflineTranslationEngine(TranslationEngine):
         if prefix_match:
             prefix = prefix_match.group(1).strip()
             text = prefix_match.group(2).strip()
-        tokenizer.src_lang = LANGUAGE_CODES[source_lang]
-        source_ids = tokenizer.encode(text, add_special_tokens=True, truncation=True, max_length=self.MAX_INPUT_TOKENS)
-        batch = [tokenizer.convert_ids_to_tokens(source_ids)]
+        tokenizer.src_lang = LANGUAGE_CODES[source_lang]  # type: ignore
+        source_ids = tokenizer.encode(text, add_special_tokens=True, truncation=True, max_length=self.MAX_INPUT_TOKENS)  # type: ignore
+        batch = [tokenizer.convert_ids_to_tokens(source_ids)]  # type: ignore
         profile = self._runtime_profile
         try:
-            results = translator.translate_batch(
+            results = translator.translate_batch(  # type: ignore
                 batch,
                 target_prefix=[[LANGUAGE_CODES[target_lang]]],
                 beam_size=int(profile["beam_size"]),
@@ -429,7 +457,7 @@ class OfflineTranslationEngine(TranslationEngine):
                 self._runtime_advice_map[self._model_key] = {"device": "cpu", "compute_type": "int8", "inter_threads": 1, "intra_threads": 4, "reason": "oom fallback"}
                 self._load_runtime()
                 translator = self._translator_map[self._model_key]
-                results = translator.translate_batch(
+                results = translator.translate_batch(  # type: ignore
                     batch,
                     target_prefix=[[LANGUAGE_CODES[target_lang]]],
                     beam_size=int(profile["beam_size"]),
@@ -443,13 +471,13 @@ class OfflineTranslationEngine(TranslationEngine):
                 )
             else:
                 raise
-        target_tokens = results[0].hypotheses[0]
-        target_ids = tokenizer.convert_tokens_to_ids(target_tokens)
-        translated = tokenizer.decode(target_ids, skip_special_tokens=True).strip()
+        target_tokens = results[0].hypotheses[0]  # type: ignore
+        target_ids = tokenizer.convert_tokens_to_ids(target_tokens)  # type: ignore
+        translated = tokenizer.decode(target_ids, skip_special_tokens=True).strip()  # type: ignore
         return f"{prefix} {translated}".strip() if prefix else translated
 
     def _resolve_source_language(self, text: str, src: str) -> str:
-        normalized = str(src or "auto").strip().lower()
+        normalized = (src or "auto").strip().lower()
         if normalized == "ru":
             return "ru"
         if normalized == "en":
@@ -500,7 +528,7 @@ class OfflineTranslationEngine(TranslationEngine):
         return None
 
     def _pick_manager(self, model_key: str | None) -> OfflineModelManager:
-        normalized = str(model_key or self._model_key).strip().lower()
+        normalized = (model_key or self._model_key).strip().lower()
         if normalized not in self._managers:
             normalized = self._model_key
         return self._managers[normalized]
@@ -509,7 +537,7 @@ class OfflineTranslationEngine(TranslationEngine):
         values = model_key if isinstance(model_key, (list, tuple)) else [model_key]
         normalized: list[str] = []
         for value in values:
-            key = str(value or "").strip().lower()
+            key = (value or "").strip().lower()
             if key in MODEL_SPECS and key not in normalized:
                 normalized.append(key)
         return normalized
@@ -539,7 +567,7 @@ class OfflineTranslationEngine(TranslationEngine):
                         "stage": "queue",
                         "percent": 100,
                         "model": completed_model,
-                        "detail": f"{completed_label} hazir. Siradaki kurulum: {next_label}",
+                        "detail": f"{completed_label} hazır. Sıradaki kurulum: {next_label}",
                         "bytes_label": "",
                     },
                 )

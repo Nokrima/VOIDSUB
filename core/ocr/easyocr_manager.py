@@ -42,7 +42,7 @@ class EasyOCRManager:
             "plugin_dir": str(self.plugin_dir),
             "state": "ready" if ready and not busy else self.state,
             "percent": 100 if ready and not busy else self.percent,
-            "detail": "Eklenti hazir." if ready and not busy else self.detail,
+            "detail": "Eklenti hazır." if ready and not busy else self.detail,
             "bytes_label": self.bytes_label,
         }
 
@@ -77,7 +77,7 @@ class EasyOCRManager:
         self._cancel.set()
         self.state = "remove"
         self.percent = 0
-        self.detail = "Eklenti kaldiriliyor."
+        self.detail = "Eklenti kaldırılıyor."
         self.bytes_label = ""
         self._send_progress()
         
@@ -100,7 +100,7 @@ class EasyOCRManager:
             self._raise_if_cancelled()
             
             # 1. GitHub API uzerinden indirme linkini bul
-            self._set_stage("planning", 5, "Indirme baglantisi araniyor")
+            self._set_stage("planning", 5, "İndirme bağlantısı aranıyor")
             download_url, size = self._get_download_info()
             self._raise_if_cancelled()
             
@@ -120,7 +120,7 @@ class EasyOCRManager:
                 
             self.state = "ready"
             self.percent = 100
-            self.detail = "EasyOCR Eklentisi hazir."
+            self.detail = "EasyOCR Eklentisi hazır."
             self.bytes_label = ""
             
             elapsed_ms = int((time.monotonic() - self._install_started_at) * 1000)
@@ -193,7 +193,7 @@ class EasyOCRManager:
             raise RuntimeError(f"Indirme basarisiz: {exc}")
 
     def _extract_plugin(self) -> None:
-        self._set_stage("extracting", 85, "Eklenti cikartiliyor...")
+        self._set_stage("extracting", 85, "Eklenti çıkartılıyor...")
         import zipfile
         
         zip_path = self.tmp_dir / EASYOCR_ASSET_NAME
@@ -211,7 +211,7 @@ class EasyOCRManager:
             raise RuntimeError(f"Zip cikartma hatasi: {exc}")
 
     def _verify_plugin(self) -> None:
-        self._set_stage("verifying", 95, "Eklenti dogrulaniyor...")
+        self._set_stage("verifying", 95, "Eklenti doğrulanıyor...")
         # Ileride gercek worker.exe adini buraya girecegiz
         worker_exe = self.plugin_dir / "easyocr-worker.exe"
         if not worker_exe.exists():
@@ -224,7 +224,7 @@ class EasyOCRManager:
         ready = self._is_ready()
         self.state = "ready" if ready else "idle"
         self.percent = 100 if ready else 0
-        self.detail = "Eklenti hazir." if ready else "EasyOCR eklentisi bekleniyor."
+        self.detail = "Eklenti hazır." if ready else "EasyOCR eklentisi bekleniyor."
         self.bytes_label = ""
 
     def _raise_if_cancelled(self) -> None:
@@ -259,7 +259,7 @@ class EasyOCRManager:
         self.percent = 0
         self.detail = message
         self.bytes_label = ""
-        log_error(PREFIX_OCR, "088", f"[EasyOCR Kurulumu] -> HATA: {message}", "Eklenti kurulumu tamamlanamadi.")
+        log_error(PREFIX_OCR, "088", f"[EasyOCR Kurulumu] -> HATA: {message}", "Eklenti kurulumu tamamlanamadı.")
         self._send("easyocr_plugin_error", {"message": message})
         self._send_status()
 
