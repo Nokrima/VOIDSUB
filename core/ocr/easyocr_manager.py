@@ -232,7 +232,7 @@ class EasyOCRManager:
 
     def _set_stage(self, state: str, percent: int, detail: str) -> None:
         self.state = state
-        self.percent = max(0, min(100, int(percent)))
+        self.percent = max(0, min(100, percent))
         self.detail = detail
         if state != "downloading":
             self.bytes_label = ""
@@ -272,4 +272,4 @@ class EasyOCRManager:
             if size < 1024.0 or unit == "GB":
                 return f"{size:.1f}{unit}" if unit != "B" else f"{int(size)}B"
             size /= 1024.0
-        return f"{int(value)}B"
+        return f"{value}B"
