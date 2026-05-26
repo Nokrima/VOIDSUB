@@ -12,10 +12,19 @@ Uygulamanızın sürümünü (örneğin v2.5.0'dan v2.6.0'a) artırmak için iki
 
 ---
 
+## ADIM 1.5: Değişiklik Tespiti (Nuitka Kararı)
+Güncellemeyi derlemeden önce, gereksiz yere 20 dakika beklememek için **hangi dosyalarda değişiklik yaptığınızı** tespit edin.
+VS Code terminalinde şu komutu çalıştırarak değişen dosyaları görün:
+```powershell
+git status
+```
+- Eğer değişen dosyalar **SADECE** `ui-tauri/` klasörü içindeyse (React, CSS, TSX dosyaları): **ADIM 2'yi (Nuitka) ATLAYIN.** Doğrudan ADIM 3'e geçin.
+- Eğer değişen dosyalar içinde `core/` klasörü, `main.py`, `.py` uzantılı dosyalar veya `build-python.ps1` varsa: **ADIM 2'yi ÇALIŞTIRMAK ZORUNDASINIZ.**
+
+---
+
 ## ADIM 2: Python Çekirdeğini Derlemek (Nuitka)
-> **💡 ÖNEMLİ NOT (Zaman Kazanma İpucu):**
-> - **Eğer SADECE Arayüzde (React/UI) Değişiklik Yaptıysanız:** Bu adımı tamamen ATLAYIN. Eski `virel-core.exe` zaten korumalı olduğu için doğrudan ADIM 3'e geçip saniyeler içinde yeni güncellemeyi gönderebilirsiniz.
-> - **Eğer Python Kodlarında Değişiklik Yaptıysanız:** Yeni kodların "Makine diline çevrilmesi ve şifrelenmesi" için bu adımı kesinlikle çalıştırmak ZORUNDASINIZ (Yaklaşık 15-20 dk sürer).
+> **💡 ÖNEMLİ NOT:** Sadece Python (`.py`) dosyalarında değişiklik yaptıysanız bu adımı çalıştırın. Yeni Python kodlarının "Makine diline çevrilmesi ve şifrelenmesi" işlemi yaklaşık 15-20 dk sürer.
 
 1. VS Code terminalini açın.
 2. Aşağıdaki komutu çalıştırın:
