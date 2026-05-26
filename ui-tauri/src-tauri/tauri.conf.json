@@ -56,7 +56,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEREMjA2MDMzMTAyNkNEMkYKUldRdnpTWVFNMkFnM2VHemZ0alNnMStRLzQ5ZE5EdUdwT2hicjlBSTZIZ0pSYXBibkdHNTFTMG0K",
       "endpoints": [
         "https://raw.githubusercontent.com/Nokrima/virel-updater/main/latest.json"
       ]
