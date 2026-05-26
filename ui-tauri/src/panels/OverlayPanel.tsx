@@ -3,7 +3,7 @@ import { useAppContext } from '../context/AppContext';
 import { PanelStage } from './PanelStage';
 import { getEventHistory, onEvent, useWebSocket } from '../bridge/websocket';
 
-import { ValueRail } from '../components/home/HomePanelShared';
+import { ValueRail } from '../components/ValueRail';
 
 type OverlaySettings = { mode: 'fixed'; font_family: string; font_size: number; font_color: string; font_bold: boolean; alpha: number; bg_visible: boolean; };
 type AppSettingsLite = { reading_speed_cps?: number };
@@ -235,7 +235,7 @@ export const OverlayPanel: React.FC = () => {
 
   const [profiles, setProfiles] = useState<TransProfile[]>(() => {
     try {
-      const saved = localStorage.getItem('virel_overlay_profiles');
+      const saved = localStorage.getItem('voidsub_overlay_profiles');
       return saved ? JSON.parse(saved) : defaultProfiles;
     } catch {
       return defaultProfiles;
@@ -243,15 +243,15 @@ export const OverlayPanel: React.FC = () => {
   });
 
   const [activeProfileId, setActiveProfileId] = useState<string>(() => {
-    return localStorage.getItem('virel_overlay_active_profile') || 'default';
+    return localStorage.getItem('voidsub_overlay_active_profile') || 'default';
   });
 
   useEffect(() => {
-    localStorage.setItem('virel_overlay_profiles', JSON.stringify(profiles));
+    localStorage.setItem('voidsub_overlay_profiles', JSON.stringify(profiles));
   }, [profiles]);
 
   useEffect(() => {
-    localStorage.setItem('virel_overlay_active_profile', activeProfileId);
+    localStorage.setItem('voidsub_overlay_active_profile', activeProfileId);
   }, [activeProfileId]);
   const [isRenamingProfile, setIsRenamingProfile] = useState(false);
   const [renameVal, setRenameVal] = useState('');

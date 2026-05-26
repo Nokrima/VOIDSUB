@@ -14,16 +14,14 @@ from core.errors import (
     PREFIX_CFG,
     PREFIX_SYS,
     PREFIX_TRL,
-    PREFIX_UPD,
     get_logger,
     log_error,
     log_event,
     set_log_level,
 )
 from core.hardware import HardwareDetector
+from core.debug.session_recorder import SessionRecorder
 from core.processor.post_processor import chunk_for_display, clean_translation, estimate_display_chunk_size
-from core.updater import AutoUpdater
-from debug.session_recorder import SessionRecorder
 
 logger = get_logger()
 LEGACY_SETTINGS_FILE = Path(__file__).resolve().parent.parent / "config" / "settings.json"
@@ -39,7 +37,6 @@ DEFAULT_SETTINGS = {
         "restore_window_after_region_selection": True,
         "overlay_snap_to_region": True,
         "log_level": "error",
-        "auto_update_check": False,
         "onboarding_completed": False,
         "ocr_engine": "easy",
         "translation_engine": "auto",
@@ -95,7 +92,6 @@ PROFILE_OVERLAY_KEYS = {"mode", "font_family", "font_size", "font_color", "font_
 PROFILE_APP_OVERRIDE_KEYS = {
     "minimize_to_tray",
     "log_level",
-    "auto_update_check",
     "reading_speed_cps",
     "src_language",
     "tgt_language",
@@ -127,7 +123,7 @@ class BridgeServer:
         from core.ocr.easyocr_manager import EasyOCRManager
         from core.cuda_manager import CudaManager
         import os
-        app_data = Path(os.environ.get('LOCALAPPDATA', 'C:/')) / 'Virel V2'
+        app_data = Path(os.environ.get('LOCALAPPDATA', 'C:/')) / 'VoidSub'
         self.easyocr_manager = EasyOCRManager(app_data / 'plugins', self)
         self.cuda_manager = CudaManager(self)
         set_log_level(self.settings["app"].get("log_level", "info"))
@@ -303,7 +299,7 @@ class BridgeServer:
         calibration_region = self._normalize_region(self.settings["app"].get("last_calibration_region"))
         frame = getattr(self._session_recorder, "preview_frame", None)
         if calibration_region and frame is not None:
-            from debug.session_recorder_preview import numpy_to_base64
+            from core.debug.session_recorder_preview import numpy_to_base64
 
             self.send("calibration_region_selected", {
                 "x1": calibration_region["left"],
@@ -773,26 +769,6 @@ class BridgeServer:
                         self.send("overlay_settings_loaded", self.settings["overlay"])
                         self._emit_saved_regions()
                         self._emit_temporary_region_state()
-
-                    elif event == "check_for_updates":
-                        log_event(
-                            PREFIX_UPD,
-                            "001",
-                            "Surum kontrolu baslatildi.",
-                            throttle_key="check_for_updates",
-                            throttle_seconds=2.0,
-                        )
-                        AutoUpdater.check_for_updates(self)
-
-                    elif event == "download_update":
-                        asset_url = payload.get("url")
-                        if asset_url:
-                            AutoUpdater.download_and_install(
-                                asset_url,
-                                self,
-                                str(payload.get("digest", "")).strip(),
-                                str(payload.get("checksum_url", "")).strip(),
-                            )
 
                     elif event == "debug_session_start":
                         if hasattr(self.worker, "diagnostics"):

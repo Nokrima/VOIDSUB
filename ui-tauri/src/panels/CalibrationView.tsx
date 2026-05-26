@@ -5,11 +5,11 @@ import { onEvent, wsClient } from '../bridge/websocket';
 import { motion } from 'framer-motion';
 
 import { PanelStage } from './PanelStage';
-import { ValueRail } from '../components/home/HomePanelShared';
+import { ValueRail } from '../components/ValueRail';
 import { SceneModeBlock } from './SceneModeBlock';
-import { conceptABasePerformanceTiers, getSettingsPerformanceKeyFromConceptA, type ConceptAPerformanceOption, type ConceptAPerformanceTier } from './workspacePerformance';
+import { conceptABasePerformanceTiers, getSettingsPerformanceKeyFromConceptA, type ConceptAPerformanceOption, type ConceptAPerformanceTier } from '../config/workspacePerformance';
 import type { AppCustomCalibrationProfile, AppPerformanceTier } from '../config/uiDefaults';
-import { type ConceptAEngineOption, workspaceEngineLabels } from './workspaceEngine';
+import { type ConceptAEngineOption, workspaceEngineLabels } from '../config/workspaceEngine';
 import { applyOcrFilterOverride, getCalibrationPreset, toRuntimeCalibrationPayload, type CalibrationRuntimeValues, type PerformanceTier } from '../config/calibrationPresets';
 
 type HoverState = 'up' | 'down' | null;

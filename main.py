@@ -1,5 +1,5 @@
 """
-TERCUMAN'T V2 - ANA CEKIRDEK (main.py)
+VoidSub - ANA CEKIRDEK (main.py)
 ISLEV: Sistem guvenligini denetler, kopruyu kurar ve pipeline'i baslatir.
 """
 from __future__ import annotations
@@ -145,7 +145,7 @@ if __name__ == "__main__":
     except Exception as e:
         import traceback
         import tempfile
-        crash_log_path = Path(tempfile.gettempdir()) / "virel_fatal_crash.log"
+        crash_log_path = Path(tempfile.gettempdir()) / "voidsub_fatal_crash.log"
         with open(crash_log_path, "w", encoding="utf-8") as f:
             f.write("FATAL CRASH!\n")
             f.write(traceback.format_exc())

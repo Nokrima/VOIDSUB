@@ -317,7 +317,7 @@ class OfflineModelManager:
 
     def _get_plugin_python(self) -> Path | None:
         import os
-        app_data = Path(os.environ.get('LOCALAPPDATA', 'C:/')) / 'Virel V2'
+        app_data = Path(os.environ.get('LOCALAPPDATA', 'C:/')) / 'VoidSub'
         python_exe = app_data / 'plugins' / 'easyocr' / 'python.exe'
         return python_exe if python_exe.exists() else None
 

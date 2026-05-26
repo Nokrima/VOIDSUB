@@ -39,8 +39,6 @@ export interface AppWebSocketBindings {
   onEngineRepair: (data: any) => void;
   onOfflineError: (data: any) => void;
   onOfflineComplete: () => void;
-  onUpdateAvailable: (data: any) => void;
-  onUpdateError: (data: any) => void;
   onTranslationFallback: (data: any) => void;
   onOcrRuntimeFallback: (data: any) => void;
   onFrameStat: (data: OcrFrameStat) => void;
@@ -75,8 +73,6 @@ export function useAppWebSocket(bindings: AppWebSocketBindings) {
     const unsubscribeEngineRepair = onEvent('engine_repair_result', bindings.onEngineRepair);
     const unsubscribeOfflineError = onEvent('offline_model_error', bindings.onOfflineError);
     const unsubscribeOfflineComplete = onEvent('offline_model_complete', bindings.onOfflineComplete);
-    const unsubscribeUpdateAvailable = onEvent('update_available', bindings.onUpdateAvailable);
-    const unsubscribeUpdateError = onEvent('update_error', bindings.onUpdateError);
     const unsubscribeTranslationFallback = onEvent('translation_engine_fallback', bindings.onTranslationFallback);
     const unsubscribeOcrRuntimeFallback = onEvent('ocr_engine_runtime_fallback', bindings.onOcrRuntimeFallback);
     const unsubscribeFrameStat = onEvent('ocr_frame_stat', (data) => bindings.onFrameStat(data as OcrFrameStat));
@@ -101,8 +97,6 @@ export function useAppWebSocket(bindings: AppWebSocketBindings) {
       unsubscribeEngineRepair();
       unsubscribeOfflineError();
       unsubscribeOfflineComplete();
-      unsubscribeUpdateAvailable();
-      unsubscribeUpdateError();
       unsubscribeTranslationFallback();
       unsubscribeOcrRuntimeFallback();
       unsubscribeFrameStat();

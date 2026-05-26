@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { PanelStage } from './PanelStage';
-import { ValueRail } from '../components/home/HomePanelShared';
+import { ValueRail } from '../components/ValueRail';
 import { useAppContext } from '../context/AppContext';
 import { wsClient } from '../bridge/websocket';
 import { motion } from 'framer-motion';
-import { conceptABasePerformanceOptions, type ConceptAPerformanceOption } from './workspacePerformance';
-import { type ConceptAEngineOption, workspaceEngineLabels } from './workspaceEngine';
+import { conceptABasePerformanceOptions, type ConceptAPerformanceOption } from '../config/workspacePerformance';
+import { type ConceptAEngineOption, workspaceEngineLabels } from '../config/workspaceEngine';
 
 const labelStyle: React.CSSProperties = {
   fontSize: 11,

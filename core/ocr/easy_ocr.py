@@ -1,6 +1,6 @@
 """
 GPU Canavarı (EasyOCREngine): Derin öğrenme tabanlı, ağır ama güçlü OCR motoru.
-V2 iyileştirmesi: Nuitka derlemeleri için taşınabilir worker (subprocess) mimarisi eklendi.
+VoidSub iyileştirmesi: derlemeler için taşınabilir worker (subprocess) mimarisi eklendi.
 """
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ class EasyOCREngine(OCREngine):
         return "EasyOCR GPU" if self.use_gpu else "EasyOCR CPU"
 
     def _get_plugin_python(self) -> Path | None:
-        app_data = Path(os.environ.get('LOCALAPPDATA', 'C:/')) / 'Virel V2'
+        app_data = Path(os.environ.get('LOCALAPPDATA', 'C:/')) / 'VoidSub'
         python_exe = app_data / 'plugins' / 'easyocr' / 'python.exe'
         return python_exe if python_exe.exists() else None
 

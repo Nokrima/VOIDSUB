@@ -11,9 +11,9 @@ from pathlib import Path
 
 from core.errors import PREFIX_OCR, log_error, log_event
 
-EASYOCR_PLUGIN_REPO = "Nokrima/Virel-Plugins"
+EASYOCR_PLUGIN_REPO = "Nokrima/VoidSub-Plugins"
 EASYOCR_RELEASE_TAG = "latest"  # Veya "v1.0"
-EASYOCR_ASSET_NAME = "virel-easyocr-plugin.zip"
+EASYOCR_ASSET_NAME = "voidsub-easyocr-plugin.zip"
 
 class EasyOCRManager:
     def __init__(self, plugins_dir: Path, bridge=None):
@@ -152,10 +152,10 @@ class EasyOCRManager:
         import urllib.request
         
         # Direkt HuggingFace baglantisi
-        url = "https://huggingface.co/Nokrima/virel-easyocr-plugin/resolve/main/virel-easyocr-plugin.zip"
+        url = "https://huggingface.co/Nokrima/voidsub-easyocr-plugin/resolve/main/voidsub-easyocr-plugin.zip"
         
         try:
-            req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": "Virel-V2"})
+            req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": "VoidSub"})
             with urllib.request.urlopen(req, timeout=10) as response:
                 total_bytes = int(response.headers.get('Content-Length', 0))
             return url, total_bytes
@@ -187,7 +187,7 @@ class EasyOCRManager:
                 self._send_progress()
                 return
 
-            headers = {"User-Agent": "Virel-V2"}
+            headers = {"User-Agent": "VoidSub"}
             mode = "wb"
             if existing_size > 0:
                 headers["Range"] = f"bytes={existing_size}-"

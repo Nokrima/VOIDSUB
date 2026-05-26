@@ -2,7 +2,7 @@
 color 0B
 echo.
 echo ==============================================
-echo    Virel V2 - Guvenli Baslatma Yoneticisi
+echo    VoidSub - Guvenli Baslatma Yoneticisi
 echo ==============================================
 echo.
 echo [-] PowerShell yetki kisitlamalari atlatiliyor...

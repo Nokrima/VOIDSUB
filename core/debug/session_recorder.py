@@ -5,8 +5,8 @@ import datetime
 from typing import Any
 
 from core.errors import PREFIX_SYS, get_logger
-from debug.session_recorder_io import build_payload, encode_frame
-from debug.session_recorder_config import ConfigPatcher
+from core.debug.session_recorder_io import build_payload, encode_frame
+from core.debug.session_recorder_config import ConfigPatcher
 
 logger = get_logger()
 
@@ -25,7 +25,7 @@ class SessionRecorder:
         self.preview_region = None
         self.preview_frame = None
 
-        from debug.session_recorder_preview import PreviewHandler
+        from core.debug.session_recorder_preview import PreviewHandler
 
         self._preview_handler = PreviewHandler(self)
 

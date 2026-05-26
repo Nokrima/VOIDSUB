@@ -15,7 +15,6 @@ from config.defaults import BASE_DIR, LOG_BACKUP_COUNT, LOG_FILE, LOG_MAX_BYTES
 PREFIX_OCR = "OCR"
 PREFIX_TRL = "TRL"
 PREFIX_SYS = "SYS"
-PREFIX_UPD = "UPD"
 PREFIX_CFG = "CFG"
 
 _logger: logging.Logger | None = None
@@ -68,7 +67,7 @@ class BridgeLogHandler(logging.Handler):
                 },
             )
         except Exception as exc:
-            logging.getLogger("VirelCoreInternal").error("[SYS-001] [Log İletimi] -> İLETİM BAŞARISIZ | Hata: %s", exc)
+            logging.getLogger("VoidSubCoreInternal").error("[SYS-001] [Log İletimi] -> İLETİM BAŞARISIZ | Hata: %s", exc)
             return
 
 
@@ -103,7 +102,7 @@ def setup_logger(level: str = "info") -> logging.Logger:
             _file_handler.setLevel(logging.DEBUG)
         return _logger
 
-    _logger = logging.getLogger("VirelCore")
+    _logger = logging.getLogger("VoidSubCore")
     _logger.setLevel(logging.DEBUG)
     _logger.propagate = False
     _file_handler = _build_file_handler()

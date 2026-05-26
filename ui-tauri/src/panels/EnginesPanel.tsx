@@ -1016,7 +1016,7 @@ export const EnginesPanel: React.FC = () => {
       setCudaCompleted(true);
       setCudaRequiresRestart(true);
       window.setTimeout(() => setCudaCompleted(false), 3000);
-      notify('success', 'CUDA başarıyla kuruldu! Aktif olması için Virel\'i yeniden başlatın.');
+      notify('success', 'CUDA başarıyla kuruldu! Aktif olması için VOIDSUB\'ı yeniden başlatın.');
     });
     const offCudaCancel = onEvent('cuda_cancelled', () => {
       setCudaAction(null);

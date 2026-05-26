@@ -7,7 +7,7 @@ $WS_PORT = 27491
 # Ekranı temizle ve başlık ekle
 Clear-Host
 Write-Host "=========================================" -ForegroundColor Cyan
-Write-Host "      Virel V2 - Gelistirme Modu         " -ForegroundColor White -BackgroundColor DarkCyan
+Write-Host "      VoidSub - Gelistirme Modu         " -ForegroundColor White -BackgroundColor DarkCyan
 Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -22,14 +22,14 @@ Write-Host "[-] Eski zombi islemler ve port kilitleri temizleniyor..." -Foregrou
 
 # Tauri pencerelerini kapat
 Get-Process -Name "ui-tauri" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Get-Process -Name "virel-core" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Get-Process -Name "voidsub-core" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 
 # Portu dinleyen önceki python'u bul ve yoked
 $existingPython = Get-NetTCPConnection -LocalPort $WS_PORT -State Listen -ErrorAction SilentlyContinue
 if ($existingPython) {
     try {
         $proc = Get-Process -Id $existingPython.OwningProcess -ErrorAction SilentlyContinue
-        if ($proc.ProcessName -match "python|virel") {
+        if ($proc.ProcessName -match "python|voidsub") {
             Write-Host "    -> Asili kalmis cekirdek kapatiliyor (PID: $($proc.Id))..." -ForegroundColor DarkYellow
             Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
         }
@@ -39,7 +39,7 @@ if ($existingPython) {
 Start-Sleep -Seconds 1 # Portun tam bosa cikmasi icin kisa bekleme
 
 # 2. Python Çekirdeğini Başlat
-Write-Host "[1/2] Virel V2 Cekirdegi (Python) baslatiliyor..." -ForegroundColor Cyan
+Write-Host "[1/2] VoidSub Cekirdegi (Python) baslatiliyor..." -ForegroundColor Cyan
 $pythonJob = Start-Process -FilePath $pythonExe -ArgumentList "main.py" -WorkingDirectory $repoRoot -WindowStyle Hidden -PassThru
 
 # Port'un açılmasını bekle
@@ -71,11 +71,11 @@ try {
     Write-Host ""
     Set-Location $uiDir
     # Çakışmaları önlemek için Rust hedef klasörünü geçici bir yere yönlendiriyoruz.
-    $env:CARGO_TARGET_DIR = Join-Path $env:LOCALAPPDATA "Virel\cargo-target"
+    $env:CARGO_TARGET_DIR = Join-Path $env:LOCALAPPDATA "VoidSub\cargo-target"
     
     # Tauri dev modunda "externalBin" dosyalarini fiziksel olarak arar (kullanmasa bile).
     # Hizli gelistirme icin saniyesinde bos/sahte exe uretip Tauri'yi kandiriyoruz.
-    $dummySidecar = Join-Path $repoRoot "ui-tauri\src-tauri\virel-core-x86_64-pc-windows-msvc.exe"
+    $dummySidecar = Join-Path $repoRoot "ui-tauri\src-tauri\voidsub-core-x86_64-pc-windows-msvc.exe"
     $dummyRedist = Join-Path $repoRoot "ui-tauri\src-tauri\bin\vc_redist.x64.exe"
     if (-not (Test-Path $dummySidecar)) { New-Item -Path $dummySidecar -ItemType File -Force | Out-Null }
     if (-not (Test-Path $dummyRedist)) { New-Item -Path $dummyRedist -ItemType File -Force | Out-Null }

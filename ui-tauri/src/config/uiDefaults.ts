@@ -24,7 +24,6 @@ export interface AppProfileOverlayOverrides {
 export interface AppProfileSettingsOverrides {
   minimize_to_tray?: boolean;
   log_level?: AppLogLevel;
-  auto_update_check?: boolean;
   reading_speed_cps?: number;
   src_language?: 'auto' | 'en' | 'tr';
   tgt_language?: 'tr' | 'en';
@@ -46,7 +45,6 @@ export interface AppCustomCalibrationProfile {
 export interface AppSettingsDefaultsShape {
   minimize_to_tray: boolean;
   log_level: AppLogLevel;
-  auto_update_check: boolean;
   onboarding_completed: boolean;
   ocr_engine: string;
   ocr_scene_mode: AppSceneMode;
@@ -70,7 +68,6 @@ export interface AppSettingsDefaultsShape {
 export const DEFAULT_APP_SETTINGS = {
   minimize_to_tray: false,
   log_level: 'error',
-  auto_update_check: false,
   onboarding_completed: false,
   ocr_engine: 'easy',
   ocr_scene_mode: 'striped',

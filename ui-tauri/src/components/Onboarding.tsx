@@ -390,7 +390,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               </p>
 
               <div className="mt-8 flex justify-center">
-                <ActionButton onClick={finishOnboarding}>Virel'i Başlat</ActionButton>
+                <ActionButton onClick={finishOnboarding}>VOIDSUB'ı Başlat</ActionButton>
               </div>
             </div>
           </motion.div>

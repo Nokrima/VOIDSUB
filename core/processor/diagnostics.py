@@ -16,7 +16,7 @@ class OCRDiagnostics:
     """Persist selected OCR cases to disk for replay and debugging."""
 
     def __init__(self) -> None:
-        self.enabled = os.getenv("VIREL_OCR_DIAGNOSTICS", "0") == "1"
+        self.enabled = os.getenv("VOIDSUB_OCR_DIAGNOSTICS", "0") == "1"
         self.root = Path(DIAGNOSTICS_DIR)
 
     def record(self, phase: str, engine: str, scene_mode: str, frame: np.ndarray, processed: np.ndarray, text: str, score: int, metadata: dict[str, Any] | None = None) -> None:

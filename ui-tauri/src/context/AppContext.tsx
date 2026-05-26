@@ -32,7 +32,6 @@ export interface AppSettingsState {
   restore_window_after_region_selection?: boolean;
 
   log_level: 'debug' | 'info' | 'warning' | 'error';
-  auto_update_check: boolean;
   onboarding_completed: boolean;
   ocr_engine: string;
   ocr_scene_mode?: 'striped' | 'floating';
@@ -129,7 +128,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [notices, setNotices] = useState<NoticeItem[]>([]);
   const noticeIdRef = useRef(0);
   // activeShortcutsRef kaldırıldı — useShortcutManager yönetiyor
-  const autoUpdateWatchRef = useRef<boolean | null>(null);
   const startupIntroShownRef = useRef(false);
   const restoreAfterRegionSelectionRef = useRef(false);
   const calibrationRestorePendingRef = useRef(false);
@@ -289,8 +287,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     onEngineRepair: (data) => enqueueNotice(Boolean(data.success) ? 'success' : 'warning', String(data.message ?? 'Motor onarım sonucu alınamadı.')),
     onOfflineError: (data) => enqueueNotice('warning', String(data.message ?? 'Offline model işlemi tamamlanamadı.')),
     onOfflineComplete: () => enqueueNotice('success', 'Offline modeller kullanıma hazır.'),
-    onUpdateAvailable: (data) => enqueueNotice('info', `v${String(data.version ?? '?')} hazır.`),
-    onUpdateError: (data) => enqueueNotice('warning', String(data.msg ?? 'Güncelleme denetimi tamamlanamadı.')),
     onTranslationFallback: (data) => enqueueNotice('warning', `${String(data.from ?? 'bilinmeyen')} yerine ${String(data.to ?? 'yedek motor')} kullanılıyor.`),
     onOcrRuntimeFallback: (data) => {
       const selected = String(data.selected ?? 'Seçili motor');
@@ -513,19 +509,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setShellVisible(true);
   }, [settings, showStartupIntro, forceOnboardingBypassed]);
 
-  useEffect(() => {
-    if (!settings) return;
-    const current = Boolean(settings.auto_update_check);
-    const previous = autoUpdateWatchRef.current;
-    if (previous === null) {
-      autoUpdateWatchRef.current = current;
-      if (current) wsClient.send('check_for_updates');
-      return;
-    }
-    if (!previous && current) wsClient.send('check_for_updates');
-    autoUpdateWatchRef.current = current;
-  }, [settings?.auto_update_check]);
-
   // ── Ctrl+Shift+Q Acil Kapatma (kısayol sistemi dışında bağımsız) ──
   useEffect(() => {
     const handleEmergencyQuit = (event: KeyboardEvent) => {
@@ -559,7 +542,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     && (
       settings.minimize_to_tray !== DEFAULT_APP_SETTINGS.minimize_to_tray
       || settings.log_level !== DEFAULT_APP_SETTINGS.log_level
-      || settings.auto_update_check !== DEFAULT_APP_SETTINGS.auto_update_check
       || settings.translation_engine !== DEFAULT_APP_SETTINGS.translation_engine
       || settings.offline_model_key !== DEFAULT_APP_SETTINGS.offline_model_key
       || settings.performance_tier !== DEFAULT_APP_SETTINGS.performance_tier

@@ -1,20 +1,19 @@
 """
-Virel V2 - Evrensel Sabitler
+VoidSub - Evrensel Sabitler
 Bu dosya projenin konfigurasyon merkezidir. Sadece sabitleri icerir.
 """
 import os
 from pathlib import Path
 
-APP_NAME = "Virel"
+APP_NAME = "VoidSub"
 APP_VERSION = "2.5.0"
-GITHUB_REPO = "Nokrima/Virel-Releases"
 
 import sys
 
 if getattr(sys, "frozen", False) or "__compiled__" in globals():
     # Derlenmis (PyInstaller veya Nuitka) calistirilabilir dosya ise:
     # Program Files gibi salt-okunur (read-only) dizinlerde cokmemesi icin LocalAppData kullan!
-    BASE_DIR = Path(os.getenv("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / "Virel V2"
+    BASE_DIR = Path(os.getenv("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / "VoidSub"
     BASE_DIR.mkdir(parents=True, exist_ok=True)
 else:
     # Geliştirme ortaminda normal sekilde calisirken:
@@ -24,7 +23,6 @@ SETTINGS_FILE = _appdata_root / APP_NAME / "settings.json"
 LOG_FILE = BASE_DIR / "logs" / "app.log"
 MODELS_DIR = BASE_DIR / "models"
 DIAGNOSTICS_DIR = BASE_DIR / "logs" / "ocr_diagnostics"
-BENCHMARKS_DIR = BASE_DIR / "logs" / "ocr_benchmarks"
 
 WEBSOCKET_HOST = "127.0.0.1"
 WEBSOCKET_PORT = 27491

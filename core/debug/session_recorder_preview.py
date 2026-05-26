@@ -10,7 +10,7 @@ import numpy as np
 import cv2
 
 from core.errors import get_logger
-from debug.preview_config_img import ConfigurableImageProcessor
+from core.debug.preview_config_img import ConfigurableImageProcessor
 
 logger = get_logger()
 
@@ -25,7 +25,7 @@ def numpy_to_base64(img: np.ndarray) -> str:
     ok, buffer = cv2.imencode(".png", encode_img)
     if not ok:
         return ""
-    return base64.b64encode(buffer).decode("utf-8")
+    return base64.b64encode(buffer.tobytes()).decode("utf-8")
 
 class PreviewHandler:
     """Canli kalibrasyon arayuzu icin anlik ekran goruntusunu isleyen sinif."""
@@ -41,7 +41,7 @@ class PreviewHandler:
     async def _select_region_async(self) -> None:
         try:
             exe = sys.executable
-            script = Path(__file__).resolve().parent.parent / "core" / "native_region_selector.py"
+            script = Path(__file__).resolve().parents[1] / "native_region_selector.py"
             flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
                 
             result = await asyncio.to_thread(

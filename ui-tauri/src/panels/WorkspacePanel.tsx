@@ -6,10 +6,10 @@ import {
   getConceptABasePerformanceIdFromSettings,
   getSettingsPerformanceKeyFromConceptA,
   type ConceptAPerformanceOption,
-} from './workspacePerformance';
+} from '../config/workspacePerformance';
 import { useAppContext } from '../context/AppContext';
 import { wsClient } from '../bridge/websocket';
-import { workspaceEngineOptions, type ConceptAEngineId, type ConceptAEngineOption } from './workspaceEngine';
+import { workspaceEngineOptions, type ConceptAEngineId, type ConceptAEngineOption } from '../config/workspaceEngine';
 
 type ConceptATab = 'workspace' | 'calibration';
 

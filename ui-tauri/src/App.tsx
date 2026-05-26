@@ -1,13 +1,13 @@
 import { type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode, useMemo, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { Sidebar, type PageType } from './components/sidebar';
+import { Sidebar, type PageType } from './components/Sidebar';
 import { WorkspacePanel } from './panels/WorkspacePanel';
 import { OverlayPanel } from './panels/OverlayPanel';
 import { EnginesPanel } from './panels/EnginesPanel';
 import { SettingsPanel } from './panels/SettingsPanel';
 import Onboarding from './components/Onboarding';
 import StartupIntro from './components/intro/StartupIntro';
-import { usePanelTransition } from './usePanelTransition';
+import { usePanelTransition } from './hooks/usePanelTransition';
 import { AppProvider, useAppContext } from './context/AppContext';
 import { Toaster } from './components/Toaster';
 import { FORCE_ONBOARDING_TEST, FORCE_PROFILE_INTRO_LOOP, FORCE_PROFILE_INTRO_TEST } from './config/debugFlags';
@@ -294,7 +294,7 @@ function AppShell() {
                         opacity: 0.85,
                       }}
                     >
-                      Virel
+                      VOIDSUB
                     </span>
                     <span
                       style={{

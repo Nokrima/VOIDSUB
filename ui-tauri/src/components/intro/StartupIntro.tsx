@@ -121,14 +121,17 @@ export default function StartupIntro({
                   />
                 ))}
               </div>
-              <motion.div
-                className="absolute bottom-[14%] left-1/2 -translate-x-1/2 text-[30px] font-semibold tracking-[-0.03em] text-white"
-                initial={{ opacity: 0, y: -30, filter: 'blur(8px)' }}
-                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                transition={{ delay: 0.2, duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
-              >
-                Virel
-              </motion.div>
+              <div className="absolute bottom-[14%] left-0 right-0 flex justify-center text-center">
+                <motion.div
+                  className="text-[30px] font-semibold text-white"
+                  style={{ letterSpacing: 0 }}
+                  initial={{ opacity: 0, y: -30, filter: 'blur(8px)' }}
+                  animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                  transition={{ delay: 0.2, duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
+                >
+                  VOIDSUB
+                </motion.div>
+              </div>
             </div>
           ) : (
             <div className="relative h-[300px] w-[560px]">

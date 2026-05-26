@@ -3,7 +3,6 @@ Donanım ve güvenlik tarayıcısı.
 """
 from __future__ import annotations
 
-import json
 import os
 import platform
 import subprocess
@@ -13,7 +12,7 @@ from importlib.util import find_spec
 
 import psutil
 
-from config.defaults import BASE_DIR, BENCHMARKS_DIR
+from config.defaults import BASE_DIR
 from core.errors import PREFIX_SYS, get_logger, log_error, log_event
 from core.ocr.windows_ocr import WindowsOCREngine
 
@@ -36,7 +35,7 @@ class HardwareDetector:
         except ImportError:
             has_easyocr_global = False
         
-        app_data = Path(os.environ.get('LOCALAPPDATA', 'C:/')) / 'Virel V2'
+        app_data = Path(os.environ.get('LOCALAPPDATA', 'C:/')) / 'VoidSub'
         easyocr_plugin_path = app_data / 'plugins' / 'easyocr' / 'easyocr-worker.py'
         has_easyocr_portable = easyocr_plugin_path.exists()
         
@@ -75,10 +74,7 @@ class HardwareDetector:
             },
         }
 
-        benchmark_recommendation = self._read_benchmark_recommendation(available_engines)
-        if benchmark_recommendation:
-            recommended = benchmark_recommendation
-        elif gpu_info["available"] and ram_gb >= 8 and "easy" in available_engines:
+        if gpu_info["available"] and ram_gb >= 8 and "easy" in available_engines:
             recommended = "easy"
         elif "winonly" in available_engines:
             recommended = "winonly"
@@ -102,19 +98,6 @@ class HardwareDetector:
             "available_engines": available_engines,
             "engine_details": engine_details,
         }
-
-    def _read_benchmark_recommendation(self, available_engines: list[str]) -> str:
-        benchmark_file = Path(BENCHMARKS_DIR) / "latest.json"
-        if not benchmark_file.exists():
-            return ""
-        try:
-            with open(benchmark_file, "r", encoding="utf-8") as handle:
-                payload = json.load(handle)
-            candidate = str(payload.get("recommended_engine") or "").strip()
-            return candidate if candidate in available_engines else ""
-        except Exception as exc:
-            log_error(PREFIX_SYS, "058", f"[Donanım Benchmark] -> OKUMA BAŞARISIZ | Hata: {exc}", "Benchmark onerisi okunamadi.")
-            return ""
 
     def repair_engine(self, engine_id: str) -> dict:
         if engine_id == "easy":
@@ -287,7 +270,7 @@ class HardwareDetector:
 
     def _check_cuda_available(self) -> bool:
         """Check if CUDA runtime is installed via metadata to avoid heavy torch import and VRAM allocation."""
-        app_data = Path(os.environ.get('LOCALAPPDATA', 'C:/')) / 'Virel V2'
+        app_data = Path(os.environ.get('LOCALAPPDATA', 'C:/')) / 'VoidSub'
         if (app_data / 'plugins' / 'easyocr' / 'python.exe').exists():
             return True
 

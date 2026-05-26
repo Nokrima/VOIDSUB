@@ -1,7 +1,7 @@
 {
-  "productName": "Virel V2",
+  "productName": "VOIDSUB",
   "version": "2.5.0",
-  "identifier": "com.nokrima.virel",
+  "identifier": "com.nokrima.voidsub",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Virel V2",
+        "title": "VOIDSUB",
         "width": 1216,
         "height": 820,
         "minWidth": 1216,
@@ -30,7 +30,6 @@
     }
   },
   "bundle": {
-    "createUpdaterArtifacts": true,
     "windows": {
       "nsis": {
         "displayLanguageSelector": true,
@@ -43,7 +42,7 @@
     },
     "active": true,
     "targets": ["nsis"],
-    "externalBin": ["virel-core"],
+    "externalBin": ["voidsub-core"],
     "resources": {
       "bin/vc_redist.x64.exe": "bin/vc_redist.x64.exe"
     },
@@ -54,13 +53,5 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
-  },
-  "plugins": {
-    "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEREMjA2MDMzMTAyNkNEMkYKUldRdnpTWVFNMkFnM2VHemZ0alNnMStRLzQ5ZE5EdUdwT2hicjlBSTZIZ0pSYXBibkdHNTFTMG0K",
-      "endpoints": [
-        "https://raw.githubusercontent.com/Nokrima/virel-updater/main/latest.json"
-      ]
-    }
   }
 }
