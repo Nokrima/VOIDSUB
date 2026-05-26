@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$repoRoot = $PSScriptRoot
+$repoRoot = Split-Path $PSScriptRoot -Parent
 $venvPython = Join-Path $repoRoot ".venv\Scripts\python.exe"
 $pyinstaller = Join-Path $repoRoot ".venv\Scripts\pyinstaller.exe"
 
@@ -18,19 +18,25 @@ Write-Host "[2/3] Python Cekirdegi donduruluyor (Freezing)..." -ForegroundColor 
 Write-Host "Bu islem bilgisayarinizin hizina gore 1-5 dakika surebilir. Lutfen bekleyin." -ForegroundColor Yellow
 
 # PyInstaller ile derleme komutu
-# --onefile: Tek bir exe yapar
-# --windowed: Konsol penceresini gizler (Arka plan servisi icin sart)
-# --name: Cikti adini virel-core yapar
-# --collect-all: Yapay zeka ve arayuz modullerinin icindeki DLL'leri zorla pakete dahil eder
+# Sadece cekirdeğe giren modueller paketlenir.
+# torch / easyocr / offline model dosyalari uygulama icinden indirilir — derlemeye GIRMEZ.
 & $pyinstaller --noconfirm --log-level=WARN `
     --onefile `
     --windowed `
     --name "virel-core" `
     --collect-all ctranslate2 `
     --collect-all tokenizers `
-    --collect-all PySide6 `
     --collect-all deep_translator `
     --hidden-import deep_translator `
+    --exclude-module torch `
+    --exclude-module torchvision `
+    --exclude-module torchaudio `
+    --exclude-module easyocr `
+    --exclude-module tensorboard `
+    --exclude-module matplotlib `
+    --exclude-module scipy `
+    --exclude-module sklearn `
+    --exclude-module pandas `
     main.py
 
 if (-not $?) {
