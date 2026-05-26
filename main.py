@@ -142,3 +142,10 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         print("\n[SISTEM] Guvenli sekilde kapatiliyor...")
+    except Exception as e:
+        import traceback
+        import tempfile
+        crash_log_path = Path(tempfile.gettempdir()) / "virel_fatal_crash.log"
+        with open(crash_log_path, "w", encoding="utf-8") as f:
+            f.write("FATAL CRASH!\n")
+            f.write(traceback.format_exc())
