@@ -29,13 +29,22 @@ class HardwareDetector:
         cpu_info = self._scan_cpu()
         gpu_info = self._scan_gpu()
         has_winrt = self._can_start_windows_ocr()
-        has_easyocr = find_spec("easyocr") is not None
+        
+        # Kullanıcı tercihine göre hem global pip paketini hem de taşınabilir eklentiyi kontrol ediyoruz
+        has_easyocr_global = find_spec("easyocr") is not None
+        
+        app_data = Path(os.environ.get('LOCALAPPDATA', 'C:/')) / 'Virel V2'
+        easyocr_plugin_path = app_data / 'plugins' / 'easyocr' / 'easyocr-worker.py'
+        has_easyocr_portable = easyocr_plugin_path.exists()
+        
+        has_easyocr = has_easyocr_global or has_easyocr_portable
+        
         log_event(
             PREFIX_SYS,
             "069",
             (
                 "OCR engine readiness summary: "
-                f"winonly={has_winrt}, easy={has_easyocr}"
+                f"winonly={has_winrt}, easy={has_easyocr} (global={has_easyocr_global}, portable={has_easyocr_portable})"
             ),
         )
 
@@ -55,9 +64,9 @@ class HardwareDetector:
             },
             "easy": {
                 "available": has_easyocr,
-                "reason": "EasyOCR hazır. GPU yoksa da daha yavaş modda çalışabilir."
+                "reason": "EasyOCR hazır (Sistem paketi veya eklenti bulundu)."
                 if has_easyocr
-                else "EasyOCR paketi bulunamadı.",
+                else "EasyOCR bulunamadı, indirilmesi veya kurulması gerekiyor.",
                 "repair_available": not has_easyocr,
                 "repair_kind": "auto" if not has_easyocr else None,
             },
@@ -256,16 +265,14 @@ class HardwareDetector:
             return False
 
     def _check_cuda_available(self) -> bool:
-        """Check if CUDA runtime is actually available via torch."""
+        """Check if CUDA runtime is installed via metadata to avoid heavy torch import and VRAM allocation."""
         try:
-            import torch
-            result = torch.cuda.is_available()
-            self.logger.info(f"[{PREFIX_SYS}-060] CUDA runtime check: {result}")
+            from importlib.metadata import version
+            torch_version = version("torch")
+            result = "+cu" in torch_version
+            self.logger.info(f"[{PREFIX_SYS}-060] CUDA check via metadata: {result} (version: {torch_version})")
             return result
-        except ImportError:
-            self.logger.debug(f"[{PREFIX_SYS}-061] PyTorch not installed, CUDA unavailable")
-            return False
         except Exception as exc:
-            self.logger.warning(f"[{PREFIX_SYS}-062] [CUDA Kontrolü] -> KONTROL HATASI | Detay: {exc}")
+            self.logger.debug(f"[{PREFIX_SYS}-061] PyTorch not installed or no CUDA variant: {exc}")
             return False
 

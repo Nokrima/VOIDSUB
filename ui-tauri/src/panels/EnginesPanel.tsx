@@ -178,66 +178,72 @@ interface MotorDurumuProps {
   isScanning?: boolean;
   easyocrAction: OfflineModelAction | null;
   easyocrCompleted: boolean;
+  cudaAction: OfflineModelAction | null;
+  cudaCompleted: boolean;
+  onCudaDownload: () => void;
+  onCudaCancel: () => void;
+  onCudaRemove: () => void;
 }
 
 type EngineInfoKey = 'overview' | 'engine_selection' | 'engine_models' | 'translation_models' |
   'winonly' | 'easy' |
   'w1' | 'w2' | 'w3' | 'm1' | 'm2' | 'm3' |
-  'l1' | 'l2' | 'l3';
+  'opus_mt_en_tr' | 'nllb';
 
 const engineInfoContent: Record<EngineInfoKey, { title: string; desc: string; detail1: string; detail2: string; detail3: string; }> = {
   overview: {
-    title: 'Motor Durumu',
-    desc: 'Panel üzerindeki alanların üzerine gelerek detaylı bilgi alabilirsiniz.',
-    detail1: 'Sol menüden aktif okuyucu motorunu seçebilirsiniz.',
-    detail2: 'Sağ tarafta motorun bağımlılıkları ve modelleri bulunur.',
-    detail3: 'Alttaki bar anlık performans tahminini gösterir.'
+    title: 'Sistem Paneli',
+    desc: 'Uygulamanın tüm çeviri ve analiz altyapısını buradan yönetebilirsiniz.',
+    detail1: 'İhtiyacınıza uygun metin tarama motorunu sol menüden seçin.',
+    detail2: 'İlgili motorun eklentileri ve dil modelleri sağ tarafta listelenir.',
+    detail3: 'Canlı performans değerleri (FPS, gecikme, GPU) alt kısımda yer alır.'
   },
   engine_selection: {
-    title: 'Motor Seçimi',
-    desc: 'Çeviri işlemini yapacak temel OCR ve işlem motorunu belirler.',
-    detail1: 'WindowsOCR: Hızlı ve sisteme gömülüdür.',
-    detail2: 'EasyOCR: Yüksek isabetli ve yapay zeka desteklidir.',
-    detail3: ''
+    title: 'Görüntü İşleme Motoru',
+    desc: 'Ekrandaki yazıları algılayacak çekirdek teknolojiyi belirler.',
+    detail1: 'WindowsOCR: Ek bir kurulum gerektirmez, ultra hızlı ve hafiftir.',
+    detail2: 'Easy Motoru: Yapay zeka desteklidir, zorlu yazılar için kusursuz bir isabete sahiptir.',
+    detail3: 'Seçiminiz anında devreye girerek sisteme entegre olur.'
   },
   engine_models: {
-    title: 'Motor Modelleri',
-    desc: 'Seçili motorun çalışma yeteneğini sağlayan alt model ve ağ dosyalarıdır.',
-    detail1: 'Bu dosyalar motorun görüntü işleme algoritmasını barındırır.',
-    detail2: 'Bulut ibaresi olanlar indirilmeye hazırdır.',
-    detail3: 'Sistem modelleri cihaza kurulu olarak gelir.'
+    title: 'Çekirdek Eklentileri',
+    desc: 'Seçtiğiniz analiz motorunun gücünü artıran yan bileşenlerdir.',
+    detail1: 'Sistem bileşenleri anında çalışmaya hazır şekilde gelir.',
+    detail2: 'Bulut ikonuna sahip olanlar, tıklanarak arka planda sessizce kurulabilir.',
+    detail3: 'Bu modüller donanımınızın potansiyelini sonuna kadar kullanmanızı sağlar.'
   },
   translation_models: {
-    title: 'Çeviri Dil Modelleri',
-    desc: 'Çevrimdışı (offline) metin çevirisi yapacak olan MarianMT vb. ağlardır.',
-    detail1: 'İnternet bağlantısına ihtiyaç duymadan çeviri yapar.',
-    detail2: 'Dosya boyutları yüksektir (100MB+).',
-    detail3: 'Birden fazla çeviri modeli aynı anda kurulu kalabilir.'
+    title: 'Yerel Çeviri Modelleri',
+    desc: 'İnternet bağlantısı gerektirmeyen gelişmiş yapay zeka çeviri paketleridir.',
+    detail1: 'Verileriniz cihaz dışına çıkmaz, %100 yerel ve gizli çalışır.',
+    detail2: 'Donanımınıza uygun olanı seçtiğinizde inanılmaz bir hızla çeviri yaparlar.',
+    detail3: 'Modüller tek tıkla indirilir ve istendiğinde cihazdan kaldırılabilir.'
   },
-  winonly: { title: 'WindowsOCR', desc: 'Windows içerisine gömülü çalışan varsayılan optik okuyucudur.', detail1: 'Kurulum veya indirme gerektirmez.', detail2: 'Sıfıra yakın performans yükü yaratır.', detail3: 'Standart ve net fontlarda çok başarılıdır.' },
-  easy: { title: 'EasyOCR', desc: 'Görüntü işleme tabanlı yapay zeka okuyucu motorudur.', detail1: 'CUDA destekli ekran kartı gerektirir.', detail2: 'Oyun içi karmaşık fontları okuyabilir.', detail3: 'Performans tüketimi nispeten daha yüksektir.' },
-  w1: { title: 'TR Paketi (Win)', desc: 'Windows için Türkçe dil paketi bağımlılığıdır.', detail1: 'Sistem dili veya OCR paketi olarak kurulur.', detail2: 'Gerekli dil paketleri ayarlardan yönetilebilir.', detail3: 'Aktif olduğunda anında çalışmaya başlar.' },
-  w2: { title: 'EN Paketi (Win)', desc: 'Windows için İngilizce dil paketi bağımlılığıdır.', detail1: 'Buluttan indirilip sisteme entegre edilebilir.', detail2: 'Uluslararası oyunlarda temel dildir.', detail3: 'Çok hızlı sonuç döndürür.' },
-  w3: { title: 'JA Paketi (Win)', desc: 'Windows için Japonca dil paketi bağımlılığıdır.', detail1: 'Özellikle Asya menşeili oyunlar için gereklidir.', detail2: 'Gelişmiş karakter algılama sunar.', detail3: 'İndirildikten sonra anında devreye girer.' },
-  m1: { title: 'Tanıma Ağı (Easy)', desc: 'EasyOCR ana karakter tanıma yapay zeka modelidir.', detail1: 'Yüksek doğrulukla harfleri birleştirir.', detail2: 'Bellek üzerinde yer kaplar.', detail3: 'Sürekli aktif olarak çalışır.' },
-  m2: { title: 'Algılama (Easy)', desc: 'Ekrandaki yazıların konumlarını bulan modeldir.', detail1: 'Yazı kutularını tespit eder.', detail2: 'Performanslı çalışması için CUDA önemlidir.', detail3: 'Tanıma ağından önce devreye girer.' },
-  m3: { title: 'El Yazısı (Easy)', desc: 'El yazısı stiline sahip fontları okuma ağıdır.', detail1: 'Geleneksel RPG oyunlarında sıkça kullanılır.', detail2: 'Normal okuma ağından daha esnektir.', detail3: 'Gerektiğinde indirilebilir.' },
-  l1: { title: 'EN -> TR Çeviri', desc: 'İngilizceden Türkçeye tam çevrimdışı çeviri yapan dev modeldir.', detail1: 'MarianMT makine çeviri ağını kullanır.', detail2: 'Tamamen yerel çalıştığı için internet gerektirmez.', detail3: 'Yaklaşık 142 MB depolama alanı kaplar.' },
-  l2: { title: 'TR -> EN Çeviri', desc: 'Türkçeden İngilizceye çevrimdışı çeviri yapan makine modelidir.', detail1: 'MarianMT tabanlıdır ve internetsiz çalışır.', detail2: 'Tersine çeviri ihtiyacı olan kullanıcılar içindir.', detail3: 'Kurulduktan sonra anında kullanılabilir.' },
-  l3: { title: 'JA -> TR Çeviri', desc: 'Japoncadan Türkçeye çeviri yapan deneysel bir ağ modelidir.', detail1: 'Fugumt mimarisi üzerine geliştirilmiştir.', detail2: 'Anime veya JRPG çevirilerinde kullanılır.', detail3: 'Deneysel olduğu için hatalı cümleler üretebilir.' }
+  winonly: { title: 'Windows Görsel Tarama', desc: 'Windows yerleşik donanım ivmelendirmesini kullanan standart analiz modülü.', detail1: 'Kusursuz bir şekilde entegredir, harici indirme veya kurulum gerektirmez.', detail2: 'Sistem kaynaklarını minimum düzeyde tüketerek oyun performansını korur.', detail3: 'Standart oyun fontlarında oldukça hızlı sonuç verir.' },
+  easy: { title: 'Yapay Zeka Destekli Tarama', desc: 'Ekrandaki karmaşık fontları bile okuyabilen derin öğrenme modülü.', detail1: 'Stilize oyun metinlerinde veya kötü çözünürlüklerde hayat kurtarır.', detail2: 'Donanımınıza (GPU) yük bindirebilir ancak sonuçlar çok daha kesindir.', detail3: 'İleri düzey kullanıcılar ve okuması zor RPG oyunları için tasarlanmıştır.' },
+  w1: { title: 'Türkçe Algılama Desteği', desc: 'Windows üzerinden Türkçe karakterlerin hatasız algılanmasını sağlar.', detail1: 'Cihazınızda zaten kuruluysa anında otomatik olarak devreye girer.', detail2: 'Eksikse, doğrudan Windows ayarlarından saniyeler içinde eklenebilir.', detail3: 'Oyun içi metinlerin dil bağımlılıklarını çözer.' },
+  w2: { title: 'İngilizce Algılama Desteği', desc: 'Uluslararası oyunların temel dili olan İngilizce paketidir.', detail1: 'Sistemde her zaman aktif bulunması önerilen temel bir modüldür.', detail2: 'Olağanüstü hızlı bir tarama kapasitesi ve sıfır hata toleransı sunar.', detail3: 'Eksiksiz analiz ve çeviri zinciri için gereklidir.' },
+  w3: { title: 'Japonca Algılama Desteği', desc: 'Asya menşeili oyunlar için geliştirilmiş karakter algılama paketi.', detail1: 'JRPG tarzı oyunlarda doğru metin analizi için zorunludur.', detail2: 'Gelişmiş Kanji ve Kana tanıma özelliklerini aktif eder.', detail3: 'Etkinleştirildiğinde Asya fontlarında yüksek başarı oranı sağlar.' },
+  m1: { title: 'Gelişmiş Görüntü Analizi', desc: 'Ekrandaki metinleri algılayıp dijital verilere dönüştüren ana zeka motorudur.', detail1: 'Görüntü kalitesinden bağımsız olarak üst düzey bir okuma yeteneği sunar.', detail2: 'Tüm görüntü analiz görevlerinin kalbidir.', detail3: 'Tek tıkla indirilir ve arka planda sorunsuzca devreye girer.' },
+  m2: { title: 'Donanım Hızlandırma (GPU)', desc: 'Ekran kartınızın gücünü serbest bırakarak analiz işlemlerini uçuşa geçirir.', detail1: 'Sadece uyumlu NVIDIA kartlarıyla tam performans (Süper hızlı) çalışır.', detail2: 'Sistem kaynaklarına nefes aldırır ve gecikmeyi milisaniyelere düşürür.', detail3: 'Eksik olduğunda sistem hız keserek işlemci (CPU) modunu tercih eder.' },
+  m3: { title: 'Stilize Metin Modülü', desc: 'El yazısı stiline sahip karmaşık oyun fontlarını çözen ekstra paket.', detail1: 'Geleneksel RPG veya bağımsız (Indie) oyunlarda mükemmel çalışır.', detail2: 'Klasik okuma sistemlerinden daha farklı ve esnek bir algoritma kullanır.', detail3: 'Sadece ihtiyaç duyduğunuzda indirip aktif edebilirsiniz.' },
+  opus_mt_en_tr: { title: 'Gelişmiş Çeviri Zekası (Hızlı)', desc: 'İngilizceden Türkçeye anında, kusursuz ve yerel çeviri sağlayan optimize ağ.', detail1: 'Hiçbir uzak sunucuya bağlanmaz, tamamen cihazınızda çalışır.', detail2: 'Yüksek hız ve mantıklı cümle kurulumları ile oyun diyalogları için idealdir.', detail3: 'İnternetiniz kopsa bile kesintisiz bir deneyim yaşatır.' },
+  nllb: { title: 'Evrensel Çeviri Zekası (Ağır)', desc: 'Çok sayıda dili aynı anda algılayabilen, devasa bir çeviri beyni.', detail1: 'İngilizce dışındaki diğer küresel dilleri de yüksek başarıyla Türkçeye çevirir.', detail2: 'Dosya boyutu ve donanım gereksinimi diğer modellere kıyasla daha ağırdır.', detail3: 'Size en doğal ve akıcı çeviri deneyimini sunma garantisi verir.' }
 };
 
-const EngineInfoDock = ({ info, visible }: { info: typeof engineInfoContent['overview']; visible: boolean }) => {
-  const [displayInfo, setDisplayInfo] = useState(info);
+const EngineInfoDock = ({ info, visible }: { info?: typeof engineInfoContent['overview']; visible: boolean }) => {
+  const safeInfo = info || engineInfoContent['overview'];
+  const [displayInfo, setDisplayInfo] = useState(safeInfo);
   const [contentVisible, setContentVisible] = useState(true);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [dockHeight, setDockHeight] = useState<number | null>(null);
 
   useEffect(() => {
-    if (info.title === displayInfo.title) return;
+    const nextInfo = info || engineInfoContent['overview'];
+    if (nextInfo.title === displayInfo.title) return;
     setContentVisible(false);
     const timeout = window.setTimeout(() => {
-      setDisplayInfo(info);
+      setDisplayInfo(nextInfo);
       window.requestAnimationFrame(() => setContentVisible(true));
     }, 90);
     return () => window.clearTimeout(timeout);
@@ -310,7 +316,7 @@ const InfoButton = ({ enabled, onToggle }: { enabled: boolean; onToggle: () => v
   </button>
 );
 
-const MotorDurumu: React.FC<MotorDurumuProps> = ({ height = '100%', hardwareInfo, healthChecks, models, perfEstimate, onEngineSelect, selectedEngineId, isAvailable, offlineLangModels, offlineBusy, modelActions, completedModelId, onLangDownload, onLangCancelDownload, onLangRequestRemove, onEasyocrDownload, onEasyocrCancel, onEasyocrRemove, onRefreshHardware, isScanning, easyocrAction, easyocrCompleted }) => {
+const MotorDurumu: React.FC<MotorDurumuProps> = ({ height = '100%', hardwareInfo, healthChecks, models, perfEstimate, onEngineSelect, selectedEngineId, isAvailable, offlineLangModels, offlineBusy, modelActions, completedModelId, onLangDownload, onLangCancelDownload, onLangRequestRemove, onEasyocrDownload, onEasyocrCancel, onEasyocrRemove, onRefreshHardware, isScanning, easyocrAction, easyocrCompleted, cudaAction, cudaCompleted, onCudaDownload, onCudaCancel, onCudaRemove }) => {
   const currentEngineId = selectedEngineId;
   const currentChecks = healthChecks[currentEngineId] || [];
   const currentModels = models[currentEngineId] || [];
@@ -528,9 +534,16 @@ const MotorDurumu: React.FC<MotorDurumuProps> = ({ height = '100%', hardwareInfo
                      action = easyocrAction || action;
                      isCompleted = easyocrCompleted;
                   }
+                  
+                  // CUDA özel aksiyonlarını bağla
+                  if (mdl.id === 'm2') {
+                     action = cudaAction || action;
+                     isCompleted = cudaCompleted;
+                  }
 
                   const hasActionButton = !!action || 
                     (mdl.id === 'm1') || // m1 always has either download or remove
+                    (mdl.id === 'm2') || // m2 has download
                     (mdl.id === 'w1' && currentEngineId === 'winonly' && mdl.status === 'available') || 
                     (mdl.id === 'w2' && currentEngineId === 'winonly');
 
@@ -563,6 +576,11 @@ const MotorDurumu: React.FC<MotorDurumuProps> = ({ height = '100%', hardwareInfo
                                  <G p="M6 6h12v12H6z" stroke="currentColor" />
                                </button>
                              )}
+                             {mdl.id === 'm2' && action.type === 'install' && (
+                               <button className="model-action-icon action-stop" title="İndirmeyi durdur" onClick={(e) => { e.stopPropagation(); onCudaCancel(); }}>
+                                 <G p="M6 6h12v12H6z" stroke="currentColor" />
+                               </button>
+                             )}
                            </>
                         ) : (
                           <>
@@ -577,14 +595,34 @@ const MotorDurumu: React.FC<MotorDurumuProps> = ({ height = '100%', hardwareInfo
                                 onMouseEnter={(e) => { 
                                   e.stopPropagation(); 
                                   focusInfo({
-                                    title: 'EasyOCR İndirimi',
-                                    desc: 'Seçili motorun sorunsuz çalışabilmesi için gerekli olan python eklentisidir.',
-                                    detail1: 'İndirme işlemi boyut ve internetinize göre birkaç dakika sürebilir.',
-                                    detail2: 'Tamamlandığında arka planda otomatik kurulur.',
-                                    detail3: 'Kurulum sırasında uygulamayı kapatmamaya özen gösterin.'
+                                    title: 'Gelişmiş Görüntü Analizi Kurulumu',
+                                    desc: 'Motorun olağanüstü isabetle çalışmasını sağlayacak olan ana analiz modülüdür.',
+                                    detail1: 'Bağlantı hızınıza göre kısa bir indirme süreci gerektirir.',
+                                    detail2: 'Tamamen arka planda kurulur ve sizi asla bekletmez.',
+                                    detail3: 'Kurulum sürerken uygulamanın açık kalmasına özen gösterin.'
                                   }); 
                                 }}
                                 onClick={(e) => { e.stopPropagation(); onEasyocrDownload(); }}
+                              >
+                                <G p="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-3 3m0 0l-3-3m3 3V4" stroke="currentColor" />
+                              </button>
+                            )}
+                            {mdl.id === 'm2' && mdl.status === 'available' && (
+                              <button 
+                                className="model-action-icon action-download" 
+                                title="CUDA Hızlandırmasını İndir" 
+                                data-info-hotspot="true"
+                                onMouseEnter={(e) => { 
+                                  e.stopPropagation(); 
+                                  focusInfo({
+                                    title: 'Donanım Hızlandırma Kurulumu',
+                                    desc: 'Analiz hızınızı maksimuma çıkarmak için ekran kartınızın tam potansiyelini açığa çıkarır.',
+                                    detail1: 'Yaklaşık 2-3 GB boyutunda devasa bir performans paketidir.',
+                                    detail2: 'Sadece NVIDIA marka donanımlarda aktifleşerek gecikmeyi milisaniyelere indirir.',
+                                    detail3: 'Arka planda sessizce kurulur ve sisteme dahil olur.'
+                                  }); 
+                                }}
+                                onClick={(e) => { e.stopPropagation(); onCudaDownload(); }}
                               >
                                 <G p="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-3 3m0 0l-3-3m3 3V4" stroke="currentColor" />
                               </button>
@@ -598,6 +636,15 @@ const MotorDurumu: React.FC<MotorDurumuProps> = ({ height = '100%', hardwareInfo
                                 <G p="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke="currentColor" />
                               </button>
                             )}
+                            {mdl.id === 'm2' && (mdl.status === 'installed' || mdl.status === 'active') && (
+                              <button 
+                                className="model-action-icon action-remove" 
+                                title="CUDA Hızlandırmasını Sistemden Kaldır"
+                                onClick={(e) => { e.stopPropagation(); onCudaRemove(); }}
+                              >
+                                <G p="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke="currentColor" />
+                              </button>
+                            )}
                             {mdl.id === 'w1' && currentEngineId === 'winonly' && mdl.status === 'available' && (
                               <button 
                                 className="model-action-icon action-download" 
@@ -607,10 +654,10 @@ const MotorDurumu: React.FC<MotorDurumuProps> = ({ height = '100%', hardwareInfo
                                   e.stopPropagation(); 
                                   focusInfo({
                                     title: 'Sistem Onarımı',
-                                    desc: `Tespit Edilen Hata: ${hardwareInfo?.engine_details?.winonly?.reason || 'Windows OCR dil paketi eksik.'}`,
-                                    detail1: 'Windows 10/11 üzerinde OCR bileşeni yüklü değil.',
-                                    detail2: 'Bu butona tıklayarak doğrudan Windows Dil Ayarları\'na gidebilirsiniz.',
-                                    detail3: 'İlgili dil seçeneğini yüklediğinizde bu uyarı kalkacaktır.'
+                                    desc: `Tespit Edilen Hata: ${hardwareInfo?.engine_details?.winonly?.reason || 'Gerekli dil paketi bulunamadı.'}`,
+                                    detail1: 'Windows 10/11 sisteminizin yerleşik tarayıcısı şu an pasif durumda.',
+                                    detail2: 'Tıklayarak doğrudan Windows Dil Ayarları menüsüne ışınlanabilirsiniz.',
+                                    detail3: 'İlgili paket eklendikten sonra bu bildirim kalıcı olarak kaybolacaktır.'
                                   }); 
                                 }}
                                 onClick={(e) => { e.stopPropagation(); wsClient.send('repair_engine', { engine: 'winonly' }); }}
@@ -626,11 +673,11 @@ const MotorDurumu: React.FC<MotorDurumuProps> = ({ height = '100%', hardwareInfo
                                 onMouseEnter={(e) => { 
                                   e.stopPropagation(); 
                                   focusInfo({
-                                    title: 'Motorları Yeniden Tara',
-                                    desc: 'Windows OCR paketini kurduktan sonra değişiklikleri algılar.',
-                                    detail1: 'Kurulumu tamamladıysanız bu tuş ile sistemi taratın.',
-                                    detail2: 'Uygulamayı yeniden başlatmanıza gerek kalmaz.',
-                                    detail3: 'Sorun çözüldüyse uyarılar kalkacaktır.'
+                                    title: 'Sistemi Yeniden Tara',
+                                    desc: 'Windows ayarlarında yaptığınız değişiklikleri anında algılayıp uygulamanızı hazır hale getirir.',
+                                    detail1: 'Eksik paketi kurduktan sonra bu butona tıklayarak donanımınızı güncelleyebilirsiniz.',
+                                    detail2: 'Uygulamayı yeniden başlatmanıza gerek kalmadan kesintisiz deneyime devam edin.',
+                                    detail3: 'Her şey tamamsa yeşil ışığı göreceksiniz.'
                                   }); 
                                 }}
                                 onClick={(e) => { 
@@ -829,6 +876,11 @@ export const EnginesPanel: React.FC = () => {
   const [isHardwareScanning, setIsHardwareScanning] = useState(false);
   const [easyocrCompleted, setEasyocrCompleted] = useState(false);
 
+  // CUDA Plugin State
+  const [cudaAction, setCudaAction] = useState<OfflineModelAction | null>(null);
+  const [cudaCompleted, setCudaCompleted] = useState(false);
+  const [cudaRequiresRestart, setCudaRequiresRestart] = useState(false);
+
 
   const confirmTimerRef = useRef<number | null>(null);
 
@@ -949,6 +1001,31 @@ export const EnginesPanel: React.FC = () => {
       notify('error', String(data?.detail ?? 'EasyOCR indirme hatasi.'));
     });
 
+    // CUDA Plugin Events
+    const offCudaProgress = onEvent('cuda_progress', (data: any) => {
+      setCudaAction({
+        type: 'install',
+        progress: data.percent ?? 0,
+        detail: data.detail ?? '',
+        stage: data.stage ?? 'downloading',
+        bytes_label: data.bytes_label ?? ''
+      });
+    });
+    const offCudaComplete = onEvent('cuda_complete', () => {
+      setCudaAction(null);
+      setCudaCompleted(true);
+      setCudaRequiresRestart(true);
+      window.setTimeout(() => setCudaCompleted(false), 3000);
+      notify('success', 'CUDA başarıyla kuruldu! Aktif olması için Virel\'i yeniden başlatın.');
+    });
+    const offCudaCancel = onEvent('cuda_cancelled', () => {
+      setCudaAction(null);
+    });
+    const offCudaError = onEvent('cuda_error', (data: any) => {
+      setCudaAction(null);
+      notify('error', String(data?.message ?? 'CUDA indirme hatası.'));
+    });
+
     return () => {
       offHardware();
       offSettings();
@@ -963,6 +1040,10 @@ export const EnginesPanel: React.FC = () => {
       offEasyComplete();
       offEasyCancel();
       offEasyError();
+      offCudaProgress();
+      offCudaComplete();
+      offCudaCancel();
+      offCudaError();
     };
   }, [isConnected]);
 
@@ -989,7 +1070,7 @@ export const EnginesPanel: React.FC = () => {
       { label: 'Motor Durumu', value: hardware?.engine_details?.winonly?.reason || 'Durum bilgisi bekleniyor', state: hardware?.available_engines.includes('winonly') ? 'ok' : 'warn' },
     ],
     easy: [
-      { label: 'CUDA', value: hardware?.cuda_available ? 'Aktif' : 'Yok', state: hardware?.cuda_available ? 'ok' : 'warn' },
+      { label: 'CUDA', value: cudaRequiresRestart ? 'Yeniden Başlatın' : (hardware?.cuda_available ? 'Aktif' : 'Yok'), state: cudaRequiresRestart ? 'ok' : (hardware?.cuda_available ? 'ok' : 'warn') },
       { label: 'Neural Ağlar', value: hardware?.available_engines.includes('easy') ? 'Mevcut' : 'Eksik', state: hardware?.available_engines.includes('easy') ? 'ok' : 'error' },
       { label: 'Motor Durumu', value: hardware?.engine_details?.easy?.reason || 'Durum bilgisi bekleniyor', state: hardware?.available_engines.includes('easy') ? 'ok' : 'warn' },
     ],
@@ -1002,7 +1083,7 @@ export const EnginesPanel: React.FC = () => {
     ],
     easy: [
       { id: 'm1', name: 'Easy Motoru', subtitle: hardware?.engine_details?.easy?.reason || 'OCR paketi kontrol ediliyor', status: hardware?.available_engines.includes('easy') ? 'active' : 'available' },
-      { id: 'm2', name: 'CUDA Desteği', subtitle: hardware?.cuda_available ? 'GPU hızlandırma açık' : 'CPU moduna düşecek', status: hardware?.cuda_available ? 'installed' : 'available' },
+      { id: 'm2', name: 'CUDA Desteği', subtitle: cudaRequiresRestart ? 'Aktif olması için uygulamayı yeniden başlatın' : (hardware?.cuda_available ? 'GPU hızlandırma açık' : 'CPU moduna düşecek'), status: cudaRequiresRestart ? 'installed' : (hardware?.cuda_available ? 'installed' : 'available') },
     ],
   };
 
@@ -1108,6 +1189,23 @@ export const EnginesPanel: React.FC = () => {
     injectInfoLog('UI-010', 'EasyOCR kaldiriliyor...');
     notify('warning', 'EasyOCR eklentisi kaldirildi.');
     send('remove_easyocr');
+  };
+
+  // CUDA Handlers
+  const handleCudaDownload = () => {
+    injectInfoLog('UI-015', 'CUDA indirme tetiklendi!');
+    notify('info', 'CUDA indirmesi başlatılıyor (Bu işlem internet hızına göre zaman alabilir)...');
+    send('download_cuda');
+  };
+  const handleCudaCancel = () => {
+    setCudaAction(null);
+    notify('warning', 'CUDA indirmesi iptal edildi.');
+    send('cancel_cuda');
+  };
+  const handleCudaRemove = () => {
+    injectInfoLog('UI-016', 'CUDA kaldiriliyor...');
+    notify('warning', 'CUDA paketleri sistemden kaldırılıyor...');
+    send('remove_cuda');
   };
 
   return (
@@ -1315,6 +1413,11 @@ export const EnginesPanel: React.FC = () => {
         }}
         easyocrAction={easyocrAction}
         easyocrCompleted={easyocrCompleted}
+        cudaAction={cudaAction}
+        cudaCompleted={cudaCompleted}
+        onCudaDownload={handleCudaDownload}
+        onCudaCancel={handleCudaCancel}
+        onCudaRemove={handleCudaRemove}
       />
 
       {removeTargetModel ? (

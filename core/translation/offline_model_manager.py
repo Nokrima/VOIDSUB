@@ -368,7 +368,7 @@ class OfflineModelManager:
             name = str(item["name"])
             size = int(item.get("size", 0) or 0)
             percent = 10 + int((downloaded / total) * 50)
-            self._set_stage("downloading", percent, name)
+            self._set_stage("downloading", percent, f"{name} indiriliyor... ({index}/{len(files)})")
             log_event(PREFIX_TRL, "048", f"[Model İndirme] -> İNDİRİLİYOR | Dosya: {name} ({index}/{len(files)}) | Boyut: {self._format_bytes(size) if size else 'Bilinmiyor'}")
             started_at = time.monotonic()
             try:
@@ -392,7 +392,7 @@ class OfflineModelManager:
                 f"hf_hub_download(repo_id={self.spec['repo_id']!r}, filename={filename!r}, local_dir={str(self.tmp_dir)!r})"
             ),
         ]
-        watch_path = self.tmp_dir / ".cache" / "huggingface" / "download"
+        watch_path = self.tmp_dir
         while True:
             try:
                 self._run_process(command, f"Model dosyası indirilemedi: {filename}", watch_path=watch_path, total_bytes=total_bytes)

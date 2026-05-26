@@ -43,7 +43,7 @@ Write-Host "[1/2] Virel V2 Cekirdegi (Python) baslatiliyor..." -ForegroundColor 
 $pythonJob = Start-Process -FilePath $pythonExe -ArgumentList "main.py" -WorkingDirectory $repoRoot -WindowStyle Hidden -PassThru
 
 # Port'un açılmasını bekle
-$timeout = 15
+$timeout = 45
 $portReady = $false
 Write-Host "[*] Python WebSocket (Port $WS_PORT) baglantisi bekleniyor..." -ForegroundColor DarkGray
 while ($timeout -gt 0) {

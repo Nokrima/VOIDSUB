@@ -137,11 +137,13 @@ class EasyOCRManager:
                 return
             self._fail(str(exc))
         except Exception as exc:
+            import traceback
+            traceback_str = traceback.format_exc()
+            log_error(PREFIX_OCR, "089", f"[EasyOCR Kurulumu] -> BEKLENMEYEN HATA:\n{traceback_str}", "Bilinmeyen bir hata oluştu.")
             self._fail(str(exc))
 
     def _prepare_workspace(self) -> None:
-        if self.tmp_dir.exists():
-            shutil.rmtree(self.tmp_dir, ignore_errors=True)
+        # DO NOT rmtree self.tmp_dir here to support resumable downloads.
         if self.plugin_dir.exists():
             shutil.rmtree(self.plugin_dir, ignore_errors=True)
         self.tmp_dir.mkdir(parents=True, exist_ok=True)
@@ -162,51 +164,113 @@ class EasyOCRManager:
 
     def _download_file(self, url: str, total_bytes: int) -> None:
         import urllib.request
+        import time
         
         zip_path = self.tmp_dir / EASYOCR_ASSET_NAME
-
-
-        try:
-            req = urllib.request.Request(url, headers={"User-Agent": "Virel-V2"})
-            with urllib.request.urlopen(req, timeout=15) as response:
-                total_size = int(response.headers.get("content-length", total_bytes))
-                downloaded = 0
+        max_retries = 5
+        retry_delay = 2.0
+        
+        for attempt in range(max_retries):
+            self._raise_if_cancelled()
+            
+            existing_size = 0
+            if zip_path.exists():
+                existing_size = zip_path.stat().st_size
+                if total_bytes > 0 and existing_size > total_bytes:
+                    zip_path.unlink()
+                    existing_size = 0
                 
-                with open(zip_path, "wb") as f:
-                    while True:
-                        self._raise_if_cancelled()
-                        chunk = response.read(8192 * 4)
-                        if not chunk:
-                            break
-                        f.write(chunk)
-                        downloaded += len(chunk)
+            if total_bytes > 0 and existing_size == total_bytes:
+                self.percent = 80
+                self.detail = "İndirme tamamlandı, doğrulanıyor..."
+                self.bytes_label = f"{self._format_bytes(existing_size)} / {self._format_bytes(total_bytes)}"
+                self._send_progress()
+                return
+
+            headers = {"User-Agent": "Virel-V2"}
+            mode = "wb"
+            if existing_size > 0:
+                headers["Range"] = f"bytes={existing_size}-"
+                mode = "ab"
+
+            try:
+                req = urllib.request.Request(url, headers=headers)
+                with urllib.request.urlopen(req, timeout=15) as response:
+                    if response.status == 206:
+                        downloaded = existing_size
+                    else:
+                        downloaded = 0
+                        mode = "wb"
                         
-                        self.percent = 10 + int((downloaded / total_size) * 70) if total_size > 0 else 50
-                        self.detail = f"{EASYOCR_ASSET_NAME} indiriliyor"
-                        self.bytes_label = f"{self._format_bytes(downloaded)} / {self._format_bytes(total_size)}"
-                        self._send_progress()
-        except RuntimeError as e:
-            if str(e) == "Indirme iptal edildi.":
+                    last_send = time.monotonic()
+                    with open(zip_path, mode) as f:
+                        while True:
+                            self._raise_if_cancelled()
+                            chunk = response.read(8192 * 16) # 128KB chunks
+                            if not chunk:
+                                break
+                            f.write(chunk)
+                            downloaded += len(chunk)
+                            
+                            now = time.monotonic()
+                            if now - last_send > 0.2 or downloaded == total_bytes:
+                                self.percent = 10 + int((downloaded / total_bytes) * 70) if total_bytes > 0 else 50
+                                self.detail = f"{EASYOCR_ASSET_NAME} indiriliyor"
+                                self.bytes_label = f"{self._format_bytes(downloaded)} / {self._format_bytes(total_bytes)}"
+                                self._send_progress()
+                                last_send = now
+                                
+                    if total_bytes > 0 and downloaded < total_bytes:
+                        raise RuntimeError(f"Bağlantı kesildi. İndirme eksik kaldı: {self._format_bytes(downloaded)} / {self._format_bytes(total_bytes)}")
+                        
+                return  # Başarıyla tamamlandı
+                
+            except RuntimeError as e:
+                if str(e) == "cancelled" or self._cancel.is_set():
+                    raise e
+                if "Bağlantı kesildi" in str(e) and attempt < max_retries - 1:
+                    time.sleep(retry_delay)
+                    continue
                 raise e
-            raise RuntimeError(f"Indirme basarisiz: {e}")
-        except Exception as exc:
-            raise RuntimeError(f"Indirme basarisiz: {exc}")
+            except Exception as e:
+                if "cancelled" in str(e) or self._cancel.is_set():
+                    raise RuntimeError("cancelled")
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay)
+                    continue
+                raise RuntimeError(f"İndirme {max_retries} denemeden sonra başarısız oldu: {e}")
 
     def _extract_plugin(self) -> None:
-        self._set_stage("extracting", 85, "Eklenti çıkartılıyor...")
+        self._set_stage("extracting", 85, "Eklenti çıkartılıyor... (Bu işlem birkaç dakika sürebilir)")
         import zipfile
+        import time
         
         zip_path = self.tmp_dir / EASYOCR_ASSET_NAME
         if not zip_path.exists():
-            raise RuntimeError("Indirilen zip dosyasi bulunamadi.")
+            raise RuntimeError("Indirilen zip dosyasi bulunamadi!")
             
         try:
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                zip_ref.extractall(self.plugin_dir)
-        except RuntimeError as e:
-            if str(e) == "Indirme iptal edildi.":
-                raise e
-            raise RuntimeError(f"Zip cikartma hatasi: {e}")
+                members = zip_ref.infolist()
+                total_files = len(members)
+                last_send = time.monotonic()
+                
+                for i, member in enumerate(members):
+                    self._raise_if_cancelled()
+                    zip_ref.extract(member, self.plugin_dir)
+                    
+                    now = time.monotonic()
+                    # Arayuzu ve loglari bogmamak icin her 0.3 saniyede bir veya son dosyada guncelle
+                    if now - last_send > 0.3 or i == total_files - 1:
+                        progress_percent = 85 + int((i / total_files) * 10)
+                        self.percent = min(95, progress_percent)
+                        self.detail = f"Dosyalar çıkartılıyor... ({i}/{total_files})"
+                        self._send_progress()
+                        log_event(PREFIX_OCR, "095", f"[Zip Çıkartma] -> DEVAM EDİYOR | Dosya: {i}/{total_files} | Çıkartılan: {member.filename}")
+                        last_send = now
+                        
+        except zipfile.BadZipFile:
+            raise RuntimeError("İndirilen zip dosyası bozuk veya bağlantı kopması nedeniyle eksik! Lütfen tekrar deneyin.")
         except Exception as exc:
             raise RuntimeError(f"Zip cikartma hatasi: {exc}")
 

@@ -74,7 +74,7 @@ class BridgeLogHandler(logging.Handler):
 
 def _build_file_handler() -> RotatingFileHandler:
     LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    LOG_FILE.write_text("", encoding="utf-8")
+    # Log dosyasını her açılışta silmeyi kaldırdık ki eski hataları görebilelim!
     handler = RotatingFileHandler(
         LOG_FILE,
         maxBytes=LOG_MAX_BYTES,

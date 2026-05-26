@@ -114,7 +114,10 @@ export function Toaster({ notices, dismissNotice }: ToasterProps) {
                 <NoticeIcon tone={notice.tone} />
               </div>
               
-              <div className={`flex-1 text-[13px] leading-[1.5] font-semibold tracking-wide ${config.text} drop-shadow-md`}>
+              <div 
+                className={`flex-1 text-[13px] leading-[1.5] font-semibold tracking-wide ${config.text} drop-shadow-md`}
+                style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }}
+              >
                 {notice.message.split('!').map((part, index, arr) => (
                   <span key={index}>
                     {part}

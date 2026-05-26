@@ -125,9 +125,11 @@ class BridgeServer:
         self._temporary_region = None
         self._temporary_region_active = False
         from core.ocr.easyocr_manager import EasyOCRManager
+        from core.cuda_manager import CudaManager
         import os
         app_data = Path(os.environ.get('LOCALAPPDATA', 'C:/')) / 'Virel V2'
         self.easyocr_manager = EasyOCRManager(app_data / 'plugins', self)
+        self.cuda_manager = CudaManager(self)
         set_log_level(self.settings["app"].get("log_level", "info"))
         log_event(
             PREFIX_SYS,
@@ -464,7 +466,16 @@ class BridgeServer:
                             throttle_key="hardware_scan",
                             throttle_seconds=1.0,
                         )
-                        self.send("hardware_result", self.scanner.scan_system())
+                        def _scan():
+                            try:
+                                res = self.scanner.scan_system()
+                                if self.loop and not self.loop.is_closed():
+                                    self.loop.call_soon_threadsafe(self.send, "hardware_result", res)
+                            except Exception:
+                                pass
+                        
+                        import threading
+                        threading.Thread(target=_scan, daemon=True).start()
 
                     elif event == "repair_engine":
                         engine_id = payload.get("engine")
@@ -500,6 +511,14 @@ class BridgeServer:
                         self.easyocr_manager.cancel()
                     elif event == "remove_easyocr":
                         self.easyocr_manager.remove()
+                    elif event == "download_cuda":
+                        self.cuda_manager.start()
+                    elif event == "cancel_cuda":
+                        self.cuda_manager.cancel()
+                    elif event == "remove_cuda":
+                        self.cuda_manager.remove()
+                    elif event == "get_cuda_status":
+                        self.cuda_manager._send_status()
                     elif event == "cancel_offline_models":
                         offline_engine = getattr(self.worker, "offline_engine", getattr(self.worker, "offline_translator", None))
                         if offline_engine is not None:

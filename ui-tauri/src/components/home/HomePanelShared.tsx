@@ -35,10 +35,10 @@ const INFO_BUBBLE_ARROW_EDGE_PADDING = 8;
 const INFO_BUBBLE_ARROW_OVERLAP = 1;
 
 const INFO_BUBBLE_TEXT_LABELS = {
-  what: '◉',
-  lower: '↓',
-  higher: '↑',
-  mode: '◎',
+  what: '◎',
+  lower: '←',
+  higher: '→',
+  mode: '✦',
 } as const;
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
