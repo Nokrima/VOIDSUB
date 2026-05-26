@@ -70,7 +70,7 @@ def _winocr_worker(
                     lines = []
                     if result and result.lines:
                         for line in result.lines:
-                            lines.append(str(line.text))
+                            lines.append(line.text)
                     result_queue.put({"success": True, "lines": lines})
                 except Exception as e:
                     result_queue.put({"success": False, "error": str(e)})
