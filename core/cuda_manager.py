@@ -80,6 +80,11 @@ class CudaManager:
         self._install_started_at = time.monotonic()
         try:
             log_event(PREFIX_SYS, "093", "[CUDA Kurulumu] -> BAŞLADI")
+            
+            is_compiled = getattr(sys, "frozen", False) or "__compiled__" in globals()
+            if is_compiled:
+                raise RuntimeError("Derlenmiş sürümde CUDA doğrudan pip ile kurulamaz. Lütfen ayarlardan EasyOCR eklentisini indirin.")
+
             self._set_stage("downloading", 5, "NVIDIA CUDA paketleri aranıyor...")
             
             # Use PyTorch with CUDA 12.4

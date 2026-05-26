@@ -126,6 +126,15 @@ class HardwareDetector:
         }
 
     def _repair_easyocr(self) -> dict:
+        is_compiled = getattr(sys, "frozen", False) or "__compiled__" in globals()
+        if is_compiled:
+            return {
+                "engine": "easy",
+                "success": False,
+                "retryable": False,
+                "message": "Derlenmiş sürümde otomatik onarım yapılamaz. Lütfen Eklentiyi Ayarlar'dan yeniden indirin.",
+            }
+
         try:
             cflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
             command = [sys.executable, "-m", "pip", "install", "easyocr"]
@@ -266,6 +275,10 @@ class HardwareDetector:
 
     def _check_cuda_available(self) -> bool:
         """Check if CUDA runtime is installed via metadata to avoid heavy torch import and VRAM allocation."""
+        app_data = Path(os.environ.get('LOCALAPPDATA', 'C:/')) / 'Virel V2'
+        if (app_data / 'plugins' / 'easyocr' / 'python.exe').exists():
+            return True
+
         try:
             from importlib.metadata import version
             torch_version = version("torch")

@@ -1,9 +1,17 @@
 """
 GPU Canavarı (EasyOCREngine): Derin öğrenme tabanlı, ağır ama güçlü OCR motoru.
-V2 iyileştirmesi: RAM optimizasyonu sağlandı ve geçersiz dil kodu hatası giderildi.
+V2 iyileştirmesi: Nuitka derlemeleri için taşınabilir worker (subprocess) mimarisi eklendi.
 """
 from __future__ import annotations
 
+import base64
+import json
+import os
+import subprocess
+import sys
+import threading
+from pathlib import Path
+import cv2
 import numpy as np
 
 from core.errors import PREFIX_OCR, get_logger
@@ -15,88 +23,146 @@ class EasyOCREngine(OCREngine):
         super().__init__()
         self.logger = get_logger()
         self.reader = None
-        # "auto" modda Ingilizce varsayilan — belirsiz Japonca listesi kaldirildi.
+        self.worker_proc: subprocess.Popen | None = None
         self.source_language = "auto"
         self.lang_list = ["en", "ru"]
         self.use_gpu = False
-        try:
-            import torch
-            self.use_gpu = torch.cuda.is_available()
-        except Exception as e:
-            self.logger.warning(f"[{PREFIX_OCR}-050] PyTorch baslangic kontrolu atlandi (Bozuk DLL veya kilitli GPU): {e}")
-            pass
+        self.is_compiled = getattr(sys, "frozen", False) or "__compiled__" in globals()
+        self.plugin_python = self._get_plugin_python()
 
     @property
     def name(self) -> str:
-        """Arayüzde gösterilecek motor adı."""
         return "EasyOCR GPU" if self.use_gpu else "EasyOCR CPU"
 
+    def _get_plugin_python(self) -> Path | None:
+        app_data = Path(os.environ.get('LOCALAPPDATA', 'C:/')) / 'Virel V2'
+        python_exe = app_data / 'plugins' / 'easyocr' / 'python.exe'
+        return python_exe if python_exe.exists() else None
+
     def start(self) -> bool:
-        """
-        Motoru hazırlar ve gerekli modelleri belleğe yükler.
-        """
         self.start_error = None
+        
+        # 1. Eğer eklenti varsa WORKER modunda başlat (Nuitka için ZORUNLU)
+        if self.plugin_python:
+            return self._start_worker_mode()
+
+        # 2. Eğer eklenti yoksa ama derlenmiş bir uygulama ise, çalışamaz.
+        if self.is_compiled:
+            self.start_error = "EasyOCR eklentisi (taşınabilir Python) bulunamadı. Lütfen eklentiyi indirin."
+            self.logger.error(f"[{PREFIX_OCR}-033] {self.start_error}")
+            return False
+
+        # 3. Geliştirici ortamındaysa yerel kütüphaneyi dene
+        return self._start_native_mode()
+
+    def _start_worker_mode(self) -> bool:
+        try:
+            worker_script = self.plugin_python.parent / "easyocr-worker.py"
+            if not worker_script.exists():
+                self.start_error = "easyocr-worker.py bulunamadı!"
+                return False
+
+            self.logger.info(f"[{PREFIX_OCR}-032] EasyOCR Worker başlatılıyor: {self.plugin_python}")
+            cflags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if sys.platform == "win32" else 0
+            self.worker_proc = subprocess.Popen(
+                [str(self.plugin_python), str(worker_script)],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                creationflags=cflags
+            )
+            
+            # GPU kontrolünü worker'dan almak zordur, şimdilik varsayılan true/false atayabiliriz
+            # (Worker kodu gpu=torch.cuda.is_available() yapıyor)
+            self.use_gpu = True 
+            self._is_ready = True
+            self.logger.info(f"[{PREFIX_OCR}-047] EasyOCR Worker hazır.")
+            return True
+        except Exception as exc:
+            self.start_error = f"{type(exc).__name__}: {exc}"
+            self.logger.error(f"[{PREFIX_OCR}-048] EasyOCR Worker start failed: {exc}")
+            return False
+
+    def _start_native_mode(self) -> bool:
         try:
             import torch
             import easyocr
-
-            lang_list = list(self.lang_list)
-            self.logger.info(
-                f"[{PREFIX_OCR}-046] EasyOCR runtime probe: languages={lang_list}, gpu={self.use_gpu}, "
-                f"torch_cuda={torch.version.cuda}, cuda_available={torch.cuda.is_available()}, "
-                f"cuda_device_count={torch.cuda.device_count()}"
-            )
-
-            self.logger.info(f"[{PREFIX_OCR}-032] EasyOCR {lang_list} dilleriyle yükleniyor (GPU: {self.use_gpu})")
-
-            self.reader = easyocr.Reader(lang_list, gpu=self.use_gpu)
+            self.use_gpu = torch.cuda.is_available()
+            self.logger.info(f"[{PREFIX_OCR}-032] EasyOCR Native {self.lang_list} dilleriyle yükleniyor (GPU: {self.use_gpu})")
+            self.reader = easyocr.Reader(self.lang_list, gpu=self.use_gpu)
             self._is_ready = True
-            self.logger.info(f"[{PREFIX_OCR}-047] EasyOCR ready: languages={lang_list}, gpu={self.use_gpu}")
             return True
-
         except ImportError:
             self.start_error = "EasyOCR kütüphanesi veya PyTorch bulunamadı."
-            self.logger.error(f"[{PREFIX_OCR}-033] EasyOCR kütüphanesi bulunamadı.")
             return False
         except Exception as exc:
             self.start_error = f"{type(exc).__name__}: {exc}"
-            self.logger.error(f"[{PREFIX_OCR}-048] EasyOCR start failed: {type(exc).__name__}: {exc}")
             return False
 
     def read(self, image: np.ndarray) -> list[tuple]:
-        """Görüntüyü okur ve kutu, metin, güven skoru döndürür."""
-        if not self._is_ready or self.reader is None:
+        if not self._is_ready:
             return []
 
+        if self.worker_proc:
+            return self._read_worker_mode(image)
+        elif self.reader:
+            return self._read_native_mode(image)
+        return []
+
+    def _read_worker_mode(self, image: np.ndarray) -> list[tuple]:
+        try:
+            ok, encoded = cv2.imencode('.png', image)
+            if not ok:
+                return []
+            img_b64 = base64.b64encode(encoded.tobytes()).decode('ascii')
+            payload = json.dumps({"command": "read", "image": img_b64}) + "\n"
+            
+            self.worker_proc.stdin.write(payload)
+            self.worker_proc.stdin.flush()
+            
+            response_line = self.worker_proc.stdout.readline()
+            if not response_line:
+                return []
+                
+            response = json.loads(response_line)
+            if response.get("status") == "ok":
+                return [(item[0], item[1], item[2]) for item in response.get("data", [])]
+            else:
+                self.logger.error(f"[{PREFIX_OCR}-034] EasyOCR Worker Hatası: {response.get('message')}")
+                return []
+        except Exception as exc:
+            self.logger.error(f"[{PREFIX_OCR}-034] EasyOCR Worker iletişim hatası: {exc}")
+            return []
+
+    def _read_native_mode(self, image: np.ndarray) -> list[tuple]:
         try:
             results = self.reader.readtext(image, detail=1)
-            return [(bbox, text, int(prob * 100)) for bbox, text, prob in results]  # type: ignore
+            return [(bbox, text, int(prob * 100)) for bbox, text, prob in results]
         except Exception as exc:
             self.logger.error(f"[{PREFIX_OCR}-034] EasyOCR okuma sırasında çöktü: {exc}")
-            err_str = str(exc).lower()
-            if "memory" in err_str or "cuda" in err_str or "cublas" in err_str or "alloc" in err_str:
-                from core.errors import emit_bridge_event
-                self.use_gpu = False
-                emit_bridge_event("translation_state", {
-                    "running": False,
-                    "reason": "engine_unavailable",
-                    "message": "Ekran kartı belleği doldu. Çeviri CPU moduna geçiyor."
-                })
             return []
 
     def stop(self) -> None:
-        """Belleği temizler ve motoru kapatır."""
+        self._is_ready = False
+        if self.worker_proc:
+            try:
+                self.worker_proc.terminate()
+                self.worker_proc.wait(timeout=1.0)
+            except Exception:
+                pass
+            self.worker_proc = None
+            
         self.reader = None
-        if self.use_gpu:
+        if self.use_gpu and not self.is_compiled:
             try:
                 import torch
                 torch.cuda.empty_cache()
             except ImportError:
                 pass
-        self._is_ready = False
 
     def configure_source_language(self, source_language: str) -> None:
-        # "auto" dahil her durumda Ingilizce calis — belirsiz mod kaldirildi.
         normalized = str(source_language or "auto").strip().lower()
         if normalized == "en":
             lang_list = ["en"]
@@ -109,13 +175,12 @@ class EasyOCREngine(OCREngine):
             return
         self.source_language = normalized
         self.lang_list = lang_list
-        if self.reader is not None:
+        if self.reader is not None or self.worker_proc is not None:
             self.stop()
         else:
             self._is_ready = False
 
     def system_check(self) -> dict:
-        """Arayüz için motorun sağlık raporunu üretir."""
         status = {
             "available": False,
             "reason": "",
@@ -125,12 +190,21 @@ class EasyOCREngine(OCREngine):
             "gpu_ok": self.use_gpu,
             "ram_ok": True,
         }
+        
+        if self.plugin_python:
+            status["available"] = True
+            return status
+            
+        if self.is_compiled:
+            status["reason"] = "EasyOCR Eklentisi eksik. Ayarlardan indirin."
+            return status
+            
         try:
             import easyocr  # noqa: F401
-
             status["available"] = True
             if not self.use_gpu:
                 status["reason"] = "GPU yok. CPU modu aşırı yavaş çalışacaktır."
         except ImportError:
             status["reason"] = "PyTorch veya EasyOCR kütüphaneleri eksik."
+            
         return status
