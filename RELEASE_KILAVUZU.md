@@ -65,8 +65,9 @@ Bu aşama, kullanıcıların program içinden "Güncellemeleri Denetle" butonuna
 1. İnternet tarayıcınızdan **virel-updater** (Nokrima/virel-updater) reposuna gidin.
 2. Sağ taraftan **Releases** sekmesine tıklayıp **"Draft a new release"** (Yeni sürüm oluştur) butonuna basın.
 3. Tag kısmına yeni versiyonu yazın (Örn: `v2.6.0`).
-4. **Attach binaries by dropping them here** yazan kutuya, 3. adımda üretilen **`Virel V2_x.x.x_x64-setup.exe`** dosyasını sürükleyip bırakın (Yüklenmesini bekleyin).
-5. Yükleme bitince yeşil **Publish release** butonuna tıklayıp sürümü yayınlayın.
+4. **Description (Açıklama)** kısmına sürüm notlarını detaylıca yazın (Kullanıcılar bu notları görecek).
+5. **Attach binaries by dropping them here** yazan kutuya, 3. adımda üretilen **`Virel V2_x.x.x_x64-setup.exe`** dosyasını sürükleyip bırakın (Yüklenmesini bekleyin).
+6. Yükleme bitince yeşil **Publish release** butonuna tıklayıp sürümü yayınlayın.
 
 ---
 
