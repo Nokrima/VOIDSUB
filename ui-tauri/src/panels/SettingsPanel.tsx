@@ -256,7 +256,6 @@ const ShortcutRow = ({ label, value, onChange }: { label: string, value: string,
 };
 
 import { getVersion } from '@tauri-apps/api/app';
-import { invoke } from '@tauri-apps/api/core';
 
 const VersionStatusBlock = () => {
   const { send, isConnected } = useWebSocket();
