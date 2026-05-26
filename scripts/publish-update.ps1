@@ -26,12 +26,12 @@ if (-not $Version) {
 }
 Write-Host "[*] Yayimlanacak surum: v$Version" -ForegroundColor Cyan
 
-# 2. Tauri'nin urettigi zip ve sig dosyalarini bul
-$zipFile = Get-ChildItem $bundleDir -Filter "*.nsis.zip"   | Select-Object -First 1
-$sigFile = Get-ChildItem $bundleDir -Filter "*.nsis.zip.sig" | Select-Object -First 1
+# 2. Tauri'nin urettigi exe ve sig dosyalarini bul
+$exeFile = Get-ChildItem $bundleDir -Filter "*-setup.exe"   | Select-Object -First 1
+$sigFile = Get-ChildItem $bundleDir -Filter "*-setup.exe.sig" | Select-Object -First 1
 
-if (-not $zipFile) {
-    Write-Host "[X] .nsis.zip dosyasi bulunamadi: $bundleDir" -ForegroundColor Red
+if (-not $exeFile) {
+    Write-Host "[X] -setup.exe dosyasi bulunamadi: $bundleDir" -ForegroundColor Red
     exit 1
 }
 
@@ -41,8 +41,8 @@ if ($sigFile) {
     $signature = $signature.Trim()
 }
 
-# 3. GitHub Release URL'si (zip dosyasini releases'e yuklemeniz gerekiyor)
-$downloadUrl = "https://github.com/Nokrima/Virel/releases/download/v$Version/$($zipFile.Name)"
+# 3. GitHub Release URL'si (exe dosyasini releases'e yuklemeniz gerekiyor)
+$downloadUrl = "https://github.com/Nokrima/Virel/releases/download/v$Version/$($exeFile.Name)"
 
 Write-Host "[*] Indirme URL: $downloadUrl" -ForegroundColor DarkGray
 

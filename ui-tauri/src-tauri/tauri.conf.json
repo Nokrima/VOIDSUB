@@ -30,6 +30,7 @@
     }
   },
   "bundle": {
+    "createUpdaterArtifacts": true,
     "windows": {
       "nsis": {
         "displayLanguageSelector": true,
@@ -41,7 +42,7 @@
       }
     },
     "active": true,
-    "targets": "all",
+    "targets": ["nsis"],
     "externalBin": ["virel-core"],
     "resources": {
       "bin/vc_redist.x64.exe": "bin/vc_redist.x64.exe"
