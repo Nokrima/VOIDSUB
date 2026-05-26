@@ -14,6 +14,8 @@ use tauri::{
     AppHandle, Emitter, Manager, Runtime, Wry,
 };
 use tauri_plugin_shell::ShellExt;
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+use tauri_plugin_updater::UpdaterExt;
 
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::Graphics::Dwm::DwmSetWindowAttribute;
@@ -393,6 +395,43 @@ fn register_global_hotkeys(app_handle: tauri::AppHandle) {
 }
 
 #[tauri::command]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+async fn check_for_updates(app: AppHandle) {
+    let updater = match app.updater() {
+        Ok(u) => u,
+        Err(e) => {
+            let _ = app.emit("update_error", serde_json::json!({ "msg": e.to_string() }));
+            return;
+        }
+    };
+    match updater.check().await {
+        Ok(Some(update)) => {
+            let _ = app.emit("update_available", serde_json::json!({
+                "version": update.version,
+                "notes": update.body.clone().unwrap_or_default(),
+            }));
+            // Store the update handle via a managed state — for now trigger install directly.
+            match update.download_and_install(
+                |chunk, total| {
+                    let pct = total.map(|t| (chunk as f64 / t as f64 * 100.0) as u32).unwrap_or(0);
+                    let _ = app.emit("update_progress", serde_json::json!({ "percent": pct }));
+                },
+                || { let _ = app.emit("update_complete", ()); }
+            ).await {
+                Ok(_) => {}
+                Err(e) => { let _ = app.emit("update_error", serde_json::json!({ "msg": e.to_string() })); }
+            }
+        }
+        Ok(None) => { let _ = app.emit("update_not_available", ()); }
+        Err(e) => { let _ = app.emit("update_error", serde_json::json!({ "msg": e.to_string() })); }
+    }
+}
+
+#[tauri::command]
+#[cfg(any(target_os = "android", target_os = "ios"))]
+async fn check_for_updates(_app: AppHandle) {}
+
+#[tauri::command]
 fn get_user_profile_info() -> UserProfileInfo {
     let display_name = current_display_name();
     let avatar_data_url = latest_avatar_file().and_then(|path| {
@@ -414,6 +453,7 @@ fn get_user_profile_info() -> UserProfileInfo {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_autostart::init(
@@ -425,7 +465,8 @@ pub fn run() {
             restore_main_window,
             update_hotkeys,
             suspend_hotkeys,
-            resume_hotkeys
+            resume_hotkeys,
+            check_for_updates
         ])
         .setup(|app| {
             #[cfg(not(debug_assertions))]

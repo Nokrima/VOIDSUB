@@ -53,5 +53,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "",
+      "endpoints": [
+        "https://raw.githubusercontent.com/Nokrima/virel-updater/main/latest.json"
+      ]
+    }
   }
 }

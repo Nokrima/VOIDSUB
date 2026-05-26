@@ -256,6 +256,7 @@ const ShortcutRow = ({ label, value, onChange }: { label: string, value: string,
 };
 
 import { getVersion } from '@tauri-apps/api/app';
+import { invoke } from '@tauri-apps/api/core';
 
 const VersionStatusBlock = () => {
   const { send, isConnected } = useWebSocket();
@@ -313,7 +314,10 @@ const VersionStatusBlock = () => {
     }
     setChecking(true);
     setSuccess(false);
-    send('check_for_updates');
+    invoke('check_for_updates').catch((e: any) => {
+      setChecking(false);
+      notify('error', e?.toString() || 'Güncelleme kontrolü başlatılamadı.', 'update_system');
+    });
   };
 
   let btnText = 'DENETLE';
