@@ -31,7 +31,10 @@ class HardwareDetector:
         has_winrt = self._can_start_windows_ocr()
         
         # Kullanıcı tercihine göre hem global pip paketini hem de taşınabilir eklentiyi kontrol ediyoruz
-        has_easyocr_global = find_spec("easyocr") is not None
+        try:
+            has_easyocr_global = find_spec("easyocr") is not None
+        except ImportError:
+            has_easyocr_global = False
         
         app_data = Path(os.environ.get('LOCALAPPDATA', 'C:/')) / 'Virel V2'
         easyocr_plugin_path = app_data / 'plugins' / 'easyocr' / 'easyocr-worker.py'
@@ -139,7 +142,11 @@ class HardwareDetector:
             cflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
             command = [sys.executable, "-m", "pip", "install", "easyocr"]
             result = subprocess.run(command, capture_output=True, text=True, timeout=900, check=False, creationflags=cflags)
-            if result.returncode == 0 and find_spec("easyocr") is not None:
+            try:
+                easyocr_ok = find_spec("easyocr") is not None
+            except ImportError:
+                easyocr_ok = False
+            if result.returncode == 0 and easyocr_ok:
                 return {
                     "engine": "easy",
                     "success": True,
@@ -223,7 +230,12 @@ class HardwareDetector:
         }
 
     def _can_start_windows_ocr(self) -> bool:
-        if find_spec("winrt.windows.media.ocr") is None:
+        try:
+            winrt_ok = find_spec("winrt.windows.media.ocr") is not None
+        except ImportError:
+            winrt_ok = False
+            
+        if not winrt_ok:
             log_event(PREFIX_SYS, "069", "Windows OCR probe: winrt.windows.media.ocr module missing", level="warning")
             return False
             

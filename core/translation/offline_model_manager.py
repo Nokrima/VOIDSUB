@@ -333,8 +333,18 @@ class OfflineModelManager:
             self._install_package_args(["ctranslate2", "transformers", "sentencepiece", "huggingface_hub", "safetensors"], "Eklenti içine dönüştürücü paketleri kurulamadı")
             return
 
-        missing = [name for name in PACKAGE_NAMES if importlib.util.find_spec(name) is None]
-        torch_ready = importlib.util.find_spec("torch") is not None and self._torch_version_ready()
+        missing = []
+        for name in PACKAGE_NAMES:
+            try:
+                if importlib.util.find_spec(name) is None:
+                    missing.append(name)
+            except ImportError:
+                missing.append(name)
+                
+        try:
+            torch_ready = importlib.util.find_spec("torch") is not None and self._torch_version_ready()
+        except ImportError:
+            torch_ready = False
         log_event(PREFIX_TRL, "043", f"[Paket Yöneticisi] -> KONTROL EDİLDİ | Model: {self.model_key} | Eksik: {missing} | Torch: {torch_ready}")
         if missing:
             self._install_package_args([*missing], "Temel Python paketleri kurulamadı")
