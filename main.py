@@ -130,6 +130,11 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
+    if "--region-selector" in sys.argv:
+        from core.native_region_selector import NativeRegionSelector
+        NativeRegionSelector().run()
+        sys.exit(0)
+
     try:
         asyncio.run(main())
     except KeyboardInterrupt:

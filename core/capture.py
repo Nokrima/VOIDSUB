@@ -55,8 +55,13 @@ IID_IDXGIDevice = GUID(
     (ctypes.c_ubyte * 8)(0x8C, 0x32, 0x88, 0xFD, 0x5F, 0x44, 0xC8, 0x4C),
 )
 
-WINRT_OVERLAY_ROOT = Path(__file__).resolve().parent / "_winrt_overlay" / "winrt"
-if str(WINRT_OVERLAY_ROOT) not in winrt.__path__:
+import sys
+if getattr(sys, "frozen", False) or "__compiled__" in globals():
+    WINRT_OVERLAY_ROOT = Path(sys.executable).parent / "core" / "_winrt_overlay" / "winrt"
+else:
+    WINRT_OVERLAY_ROOT = Path(__file__).resolve().parent / "_winrt_overlay" / "winrt"
+
+if WINRT_OVERLAY_ROOT.exists() and str(WINRT_OVERLAY_ROOT) not in winrt.__path__:
     winrt.__path__.append(str(WINRT_OVERLAY_ROOT))
 
 

@@ -1021,15 +1021,24 @@ class BridgeServer:
         return normalized
 
     async def _run_native_region_selector(self) -> None:
-        selector_script = Path(__file__).resolve().parent / "native_region_selector.py"
         python_executable = Path(sys.executable)
+        
+        is_compiled = getattr(sys, "frozen", False) or "__compiled__" in globals()
+        if is_compiled:
+            cmd = [str(python_executable), "--region-selector"]
+        else:
+            selector_script = Path(__file__).resolve().parent / "native_region_selector.py"
+            cmd = [str(python_executable), str(selector_script)]
+
         creation_flags = 0
         if sys.platform == "win32":
+            import subprocess
             creation_flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
         def _run_selector() -> subprocess.CompletedProcess:
+            import subprocess
             return subprocess.run(
-                [str(python_executable), str(selector_script)],
+                cmd,
                 capture_output=True,
                 text=True,
                 encoding="utf-8",

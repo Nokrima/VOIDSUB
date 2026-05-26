@@ -9,7 +9,15 @@ APP_NAME = "Virel"
 APP_VERSION = "2.5.0"
 GITHUB_REPO = "Nokrima/Virel-Releases"
 
-BASE_DIR = Path(__file__).parent.parent
+import sys
+
+if getattr(sys, "frozen", False) or "__compiled__" in globals():
+    # Derlenmis (PyInstaller veya Nuitka) calistirilabilir dosya ise:
+    # Executable'in bulundugu klasoru (or: AppData/Local/Virel V2) BASE_DIR olarak kabul et
+    BASE_DIR = Path(sys.executable).parent
+else:
+    # Geliştirme ortaminda normal sekilde calisirken:
+    BASE_DIR = Path(__file__).parent.parent
 _appdata_root = Path(os.getenv("APPDATA", str(Path.home() / "AppData" / "Roaming")))
 SETTINGS_FILE = _appdata_root / APP_NAME / "settings.json"
 LOG_FILE = BASE_DIR / "logs" / "app.log"

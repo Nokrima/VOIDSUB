@@ -24,6 +24,7 @@ Write-Host "UYARI: Bu islem C++ derlemesi yaptigi icin 10-30 dakika surebilir. L
 & $venvPython -m nuitka --standalone --onefile `
     --windows-console-mode=disable `
     --enable-plugin=pyside6 `
+    --enable-plugin=tk-inter `
     --include-package=ctranslate2 `
     --include-package=tokenizers `
     --include-package=deep_translator `
