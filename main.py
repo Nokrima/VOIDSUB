@@ -27,6 +27,10 @@ if sys.platform == 'win32':
 
 
 def ensure_project_venv() -> None:
+    # Nuitka veya PyInstaller ile derlenmisse sanal ortam (venv) gecisini iptal et
+    if "__compiled__" in globals() or getattr(sys, "frozen", False):
+        return
+
     project_root = Path(__file__).resolve().parent
     venv_python = project_root / ".venv" / "Scripts" / "python.exe"
     if not venv_python.exists():
@@ -40,6 +44,13 @@ def ensure_project_venv() -> None:
 
 
 ensure_project_venv()
+
+# Nuitka ile konsol devre disi birakildiginda (windows-console-mode=disable),
+# sys.stdout ve sys.stderr None olur. print() cagrilarinin cokmesini onlemek icin bosa yonlendir.
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w")
 
 from core.bridge import BridgeServer
 from core.capture import ScreenCapturer
