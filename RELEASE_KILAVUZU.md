@@ -13,15 +13,16 @@ Uygulamanızın sürümünü (örneğin v2.5.0'dan v2.6.0'a) artırmak için iki
 ---
 
 ## ADIM 2: Python Çekirdeğini Derlemek (Nuitka)
-Arka plandaki Python kodlarında (`core/`, `main.py` vb.) değişiklik yapılmışsa veya hiç yapılmamış olsa bile güncel paketleri oluşturmak için bu adımı çalıştırın.
-*(Eğer SADECE arayüzde (React/TSX) değişiklik yaptıysanız ve Python'a hiç dokunmadıysanız, bu adımı atlayıp doğrudan Adım 3'e geçebilirsiniz, zaman kazandırır.)*
+> **💡 ÖNEMLİ NOT (Zaman Kazanma İpucu):**
+> - **Eğer SADECE Arayüzde (React/UI) Değişiklik Yaptıysanız:** Bu adımı tamamen ATLAYIN. Eski `virel-core.exe` zaten korumalı olduğu için doğrudan ADIM 3'e geçip saniyeler içinde yeni güncellemeyi gönderebilirsiniz.
+> - **Eğer Python Kodlarında Değişiklik Yaptıysanız:** Yeni kodların "Makine diline çevrilmesi ve şifrelenmesi" için bu adımı kesinlikle çalıştırmak ZORUNDASINIZ (Yaklaşık 15-20 dk sürer).
 
 1. VS Code terminalini açın.
 2. Aşağıdaki komutu çalıştırın:
    ```powershell
    .\scripts\build-python.ps1
    ```
-3. Bu adım, Python kodlarınızı C++ üzerinden makine koduna derler. Yaklaşık 10-30 dakika sürer. Bittiğinde `virel-core.exe` başarıyla kopyalandı mesajını görmelisiniz.
+3. İşlem bittiğinde `virel-core.exe` başarıyla kopyalandı mesajını görmelisiniz.
 
 ---
 
