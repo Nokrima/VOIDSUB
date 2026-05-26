@@ -314,10 +314,12 @@ const VersionStatusBlock = () => {
     }
     setChecking(true);
     setSuccess(false);
-    invoke('check_for_updates').catch((e: any) => {
+    try {
+      send('check_for_updates');
+    } catch (e: any) {
       setChecking(false);
       notify('error', e?.toString() || 'Güncelleme kontrolü başlatılamadı.', 'update_system');
-    });
+    }
   };
 
   let btnText = 'DENETLE';
