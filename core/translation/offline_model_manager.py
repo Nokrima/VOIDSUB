@@ -630,11 +630,16 @@ class OfflineModelManager:
             raise RuntimeError(f"{failure_message}: exit code {self.active_proc.returncode}")
 
     def _packages_ready(self) -> bool:
-        return (
-            all(importlib.util.find_spec(name) is not None for name in PACKAGE_NAMES)
-            and importlib.util.find_spec("torch") is not None
-            and self._torch_version_ready()
-        )
+        try:
+            return (
+                all(importlib.util.find_spec(name) is not None for name in PACKAGE_NAMES)
+                and importlib.util.find_spec("torch") is not None
+                and self._torch_version_ready()
+            )
+        except ImportError:
+            # Nuitka '--nofollow-import-to' ile derlendiginde, haric tutulan 
+            # moduller icin find_spec ImportError firlatir.
+            return False
 
     def _torch_version_ready(self) -> bool:
         version = self._torch_version_label()
