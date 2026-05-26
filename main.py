@@ -130,6 +130,9 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
+    import multiprocessing
+    multiprocessing.freeze_support()
+
     if "--region-selector" in sys.argv:
         from core.native_region_selector import NativeRegionSelector
         NativeRegionSelector().run()

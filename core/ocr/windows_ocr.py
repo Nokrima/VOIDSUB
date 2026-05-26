@@ -18,29 +18,11 @@ from core.ocr.base import OCREngine
 
 
 def _get_winrt_languages() -> list[str]:
-    code = """
-import json, sys
-try:
-    from winrt.windows.media.ocr import OcrEngine
-    langs = [lang.language_tag for lang in OcrEngine.available_recognizer_languages]
-    print(json.dumps(langs))
-except Exception:
-    print("[]")
-"""
     try:
-        cflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-        res = subprocess.run(
-            [sys.executable, "-c", code],
-            capture_output=True,
-            text=True,
-            timeout=5.0,
-            creationflags=cflags,
-        )
-        if res.returncode == 0:
-            return json.loads(res.stdout.strip())
+        from winrt.windows.media.ocr import OcrEngine
+        return [lang.language_tag for lang in OcrEngine.available_recognizer_languages]
     except Exception:
-        pass
-    return []
+        return []
 
 
 def _winocr_worker(
@@ -328,32 +310,16 @@ class WindowsOCREngine(OCREngine):
 
         check_tag = self.language_tag if self.language_tag else available[0]
         
-        code = f"""
-import sys
-try:
-    from winrt.windows.globalization import Language
-    from winrt.windows.media.ocr import OcrEngine
-    engine = OcrEngine.try_create_from_language(Language("{check_tag}"))
-    sys.exit(0 if engine is not None else 1)
-except Exception:
-    sys.exit(2)
-"""
         try:
-            cflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-            res = subprocess.run(
-                [sys.executable, "-c", code],
-                capture_output=True,
-                timeout=5.0,
-                creationflags=cflags,
-            )
-            if res.returncode == 0:
+            from winrt.windows.globalization import Language
+            from winrt.windows.media.ocr import OcrEngine
+            engine = OcrEngine.try_create_from_language(Language(check_tag))
+            if engine is not None:
                 status["available"] = True
-            elif res.returncode == 1:
-                status["reason"] = f"Windows OCR paketi başlatılamadı: {check_tag}"
             else:
-                status["reason"] = "Windows API (WinRT) eksik veya uyumsuz."
+                status["reason"] = f"Windows OCR paketi başlatılamadı: {check_tag}"
         except Exception as e:
-            status["reason"] = f"Kontrol sırasında IPC hatası: {e}"
+            status["reason"] = f"Windows API (WinRT) eksik veya uyumsuz: {e}"
 
         return status
 

@@ -315,8 +315,24 @@ class OfflineModelManager:
         finally:
             self.active_proc = None
 
+    def _get_plugin_python(self) -> Path | None:
+        import os
+        app_data = Path(os.environ.get('LOCALAPPDATA', 'C:/')) / 'Virel V2'
+        python_exe = app_data / 'plugins' / 'easyocr' / 'python.exe'
+        return python_exe if python_exe.exists() else None
+
     def _ensure_packages(self) -> None:
         self._set_stage("packages", 4, "Paketler kontrol ediliyor")
+        
+        is_compiled = getattr(sys, "frozen", False) or "__compiled__" in globals()
+        if is_compiled:
+            plugin_python = self._get_plugin_python()
+            if not plugin_python:
+                raise RuntimeError("Çevrimdışı modelleri indirebilmek ve dönüştürebilmek için önce Ayarlar'dan EasyOCR Eklentisini indirmeniz gerekmektedir (PyTorch barındırır).")
+            # Plugin içinde transformers ve ctranslate2 olduğundan emin olalım
+            self._install_package_args(["ctranslate2", "transformers", "sentencepiece", "huggingface_hub", "safetensors"], "Eklenti içine dönüştürücü paketleri kurulamadı")
+            return
+
         missing = [name for name in PACKAGE_NAMES if importlib.util.find_spec(name) is None]
         torch_ready = importlib.util.find_spec("torch") is not None and self._torch_version_ready()
         log_event(PREFIX_TRL, "043", f"[Paket Yöneticisi] -> KONTROL EDİLDİ | Model: {self.model_key} | Eksik: {missing} | Torch: {torch_ready}")
@@ -327,7 +343,11 @@ class OfflineModelManager:
 
     def _install_package_args(self, packages: list[str], failure_message: str) -> None:
         log_event(PREFIX_TRL, "044", f"[Paket Yöneticisi] -> KURULUM BAŞLADI | Paketler: {packages}")
-        command = [sys.executable, "-m", "pip", "install", "--upgrade", *packages]
+        
+        is_compiled = getattr(sys, "frozen", False) or "__compiled__" in globals()
+        executable = str(self._get_plugin_python()) if is_compiled else sys.executable
+        
+        command = [executable, "-m", "pip", "install", "--upgrade", *packages]
         self._run_process(command, failure_message, log_stdout=False)
         log_event(PREFIX_TRL, "045", f"[Paket Yöneticisi] -> KURULUM TAMAMLANDI | Paketler: {packages}")
 
@@ -384,8 +404,11 @@ class OfflineModelManager:
         self._verify_download_plan(files)
 
     def _download_file(self, filename: str, total_bytes: int) -> None:
+        is_compiled = getattr(sys, "frozen", False) or "__compiled__" in globals()
+        executable = str(self._get_plugin_python()) if is_compiled else sys.executable
+        
         command = [
-            sys.executable,
+            executable,
             "-c",
             (
                 "from huggingface_hub import hf_hub_download; "
@@ -665,6 +688,14 @@ class OfflineModelManager:
             shutil.rmtree(path, ignore_errors=True)
 
     def _converter_path(self) -> Path | str:
+        is_compiled = getattr(sys, "frozen", False) or "__compiled__" in globals()
+        if is_compiled:
+            plugin_python = self._get_plugin_python()
+            if plugin_python:
+                converter = plugin_python.parent / "Scripts" / "ct2-transformers-converter.exe"
+                if converter.exists():
+                    return converter
+        
         converter = Path(sys.executable).with_name("ct2-transformers-converter.exe")
         return converter if converter.exists() else "ct2-transformers-converter"
 
