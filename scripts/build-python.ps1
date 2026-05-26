@@ -28,6 +28,14 @@ Write-Host "UYARI: Bu islem C++ derlemesi yaptigi icin 10-30 dakika surebilir. L
     --include-package=ctranslate2 `
     --include-package=tokenizers `
     --include-package=deep_translator `
+    --include-package=winrt.windows.security `
+    --include-package=winrt.windows.graphics.capture `
+    --include-package=winrt.windows.graphics.directx `
+    --include-package=winrt.windows.graphics.imaging `
+    --include-package=winrt.windows.media.ocr `
+    --include-package=winrt.windows.globalization `
+    --include-package=winrt.windows.foundation `
+    --include-package=winrt.windows.storage.streams `
     --nofollow-import-to=torch,torchvision,torchaudio,easyocr,tensorboard,matplotlib,scipy,sklearn,pandas,jupyter `
     --output-filename=virel-core.exe `
     --assume-yes-for-downloads `
