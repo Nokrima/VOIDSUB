@@ -1,17 +1,9 @@
-$ErrorActionPreference = "Stop"
-
-# ─────────────────────────────────────────────────────────────
-# publish-update.ps1 — Tauri build sonrasi calistirilir.
-# Yapilan isler:
-#  1. Tauri'nin urettigi .nsis.zip + .sig dosyalarini bulur
-#  2. latest.json manifest'ini olusturur / gunceller
-#  3. virel-updater reposunu gunceller ve push eder
-# ─────────────────────────────────────────────────────────────
-
 param (
     [string]$Version = "",
     [string]$Notes   = "Hata düzeltmeleri ve performans iyileştirmeleri."
 )
+
+$ErrorActionPreference = "Stop"
 
 $repoRoot      = Split-Path $PSScriptRoot -Parent
 $tauriConf     = Join-Path $repoRoot "ui-tauri\src-tauri\tauri.conf.json"
@@ -41,8 +33,8 @@ if ($sigFile) {
     $signature = $signature.Trim()
 }
 
-# 3. GitHub Release URL'si (exe dosyasini releases'e yuklemeniz gerekiyor)
-$downloadUrl = "https://github.com/Nokrima/Virel/releases/download/v$Version/$($exeFile.Name)"
+# 3. GitHub Release URL'si (exe dosyasini virel-updater reposuna yuklemeniz gerekiyor)
+$downloadUrl = "https://github.com/Nokrima/virel-updater/releases/download/v$Version/$($exeFile.Name)"
 
 Write-Host "[*] Indirme URL: $downloadUrl" -ForegroundColor DarkGray
 
