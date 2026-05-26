@@ -26,6 +26,9 @@ git status
 ## ADIM 2: Python Çekirdeğini Derlemek (Nuitka)
 > **💡 ÖNEMLİ NOT:** Sadece Python (`.py`) dosyalarında değişiklik yaptıysanız bu adımı çalıştırın. Yeni Python kodlarının "Makine diline çevrilmesi ve şifrelenmesi" işlemi yaklaşık 15-20 dk sürer.
 
+> **🚨 KRİTİK KURAL (DOSYA ŞİŞMEMESİ İÇİN):** 
+> İleride projeye yeni bir ağır yapay zeka kütüphanesi (örn: yeni bir görüntü işleme veya ses modeli) eklerseniz, bunu ASLA Nuitka derlemesine dahil ETMEYİN (Exe boyutunuz tekrar 3GB'lara çıkar ve sistem çöker). Ağır paketleri her zaman uygulama içinden indirilecek şekilde tasarlayın ve `build-python.ps1` içindeki `--nofollow-import-to=` listesine ekleyerek derlemeden kesinlikle dışlayın!
+
 1. VS Code terminalini açın.
 2. Aşağıdaki komutu çalıştırın:
    ```powershell
