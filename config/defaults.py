@@ -13,8 +13,9 @@ import sys
 
 if getattr(sys, "frozen", False) or "__compiled__" in globals():
     # Derlenmis (PyInstaller veya Nuitka) calistirilabilir dosya ise:
-    # Executable'in bulundugu klasoru (or: AppData/Local/Virel V2) BASE_DIR olarak kabul et
-    BASE_DIR = Path(sys.executable).parent
+    # Program Files gibi salt-okunur (read-only) dizinlerde cokmemesi icin LocalAppData kullan!
+    BASE_DIR = Path(os.getenv("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / "Virel V2"
+    BASE_DIR.mkdir(parents=True, exist_ok=True)
 else:
     # Geliştirme ortaminda normal sekilde calisirken:
     BASE_DIR = Path(__file__).parent.parent
