@@ -23,6 +23,7 @@ APP_DIR = EMBEDDED_DIR / "app"
 SOURCES_TO_COPY = [
     ROOT_DIR / "main.py",
     ROOT_DIR / "core",
+    ROOT_DIR / "config",
 ]
 REQUIREMENTS_FILE = ROOT_DIR / "requirements.txt"
 
