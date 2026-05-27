@@ -420,6 +420,8 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec!["--hidden"]),
         ))
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             get_user_profile_info,
             restore_main_window,
