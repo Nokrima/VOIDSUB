@@ -50,9 +50,9 @@
     },
     "active": true,
     "targets": ["nsis"],
-    "externalBin": [],
     "resources": {
-      "bin/vc_redist.x64.exe": "bin/vc_redist.x64.exe"
+      "bin/vc_redist.x64.exe": "bin/vc_redist.x64.exe",
+      "../../dist/python_embedded/**/*": "python_embedded/"
     },
     "icon": [
       "icons/32x32.png",
