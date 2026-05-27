@@ -171,7 +171,7 @@ export const wsClient = {
 };
 
 // Tauri backend-ready dinleyicisi (Production Modu için Dinamik Port)
-if (window.__TAURI_INTERNALS__) {
+if ((window as any).__TAURI_INTERNALS__) {
   listen<string>('backend-ready', (event) => {
     const dynamicPort = event.payload;
     console.log(`[Tauri] backend-ready eventi alindi, port: ${dynamicPort}`);

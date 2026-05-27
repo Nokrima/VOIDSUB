@@ -1,7 +1,7 @@
 {
   "productName": "VOIDSUB",
   "version": "2.5.0",
-  "identifier": "com.voidsub.app",
+  "identifier": "com.voidsub.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
