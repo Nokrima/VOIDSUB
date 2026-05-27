@@ -38,6 +38,7 @@
     }
   },
   "bundle": {
+    "createUpdaterArtifacts": true,
     "windows": {
       "nsis": {
         "displayLanguageSelector": true,
