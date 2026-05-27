@@ -1,7 +1,7 @@
 {
   "productName": "VOIDSUB",
   "version": "2.5.0",
-  "identifier": "com.nokrima.voidsub",
+  "identifier": "com.voidsub.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
