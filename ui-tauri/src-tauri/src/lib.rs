@@ -13,8 +13,7 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, Manager, Runtime, Wry,
 };
-#[cfg(not(debug_assertions))]
-use tauri_plugin_shell::ShellExt;
+
 
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::Graphics::Dwm::DwmSetWindowAttribute;
