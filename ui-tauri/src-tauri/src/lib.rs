@@ -431,27 +431,40 @@ pub fn run() {
         .setup(|app| {
             #[cfg(not(debug_assertions))]
             {
-                if let Ok(sidecar_command) = app.shell().sidecar("voidsub-core") {
-                    if let Ok((mut rx, _child)) = sidecar_command.spawn() {
-                        let app_handle = app.handle().clone();
-                        tauri::async_runtime::spawn(async move {
-                            use tauri_plugin_shell::process::CommandEvent;
-                            while let Some(event) = rx.recv().await {
-                                if let CommandEvent::Stdout(line_bytes) = event {
-                                    if let Ok(line) = String::from_utf8(line_bytes) {
-                                        if let Some(start) = line.find("[[VOIDSUB_WS_PORT:") {
-                                            let port_str = &line[start + 18..];
-                                            if let Some(end) = port_str.find("]]") {
-                                                let port = &port_str[..end];
-                                                let _ = app_handle.emit("backend-ready", port);
-                                            }
+                let app_handle = app.handle().clone();
+                std::thread::spawn(move || {
+                    use std::io::{BufRead, BufReader};
+                    use std::process::{Command, Stdio};
+
+                    if let Ok(resource_dir) = app_handle.path().resource_dir() {
+                        let python_exe = resource_dir.join("python_embedded").join("python.exe");
+                        let main_pyc = resource_dir.join("python_embedded").join("app").join("main.pyc");
+
+                        let mut cmd = Command::new(python_exe);
+                        cmd.arg(main_pyc).stdout(Stdio::piped());
+
+                        #[cfg(target_os = "windows")]
+                        {
+                            use std::os::windows::process::CommandExt;
+                            cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+                        }
+
+                        if let Ok(mut child) = cmd.spawn() {
+                            if let Some(stdout) = child.stdout.take() {
+                                let reader = BufReader::new(stdout);
+                                for line in reader.lines().map_while(Result::ok) {
+                                    if let Some(start) = line.find("[[VOIDSUB_WS_PORT:") {
+                                        let port_str = &line[start + 18..];
+                                        if let Some(end) = port_str.find("]]") {
+                                            let port = &port_str[..end];
+                                            let _ = app_handle.emit("backend-ready", port);
                                         }
                                     }
                                 }
                             }
-                        });
+                        }
                     }
-                }
+                });
             }
 
             let tray_menu = MenuBuilder::new(app)

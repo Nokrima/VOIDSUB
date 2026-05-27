@@ -50,7 +50,7 @@
     },
     "active": true,
     "targets": ["nsis"],
-    "externalBin": ["voidsub-core"],
+    "externalBin": [],
     "resources": {
       "bin/vc_redist.x64.exe": "bin/vc_redist.x64.exe"
     },
