@@ -4,6 +4,8 @@ import { LogPanel } from './LogPanel';
 import { getEventHistory, onEvent, send, useWebSocket } from '../bridge/websocket';
 import { useAppContext } from '../context/AppContext';
 import { validateShortcutKey, suspendHotkeys, resumeHotkeys, syncHotkeysToRust, type ShortcutAction } from '../hooks/useShortcutManager';
+import { useAutoUpdater } from '../hooks/useAutoUpdater';
+import { motion } from 'framer-motion';
 
 const colors = {
   bgGlass: 'rgba(255,255,255,0.015)',
@@ -255,6 +257,181 @@ const ShortcutRow = ({ label, value, onChange }: { label: string, value: string,
   );
 };
 
+const UpdaterRow = () => {
+  const { status, progress, versionInfo, checkForUpdates, installUpdate } = useAutoUpdater();
+
+  let statusColor = 'rgba(159,183,207,0.7)'; // "Sistem Güncel" text color
+  let statusText = 'Sistem Güncel';
+  let dotColor = '#10b981'; // Green dot for up-to-date
+  
+  if (status === 'checking') {
+    statusColor = '#7dd3fc';
+    statusText = 'Denetleniyor...';
+    dotColor = '#7dd3fc';
+  } else if (status === 'available') {
+    statusColor = '#fcd34d';
+    statusText = `Yeni Sürüm: ${versionInfo}`;
+    dotColor = '#fcd34d';
+  } else if (status === 'downloading') {
+    statusColor = '#7dd3fc';
+    statusText = `İndiriliyor: %${progress}`;
+    dotColor = '#7dd3fc';
+  } else if (status === 'ready') {
+    statusColor = '#86efac';
+    statusText = 'Yeniden başlatılıyor...';
+    dotColor = '#86efac';
+  } else if (status === 'error') {
+    statusColor = '#fca5a5';
+    statusText = 'Güncelleme başarısız';
+    dotColor = '#fca5a5';
+  } else if (status === 'up-to-date') {
+    statusColor = 'rgba(159,183,207,0.7)';
+    statusText = 'Sistem Güncel';
+    dotColor = '#10b981';
+  }
+
+  const isWorking = status === 'checking' || status === 'downloading';
+  const showInstall = status === 'available';
+  
+  const handleAction = () => {
+    if (isWorking || status === 'ready') return;
+    if (showInstall) installUpdate();
+    else checkForUpdates();
+  };
+
+  const actionLabel = showInstall ? 'İNDİR VE KUR' : status === 'downloading' ? 'İNDİRİLİYOR...' : status === 'checking' ? 'DENETLENİYOR...' : 'DENETLE';
+
+  return (
+    <div 
+      style={{ 
+        display: 'flex', alignItems: 'center', padding: '12px 0px', 
+        background: 'transparent',
+        justifyContent: 'space-between'
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        {/* Kalkan İkonu Kutusu */}
+        <div style={{ 
+          width: 44, height: 44, borderRadius: 12, 
+          background: 'rgba(125,211,252,0.02)', 
+          border: '1px solid rgba(125,211,252,0.12)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.02)',
+          color: '#7dd3fc'
+        }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+        </div>
+        
+        {/* Metin Bloğu */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={{ fontSize: 16, fontWeight: 700, color: '#f8fafc', letterSpacing: '0.01em' }}>
+            VoidSub V2
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ 
+              width: 6, height: 6, borderRadius: '50%', 
+              background: dotColor, 
+              boxShadow: `0 0 8px ${dotColor}`,
+              animation: isWorking ? 'conceptBlink 1.5s infinite' : 'none'
+            }} />
+            <span style={{ fontSize: 12, fontWeight: 500, color: statusColor }}>
+              v2.5.0 • {statusText}
+            </span>
+          </div>
+        </div>
+      </div>
+      
+      {/* Sağ taraftaki Buton */}
+      <div>
+        <motion.button
+          type="button"
+          onClick={handleAction}
+          whileHover={{ scale: isWorking ? 1 : 1.02 }}
+          whileTap={{ scale: isWorking ? 1 : 0.98 }}
+          style={{
+            border: '1px solid rgba(255,255,255,0.06)',
+            borderRadius: 999,
+            background: 'rgba(255,255,255,0.02)',
+            backdropFilter: 'blur(12px)',
+            color: '#eef2f6',
+            padding: '0 16px',
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: '0.05em',
+            cursor: isWorking ? 'wait' : 'pointer',
+            height: 32,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            position: 'relative',
+            overflow: 'hidden'
+          }}
+        >
+          {isWorking && (
+            <motion.div
+              initial={{ width: '0%', opacity: 0 }}
+              animate={{ width: status === 'downloading' ? `${progress}%` : '90%', opacity: 1 }}
+              transition={{ duration: status === 'downloading' ? 0.2 : 4.5, ease: 'easeOut' }}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                height: '100%',
+                background: 'linear-gradient(90deg, rgba(252, 211, 77, 0.0) 0%, rgba(252, 211, 77, 0.2) 100%)',
+                zIndex: 0,
+                borderRadius: 999,
+              }}
+            />
+          )}
+          
+          <span style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+            {isWorking && (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <style>
+                  {`
+                    @keyframes fadePulse {
+                      0% { opacity: 1; }
+                      100% { opacity: 0.15; }
+                    }
+                  `}
+                </style>
+                <line x1="12" y1="2" x2="12" y2="6" style={{ animation: 'fadePulse 0.8s linear infinite', animationDelay: '-0.7s' }} />
+                <line x1="12" y1="2" x2="12" y2="6" transform="rotate(45 12 12)" style={{ animation: 'fadePulse 0.8s linear infinite', animationDelay: '-0.6s' }} />
+                <line x1="12" y1="2" x2="12" y2="6" transform="rotate(90 12 12)" style={{ animation: 'fadePulse 0.8s linear infinite', animationDelay: '-0.5s' }} />
+                <line x1="12" y1="2" x2="12" y2="6" transform="rotate(135 12 12)" style={{ animation: 'fadePulse 0.8s linear infinite', animationDelay: '-0.4s' }} />
+                <line x1="12" y1="2" x2="12" y2="6" transform="rotate(180 12 12)" style={{ animation: 'fadePulse 0.8s linear infinite', animationDelay: '-0.3s' }} />
+                <line x1="12" y1="2" x2="12" y2="6" transform="rotate(225 12 12)" style={{ animation: 'fadePulse 0.8s linear infinite', animationDelay: '-0.2s' }} />
+                <line x1="12" y1="2" x2="12" y2="6" transform="rotate(270 12 12)" style={{ animation: 'fadePulse 0.8s linear infinite', animationDelay: '-0.1s' }} />
+                <line x1="12" y1="2" x2="12" y2="6" transform="rotate(315 12 12)" style={{ animation: 'fadePulse 0.8s linear infinite', animationDelay: '0s' }} />
+              </svg>
+            )}
+            {(!isWorking && !showInstall) && (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
+            )}
+            {showInstall && (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+            )}
+            {actionLabel}
+          </span>
+        </motion.button>
+      </div>
+    </div>
+  );
+};
+
 export const SettingsPanel: React.FC = () => {
   const { isConnected } = useWebSocket();
   const getAppSet = () => {
@@ -410,6 +587,17 @@ export const SettingsPanel: React.FC = () => {
                   <ShortcutRow label="Çeviri Bölgesi Seç" value={shortcuts.select_region} onChange={(v) => updateShortcut('select_region', v)} />
                   <ShortcutRow label="Geçici Alan Seçimi" value={shortcuts.temporary_region} onChange={(v) => updateShortcut('temporary_region', v)} />
                   <ShortcutRow label="Katmanı Gizle / Göster" value={shortcuts.hide_overlay} onChange={(v) => updateShortcut('hide_overlay', v)} />
+                </div>
+              </div>
+
+              {/* SÜRÜM DURUMU */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, ...TS.boxTitle }}>
+                  <G p="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" stroke="rgba(191,215,242,0.72)" />
+                  <span>SÜRÜM DURUMU</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <UpdaterRow />
                 </div>
               </div>
 

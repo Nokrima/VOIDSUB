@@ -4,28 +4,27 @@ Bu dosya projenin konfigurasyon merkezidir. Sadece sabitleri icerir.
 """
 import os
 from pathlib import Path
+import sys
 
 APP_NAME = "VoidSub"
 APP_VERSION = "2.5.0"
 
-import sys
+# BASE_DIR: Read-only uygulama kök dizini (C:\Program Files\VoidSub)
+BASE_DIR = Path(__file__).resolve().parent.parent
 
-if getattr(sys, "frozen", False) or "__compiled__" in globals():
-    # Derlenmis (PyInstaller veya Nuitka) calistirilabilir dosya ise:
-    # Program Files gibi salt-okunur (read-only) dizinlerde cokmemesi icin LocalAppData kullan!
-    BASE_DIR = Path(os.getenv("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / "VoidSub"
-    BASE_DIR.mkdir(parents=True, exist_ok=True)
-else:
-    # Geliştirme ortaminda normal sekilde calisirken:
-    BASE_DIR = Path(__file__).parent.parent
-_appdata_root = Path(os.getenv("APPDATA", str(Path.home() / "AppData" / "Roaming")))
-SETTINGS_FILE = _appdata_root / APP_NAME / "settings.json"
-LOG_FILE = BASE_DIR / "logs" / "app.log"
+# USER_DATA_DIR: Yazılabilir kullanıcı dizini (%LOCALAPPDATA%\VoidSub)
+# Uygulama logları, ayarları ve geçici dosyaları her zaman buraya kaydedilir
+USER_DATA_DIR = Path(os.getenv("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / "VoidSub"
+USER_DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+SETTINGS_FILE = USER_DATA_DIR / "settings.json"
+LOG_FILE = USER_DATA_DIR / "logs" / "app.log"
+DIAGNOSTICS_DIR = USER_DATA_DIR / "logs" / "ocr_diagnostics"
+
 MODELS_DIR = BASE_DIR / "models"
-DIAGNOSTICS_DIR = BASE_DIR / "logs" / "ocr_diagnostics"
 
 WEBSOCKET_HOST = "127.0.0.1"
-WEBSOCKET_PORT = 27491
+WEBSOCKET_PORT = int(os.getenv("VOIDSUB_PORT", "0"))  # Dev ortamında 27491, Production'da 0 (dinamik port) olacak
 
 LOG_MAX_BYTES = 5 * 1024 * 1024
 LOG_BACKUP_COUNT = 3

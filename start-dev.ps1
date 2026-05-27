@@ -40,6 +40,7 @@ Start-Sleep -Seconds 1 # Portun tam bosa cikmasi icin kisa bekleme
 
 # 2. Python Çekirdeğini Başlat
 Write-Host "[1/2] VoidSub Cekirdegi (Python) baslatiliyor..." -ForegroundColor Cyan
+$env:VOIDSUB_PORT = $WS_PORT
 $pythonJob = Start-Process -FilePath $pythonExe -ArgumentList "main.py" -WorkingDirectory $repoRoot -WindowStyle Hidden -PassThru
 
 # Port'un açılmasını bekle

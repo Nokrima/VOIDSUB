@@ -17,10 +17,7 @@ try:
 except ImportError:
     pass
 
-if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
-    qt_plugin_path = os.path.join(sys._MEIPASS, "PySide6", "plugins")
-    os.environ["QT_PLUGIN_PATH"] = qt_plugin_path
-    os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = os.path.join(qt_plugin_path, "platforms")
+# Nuitka kalıntıları temizlendi, artık Embedded Python mantığı kullanılıyor.
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -65,9 +62,24 @@ if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 
+import signal
+
 async def main() -> None:
     setup_crash_handler()
     cleanup_startup_artifacts()
+    
+    # Graceful Shutdown Sinyal Yakalayıcılar
+    def handle_sigint(*args):
+        print("\n[SISTEM] Kapanma sinyali (SIGINT/SIGTERM) alındı. Zombiler temizleniyor...")
+        raise KeyboardInterrupt()
+
+    try:
+        signal.signal(signal.SIGINT, handle_sigint)
+        signal.signal(signal.SIGTERM, handle_sigint)
+        signal.signal(signal.SIGBREAK, handle_sigint)
+    except Exception:
+        pass
+
     print("\n[SISTEM] Python Core motoru uyaniyor. Lutfen bekleyin...")
     logger = get_logger()
     log_event(
@@ -181,10 +193,11 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\n[SISTEM] Guvenli sekilde kapatiliyor...")
     except Exception:
-        import tempfile
         import traceback
+        from config.defaults import USER_DATA_DIR
 
-        crash_log_path = Path(tempfile.gettempdir()) / "voidsub_fatal_crash.log"
+        crash_log_path = USER_DATA_DIR / "logs" / "voidsub_fatal_crash.log"
+        crash_log_path.parent.mkdir(parents=True, exist_ok=True)
         with open(crash_log_path, "w", encoding="utf-8") as f:
             f.write("FATAL CRASH!\n")
             f.write(traceback.format_exc())

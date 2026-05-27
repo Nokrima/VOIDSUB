@@ -823,8 +823,18 @@ class BridgeServer:
     async def start(self):
         self.loop = asyncio.get_running_loop()
         self.shutdown_event = asyncio.Event()
-        async with websockets.serve(self.handler, self.host, self.port):
-            await self.shutdown_event.wait()
+        server = await websockets.serve(self.handler, self.host, self.port)
+        
+        # İşletim sisteminin atadığı dinamik portu (veya statik portu) yakala
+        self.port = server.sockets[0].getsockname()[1]
+        
+        # Tauri'nin (Rust) yakalayabilmesi için özel formatta konsola bas ve flush et
+        sys.stdout.write(f"[[VOIDSUB_WS_PORT:{self.port}]]\n")
+        sys.stdout.flush()
+        
+        await self.shutdown_event.wait()
+        server.close()
+        await server.wait_closed()
 
     def _load_settings(self) -> dict:
         settings = deepcopy(DEFAULT_SETTINGS)

@@ -432,7 +432,25 @@ pub fn run() {
             #[cfg(not(debug_assertions))]
             {
                 if let Ok(sidecar_command) = app.shell().sidecar("voidsub-core") {
-                    let _ = sidecar_command.spawn();
+                    if let Ok((mut rx, _child)) = sidecar_command.spawn() {
+                        let app_handle = app.handle().clone();
+                        tauri::async_runtime::spawn(async move {
+                            use tauri_plugin_shell::process::CommandEvent;
+                            while let Some(event) = rx.recv().await {
+                                if let CommandEvent::Stdout(line_bytes) = event {
+                                    if let Ok(line) = String::from_utf8(line_bytes) {
+                                        if let Some(start) = line.find("[[VOIDSUB_WS_PORT:") {
+                                            let port_str = &line[start + 18..];
+                                            if let Some(end) = port_str.find("]]") {
+                                                let port = &port_str[..end];
+                                                let _ = app_handle.emit("backend-ready", port);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }
                 }
             }
 

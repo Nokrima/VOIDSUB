@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { listen } from '@tauri-apps/api/event';
 
-const WS_URL = 'ws://localhost:27491';
+let WS_URL = 'ws://127.0.0.1:27491'; // Fallback / Dev default
 let socket: WebSocket | null = null;
 let isConnecting = false;
 let reconnectTimeout: ReturnType<typeof setTimeout>;
@@ -62,7 +63,7 @@ export const connect = () => {
   socket = new WebSocket(WS_URL);
 
   socket.onopen = () => {
-    console.log('Python Core ile baglanti kuruldu.');
+    console.log(`Python Core ile baglanti kuruldu (${WS_URL}).`);
     isConnecting = false;
     clearTimeout(reconnectTimeout);
     flushPendingMessages();
@@ -168,3 +169,16 @@ export const wsClient = {
   clearEventHistory,
   injectEvent,
 };
+
+// Tauri backend-ready dinleyicisi (Production Modu için Dinamik Port)
+if (window.__TAURI_INTERNALS__) {
+  listen<string>('backend-ready', (event) => {
+    const dynamicPort = event.payload;
+    console.log(`[Tauri] backend-ready eventi alindi, port: ${dynamicPort}`);
+    WS_URL = `ws://127.0.0.1:${dynamicPort}`;
+    if (socket) {
+      disconnect();
+    }
+    connect();
+  }).catch((err) => console.error("backend-ready dinlenirken hata:", err));
+}
