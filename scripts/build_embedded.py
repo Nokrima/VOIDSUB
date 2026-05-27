@@ -138,19 +138,27 @@ def copy_sources():
             print(f"    Dosya kopyalandı: {src.name}")
 
 def compile_to_pyc():
+    import compileall
     print_step("Python dosyaları (.py) bytecode'a (.pyc) derleniyor ve asılları siliniyor...")
-    compiled_count = 0
+    
+    # Tüm .py dosyalarını .pyc olarak derle. legacy=True ile .pyc dosyaları __pycache__ yerine doğrudan aynı dizine yazılır.
+    compileall.compile_dir(str(APP_DIR), force=True, legacy=True, quiet=1)
+    
+    # Orijinal .py dosyalarını temizle
+    deleted_py_count = 0
     for py_file in APP_DIR.rglob("*.py"):
-        pyc_file = py_file.with_suffix(".pyc")
         try:
-            # cfile parametresi ile .pyc dosyasını doğrudan orijinal .py dosyası ile aynı klasöre çıkarıyoruz
-            py_compile.compile(str(py_file), cfile=str(pyc_file), doraise=True)
-            py_file.unlink() # Orijinal .py dosyasını siliyoruz
-            compiled_count += 1
-        except Exception as e:
-            print(f"    [Hata] {py_file.name} derlenemedi: {e}")
+            py_file.unlink()
+            deleted_py_count += 1
+        except OSError:
+            pass
             
-    print(f"    Toplam {compiled_count} adet .py dosyası .pyc formatına dönüştürüldü.")
+    # Varsa __pycache__ klasörlerini temizle
+    for pycache_dir in APP_DIR.rglob("__pycache__"):
+        if pycache_dir.is_dir():
+            shutil.rmtree(pycache_dir, ignore_errors=True)
+            
+    print(f"    Toplam {deleted_py_count} adet .py dosyası .pyc formatına dönüştürüldü ve asılları silindi.")
 
 def main():
     print("="*50)
