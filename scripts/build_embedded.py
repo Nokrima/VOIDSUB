@@ -4,7 +4,12 @@ import zipfile
 import subprocess
 import shutil
 import py_compile
+import sys
 from pathlib import Path
+
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
 
 # --- Yapılandırma ---
 PYTHON_VERSION = "3.11.9"
