@@ -49,7 +49,7 @@
       }
     },
     "active": true,
-    "targets": ["nsis", "updater"],
+    "targets": ["nsis"],
     "resources": {
       "../../dist/python_embedded/**/*": "python_embedded/"
     },
