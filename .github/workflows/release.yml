@@ -41,12 +41,24 @@ jobs:
         working-directory: ./ui-tauri
         run: npm install
 
+      - name: 6.5. Github Secrets Akil Sagligi Kontrolu
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+        run: |
+          if (-not $env:TAURI_SIGNING_PRIVATE_KEY) {
+            Write-Error "KRITIK HATA: TAURI_PRIVATE_KEY isimli Github Secret degeri BOS veya hic yok! Lutfen Github reposundan ayarlari kontrol edin."
+            exit 1
+          } else {
+            Write-Output "Imzalama anahtari Github Actions ortaminda mevcut."
+          }
+
       - name: 7. Tauri Uygulamasını Derle ve İmzala
         working-directory: ./ui-tauri
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
-        run: npm run tauri build
+        run: npm run tauri build -- --verbose
 
       - name: 8. Dinamik update.json Dosyasını Üret
         id: generate-update-json
