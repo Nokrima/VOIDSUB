@@ -44,8 +44,8 @@ jobs:
       - name: 7. Tauri Uygulamasını Derle ve İmzala
         working-directory: ./ui-tauri
         env:
-          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         run: npm run tauri build
 
       - name: 8. Dinamik update.json Dosyasını Üret
