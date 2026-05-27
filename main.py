@@ -17,12 +17,12 @@ try:
 except ImportError:
     pass
 
-if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-    qt_plugin_path = os.path.join(sys._MEIPASS, 'PySide6', 'plugins')
-    os.environ['QT_PLUGIN_PATH'] = qt_plugin_path
-    os.environ['QT_QPA_PLATFORM_PLUGIN_PATH'] = os.path.join(qt_plugin_path, 'platforms')
+if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+    qt_plugin_path = os.path.join(sys._MEIPASS, "PySide6", "plugins")
+    os.environ["QT_PLUGIN_PATH"] = qt_plugin_path
+    os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = os.path.join(qt_plugin_path, "platforms")
 
-if sys.platform == 'win32':
+if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
@@ -64,6 +64,7 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
+
 async def main() -> None:
     setup_crash_handler()
     cleanup_startup_artifacts()
@@ -79,47 +80,82 @@ async def main() -> None:
         ),
     )
 
-    print("[SISTEM] Ana donanim taramasi yapiliyor...")
-    capturer = ScreenCapturer()
-    log_event(
-        PREFIX_SYS,
-        "071",
-        (
-            "Capture bootstrap complete: "
-            f"backend={getattr(capturer, '_backend', 'unknown')}, "
-            f"state={getattr(capturer, '_capture_state', 'unknown')}, "
-            f"runtime_error={getattr(capturer, '_runtime_error', None)!r}"
-        ),
-    )
     bridge = BridgeServer(worker=None)
-    native_overlay = ModernOverlay()
     set_bridge_emitter(bridge.send)
-
-    pipeline = TranslationPipeline(bridge=bridge, capturer=capturer)
-    pipeline.update_config(
-        engine_id=bridge.settings["app"].get("ocr_engine"),
-        translation_engine=bridge.settings["app"].get("translation_engine"),
-        performance_tier=bridge.settings["app"].get("performance_tier"),
-        scene_mode=bridge.settings["app"].get("ocr_scene_mode"),
-        src_language=bridge.settings["app"].get("src_language"),
-        tgt_language=bridge.settings["app"].get("tgt_language"),
-    )
-    bridge.attach_worker(pipeline)
-    bridge.attach_native_overlay(native_overlay)
-    native_overlay.apply_settings(bridge.settings.get("overlay", {}))
+    bridge_task = None
 
     try:
         print(f"[AKTIF] WebSocket Santrali {bridge.host}:{bridge.port} uzerinde dinleniyor.")
         print("[SISTEM] UI baglantisi bekleniyor...\n")
-        log_event(PREFIX_SYS, "072", f"[Ağ İletişimi] -> SİSTEM KÖPRÜSÜ BAŞLATILIYOR | Host: {bridge.host} | Port: {bridge.port}")
-        await bridge.start()
+        log_event(
+            PREFIX_SYS,
+            "072",
+            f"[Ag Iletisimi] -> SISTEM KOPRUSU BASLATILIYOR | Host: {bridge.host} | Port: {bridge.port}",
+        )
+        bridge_task = asyncio.create_task(bridge.start())
+        await asyncio.sleep(0)
+
+        capturer = None
+        native_overlay = None
+        pipeline = None
+
+        try:
+            print("[SISTEM] Ana donanim taramasi yapiliyor...")
+            capturer = ScreenCapturer()
+            log_event(
+                PREFIX_SYS,
+                "071",
+                (
+                    "Capture bootstrap complete: "
+                    f"backend={getattr(capturer, '_backend', 'unknown')}, "
+                    f"state={getattr(capturer, '_capture_state', 'unknown')}, "
+                    f"runtime_error={getattr(capturer, '_runtime_error', None)!r}"
+                ),
+            )
+        except Exception as exc:
+            log_error(PREFIX_SYS, "071", f"Capture bootstrap failed: {type(exc).__name__}: {exc}", "Capture baslatilamadi.")
+            bridge.send("capture_unavailable", {"message": str(exc), "error_type": type(exc).__name__})
+
+        try:
+            native_overlay = ModernOverlay()
+            native_overlay.apply_settings(bridge.settings.get("overlay", {}))
+        except Exception as exc:
+            native_overlay = None
+            log_error(PREFIX_SYS, "018", f"Overlay bootstrap failed: {type(exc).__name__}: {exc}", "Overlay baslatilamadi.")
+            bridge.send("overlay_unavailable", {"message": str(exc), "error_type": type(exc).__name__})
+
+        try:
+            pipeline = TranslationPipeline(bridge=bridge, capturer=capturer)
+            pipeline.update_config(
+                engine_id=bridge.settings["app"].get("ocr_engine"),
+                translation_engine=bridge.settings["app"].get("translation_engine"),
+                performance_tier=bridge.settings["app"].get("performance_tier"),
+                scene_mode=bridge.settings["app"].get("ocr_scene_mode"),
+                src_language=bridge.settings["app"].get("src_language"),
+                tgt_language=bridge.settings["app"].get("tgt_language"),
+            )
+        except Exception as exc:
+            pipeline = None
+            log_error(PREFIX_SYS, "073", f"Pipeline bootstrap failed: {type(exc).__name__}: {exc}", "Pipeline baslatilamadi.")
+            bridge.send("pipeline_unavailable", {"message": str(exc), "error_type": type(exc).__name__})
+
+        if pipeline is not None:
+            bridge.attach_worker(pipeline)
+        if native_overlay is not None:
+            try:
+                bridge.attach_native_overlay(native_overlay)
+            except Exception as exc:
+                log_error(PREFIX_SYS, "018", f"Overlay attach failed: {type(exc).__name__}: {exc}", "Overlay baglanamadi.")
+                bridge.send("overlay_unavailable", {"message": str(exc), "error_type": type(exc).__name__})
+
+        await bridge_task
     except Exception as exc:
         print(f"[HATA] Sunucu baslatilamadi: {exc}")
-        log_error(PREFIX_SYS, "073", f"[Sistem Köprüsü] -> BAŞLATILAMADI | Hata: {type(exc).__name__}: {exc}", "Sunucu baslatilamadi.")
+        log_error(PREFIX_SYS, "073", f"[Sistem Koprusu] -> BASLATILAMADI | Hata: {type(exc).__name__}: {exc}", "Sunucu baslatilamadi.")
     finally:
-        logger.info(f"[{PREFIX_SYS}-074] [Sistem Çekirdeği] -> KAPANIŞ İSTENDİ | Temizlik başlıyor...")
-        # Öksüz kalan tüm alt işlemleri (child processes) temizle (MEI klasör kilitlenmesini çözer)
+        logger.info(f"[{PREFIX_SYS}-074] [Sistem Cekirdegi] -> KAPANIS ISTENDI | Temizlik basliyor...")
         import psutil
+
         current_proc = psutil.Process()
         for child in current_proc.children(recursive=True):
             try:
@@ -131,10 +167,12 @@ async def main() -> None:
 
 if __name__ == "__main__":
     import multiprocessing
+
     multiprocessing.freeze_support()
 
     if "--region-selector" in sys.argv:
         from core.native_region_selector import NativeRegionSelector
+
         NativeRegionSelector().run()
         sys.exit(0)
 
@@ -142,9 +180,10 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         print("\n[SISTEM] Guvenli sekilde kapatiliyor...")
-    except Exception as e:
-        import traceback
+    except Exception:
         import tempfile
+        import traceback
+
         crash_log_path = Path(tempfile.gettempdir()) / "voidsub_fatal_crash.log"
         with open(crash_log_path, "w", encoding="utf-8") as f:
             f.write("FATAL CRASH!\n")

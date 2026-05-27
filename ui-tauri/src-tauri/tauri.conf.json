@@ -29,6 +29,13 @@
       "csp": null
     }
   },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/Nokrima/VOIDSUB/releases/latest/download/update.json"
+      ]
+    }
+  },
   "bundle": {
     "windows": {
       "nsis": {

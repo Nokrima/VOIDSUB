@@ -1,0 +1,102 @@
+name: Release & Auto-Updater
+
+# Sadece 'v' ile başlayan bir tag atıldığında çalışır (Örn: git tag v1.0.0 && git push origin v1.0.0)
+on:
+  push:
+    tags:
+      - 'v*'
+
+# GitHub Releases oluşturabilmek ve dosya yükleyebilmek için yazma izinleri
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    name: Build and Release Windows
+    runs-on: windows-latest
+    
+    steps:
+      - name: 1. Repoyu Klonla
+        uses: actions/checkout@v4
+
+      - name: 2. Node.js Kurulumu
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 3. Rust Toolchain Kurulumu
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: 4. Python 3.11 Kurulumu (Embedded betiği için)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 5. Embedded Python Ortamını Hazırla
+        run: python scripts/build_embedded.py
+
+      - name: 6. Frontend Bağımlılıklarını Yükle
+        working-directory: ./ui-tauri
+        run: npm install
+
+      - name: 7. Tauri Uygulamasını Derle ve İmzala
+        working-directory: ./ui-tauri
+        env:
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        run: npm run tauri build
+
+      - name: 8. Dinamik update.json Dosyasını Üret
+        id: generate-update-json
+        shell: pwsh
+        run: |
+          $VERSION = "${{ github.ref_name }}".TrimStart('v')
+          
+          $BUNDLE_DIR = "ui-tauri/src-tauri/target/release/bundle/nsis"
+          
+          $ZIP_FILE = Get-ChildItem -Path $BUNDLE_DIR -Filter "*.zip" | Select-Object -First 1
+          $SIG_FILE = Get-ChildItem -Path $BUNDLE_DIR -Filter "*.sig" | Select-Object -First 1
+          
+          if (-not $ZIP_FILE -or -not $SIG_FILE) {
+            Write-Error "Tauri updater dosyaları (.zip veya .sig) bulunamadı! Derleme başarısız olmuş olabilir."
+            exit 1
+          }
+          
+          $SIG_CONTENT = (Get-Content -Path $SIG_FILE.FullName -Raw).Trim()
+          
+          $DOWNLOAD_URL = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/$($ZIP_FILE.Name)"
+          
+          $DATE = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+          
+          $UPDATE_JSON_OBJ = @{
+              version = $VERSION
+              notes = "Otomatik Güncelleme - Sürüm $VERSION"
+              pub_date = $DATE
+              platforms = @{
+                  "windows-x86_64" = @{
+                      signature = $SIG_CONTENT
+                      url = $DOWNLOAD_URL
+                  }
+              }
+          }
+          
+          $UPDATE_JSON = $UPDATE_JSON_OBJ | ConvertTo-Json -Depth 5
+          Set-Content -Path "$BUNDLE_DIR/update.json" -Value $UPDATE_JSON -Encoding utf8
+          
+          Write-Output "update.json başarıyla oluşturuldu:"
+          Write-Output $UPDATE_JSON
+
+      - name: 9. GitHub Releases'e Yükle
+        uses: softprops/action-gh-release@v2
+        with:
+          name: VOIDSUB ${{ github.ref_name }}
+          files: |
+            ui-tauri/src-tauri/target/release/bundle/nsis/*.exe
+            ui-tauri/src-tauri/target/release/bundle/nsis/*.zip
+            ui-tauri/src-tauri/target/release/bundle/nsis/*.sig
+            ui-tauri/src-tauri/target/release/bundle/nsis/update.json
+          draft: false
+          prerelease: false
+          generate_release_notes: true

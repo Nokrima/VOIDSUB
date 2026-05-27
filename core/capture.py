@@ -10,20 +10,20 @@ from typing import Optional
 
 import cv2
 import numpy as np
-import winrt
-from winrt.windows.graphics.capture import (
-    Direct3D11CaptureFramePool,
-    GraphicsCaptureAccess,
-    GraphicsCaptureAccessKind,
-    GraphicsCaptureItem,
-    GraphicsCaptureSession,
-)
-from winrt.windows.graphics.directx import DirectXPixelFormat
-from winrt.windows.graphics.directx.direct3d11.interop import create_direct3d11_device_from_dxgi_device
-from winrt.windows.graphics.imaging import BitmapAlphaMode, BitmapPixelFormat, SoftwareBitmap
-from winrt.windows.storage.streams import Buffer
 
 from core.errors import PREFIX_SYS, get_logger, log_error
+
+Direct3D11CaptureFramePool = None
+GraphicsCaptureAccess = None
+GraphicsCaptureAccessKind = None
+GraphicsCaptureItem = None
+GraphicsCaptureSession = None
+DirectXPixelFormat = None
+create_direct3d11_device_from_dxgi_device = None
+BitmapAlphaMode = None
+BitmapPixelFormat = None
+SoftwareBitmap = None
+Buffer = None
 
 D3D_DRIVER_TYPE_HARDWARE = 1
 D3D11_CREATE_DEVICE_BGRA_SUPPORT = 0x20
@@ -55,14 +55,66 @@ IID_IDXGIDevice = GUID(
     (ctypes.c_ubyte * 8)(0x8C, 0x32, 0x88, 0xFD, 0x5F, 0x44, 0xC8, 0x4C),
 )
 
-import sys
-if getattr(sys, "frozen", False) or "__compiled__" in globals():
-    WINRT_OVERLAY_ROOT = Path(sys.executable).parent / "core" / "ocr" / "_winrt_overlay" / "winrt"
-else:
-    WINRT_OVERLAY_ROOT = Path(__file__).resolve().parent / "ocr" / "_winrt_overlay" / "winrt"
+def _load_winrt_runtime() -> bool:
+    global Direct3D11CaptureFramePool
+    global GraphicsCaptureAccess
+    global GraphicsCaptureAccessKind
+    global GraphicsCaptureItem
+    global GraphicsCaptureSession
+    global DirectXPixelFormat
+    global create_direct3d11_device_from_dxgi_device
+    global BitmapAlphaMode
+    global BitmapPixelFormat
+    global SoftwareBitmap
+    global Buffer
 
-if WINRT_OVERLAY_ROOT.exists() and str(WINRT_OVERLAY_ROOT) not in winrt.__path__:
-    winrt.__path__.append(str(WINRT_OVERLAY_ROOT))
+    if GraphicsCaptureSession is not None:
+        return True
+
+    try:
+        import sys
+        import winrt
+        from winrt.windows.graphics.capture import (
+            Direct3D11CaptureFramePool as _Direct3D11CaptureFramePool,
+            GraphicsCaptureAccess as _GraphicsCaptureAccess,
+            GraphicsCaptureAccessKind as _GraphicsCaptureAccessKind,
+            GraphicsCaptureItem as _GraphicsCaptureItem,
+            GraphicsCaptureSession as _GraphicsCaptureSession,
+        )
+        from winrt.windows.graphics.directx import DirectXPixelFormat as _DirectXPixelFormat
+        from winrt.windows.graphics.directx.direct3d11.interop import (
+            create_direct3d11_device_from_dxgi_device as _create_direct3d11_device_from_dxgi_device,
+        )
+        from winrt.windows.graphics.imaging import (
+            BitmapAlphaMode as _BitmapAlphaMode,
+            BitmapPixelFormat as _BitmapPixelFormat,
+            SoftwareBitmap as _SoftwareBitmap,
+        )
+        from winrt.windows.storage.streams import Buffer as _Buffer
+
+        if getattr(sys, "frozen", False) or "__compiled__" in globals():
+            overlay_root = Path(sys.executable).parent / "core" / "ocr" / "_winrt_overlay" / "winrt"
+        else:
+            overlay_root = Path(__file__).resolve().parent / "ocr" / "_winrt_overlay" / "winrt"
+
+        if overlay_root.exists() and str(overlay_root) not in winrt.__path__:
+            winrt.__path__.append(str(overlay_root))
+
+        Direct3D11CaptureFramePool = _Direct3D11CaptureFramePool
+        GraphicsCaptureAccess = _GraphicsCaptureAccess
+        GraphicsCaptureAccessKind = _GraphicsCaptureAccessKind
+        GraphicsCaptureItem = _GraphicsCaptureItem
+        GraphicsCaptureSession = _GraphicsCaptureSession
+        DirectXPixelFormat = _DirectXPixelFormat
+        create_direct3d11_device_from_dxgi_device = _create_direct3d11_device_from_dxgi_device
+        BitmapAlphaMode = _BitmapAlphaMode
+        BitmapPixelFormat = _BitmapPixelFormat
+        SoftwareBitmap = _SoftwareBitmap
+        Buffer = _Buffer
+        return True
+    except Exception as exc:
+        log_error(PREFIX_SYS, "076", str(exc), "WinRT runtime yuklenemedi.")
+        return False
 
 
 class ScreenCapturer:
@@ -94,6 +146,11 @@ class ScreenCapturer:
     def start_camera(self) -> bool:
         if self._capture_thread is not None and self._capture_thread.is_alive():
             return True
+        if not _load_winrt_runtime():
+            self._runtime_error = "WinRT runtime import failed"
+            self._backend = "unavailable"
+            self._set_capture_state("unavailable")
+            return False
         try:
             supported = bool(GraphicsCaptureSession.is_supported())
         except Exception as exc:
