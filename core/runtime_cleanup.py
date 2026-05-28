@@ -51,8 +51,14 @@ def cleanup_startup_artifacts() -> None:
                     parts = line.strip().split()
                     if len(parts) >= 5:
                         pid = parts[-1]
-                        subprocess.run(f"taskkill /PID {pid} /F", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=cflags)
-                        log_event(PREFIX_SYS, "012", f"[Ağ Temizliği] -> ZOMBİ İŞLEM (ZOMBIE) TEMİZLENDİ | Port: {WEBSOCKET_PORT} | PID: {pid}")
+                        # Process kimliğini doğrula (sadece python veya uygulamanın kendi processleri)
+                        try:
+                            tasklist_out = subprocess.check_output(f'tasklist /FI "PID eq {pid}" /NH', shell=True, text=True, creationflags=cflags).lower()
+                            if "python" in tasklist_out or "voidsub" in tasklist_out:
+                                subprocess.run(f"taskkill /PID {pid} /F", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=cflags)
+                                log_event(PREFIX_SYS, "012", f"[Ağ Temizliği] -> ZOMBİ İŞLEM (ZOMBIE) TEMİZLENDİ | Port: {WEBSOCKET_PORT} | PID: {pid}")
+                        except Exception:
+                            pass
         except Exception:
             pass
 
