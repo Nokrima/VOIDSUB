@@ -1,6 +1,6 @@
 {
   "productName": "VOIDSUB",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "identifier": "com.voidsub.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",

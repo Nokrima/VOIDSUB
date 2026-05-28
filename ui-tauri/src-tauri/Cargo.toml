@@ -1,6 +1,6 @@
 [package]
 name = "voidsub"
-version = "2.5.0"
+version = "2.5.1"
 description = "VoidSub desktop shell"
 authors = ["Nokrima"]
 edition = "2021"
