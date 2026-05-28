@@ -5,11 +5,10 @@ import './styles/global.css';
 
 // Kök seviyede global tuş ve arayüz kısıtlamaları
 document.addEventListener('keydown', (e) => {
-  // F5 (Yenile), Ctrl+R (Yenile) ve Tab (Sekme Gezinmesi) tuşlarını engelle. (F12 Test için açık bırakıldı)
+  // F5 (Yenile) ve Ctrl+R (Yenile) tuşlarını engelle. (F12 Test için açık bırakıldı)
   if (
     e.key === 'F5' || 
-    (e.ctrlKey && e.key.toLowerCase() === 'r') || 
-    e.key === 'Tab'
+    (e.ctrlKey && e.key.toLowerCase() === 'r')
   ) {
     e.preventDefault();
   }

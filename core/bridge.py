@@ -21,7 +21,7 @@ from core.errors import (
 )
 from core.hardware import HardwareDetector
 from core.debug.session_recorder import SessionRecorder
-from core.processor.post_processor import chunk_for_display, clean_translation, estimate_display_chunk_size
+
 
 logger = get_logger()
 LEGACY_SETTINGS_FILE = Path(__file__).resolve().parent.parent / "config" / "settings.json"
