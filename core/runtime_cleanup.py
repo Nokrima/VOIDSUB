@@ -56,7 +56,13 @@ def cleanup_startup_artifacts() -> None:
                             ps_cmd = f"Get-Process -Id {pid} -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Path"
                             path_out = subprocess.check_output(["powershell", "-NoProfile", "-Command", ps_cmd], text=True, creationflags=cflags).strip().lower()
                             
-                            if "python" in path_out or "voidsub" in path_out:
+                            is_our_process = False
+                            if path_out:
+                                base_dir_str = str(BASE_DIR).lower()
+                                if (base_dir_str in path_out) or ("voidsub" in path_out) or ("python_embedded" in path_out):
+                                    is_our_process = True
+                                    
+                            if is_our_process:
                                 subprocess.run(["taskkill", "/PID", str(pid), "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=cflags)
                                 log_event(PREFIX_SYS, "012", f"[Ağ Temizliği] -> ZOMBİ İŞLEM (ZOMBIE) TEMİZLENDİ | Port: {WEBSOCKET_PORT} | PID: {pid}")
                         except ValueError:

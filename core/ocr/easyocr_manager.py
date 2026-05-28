@@ -7,6 +7,7 @@ import subprocess
 import sys
 import threading
 import time
+import os
 from pathlib import Path
 
 from core.errors import PREFIX_OCR, log_error, log_event
@@ -259,7 +260,6 @@ class EasyOCRManager:
                     self._raise_if_cancelled()
                     
                     # Zip Slip koruması
-                    import os
                     target_path = (self.plugin_dir / member.name).resolve()
                     base_path = self.plugin_dir.resolve()
                     if os.path.commonpath([str(base_path), str(target_path)]) != str(base_path) or '..' in member.name or member.name.startswith('/') or member.name.startswith('\\'):

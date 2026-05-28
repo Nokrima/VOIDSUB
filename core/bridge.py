@@ -27,6 +27,10 @@ logger = get_logger()
 LEGACY_SETTINGS_FILE = Path(__file__).resolve().parent.parent / "config" / "settings.json"
 
 def _clip_log_text(text: str, limit: int = 160) -> str:
+    import sys
+    import logging
+    if getattr(sys, 'frozen', False) and logger.level > logging.DEBUG:
+        return "*** [REDACTED] ***"
     normalized = " ".join((text or "").split())
     return normalized if len(normalized) <= limit else f"{normalized[:limit]}..."
 

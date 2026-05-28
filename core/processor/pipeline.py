@@ -126,7 +126,7 @@ class TranslationPipeline:
         if getattr(sys, 'frozen', False):
             # Maskeleme regex'i: text='...', translated_text="..." gibi alanları bulur ve içini gizler.
             message = re.sub(
-                r'(text|before|after|candidate|source|translated_text|raw_text|original_text|last_detected_text|last_text|current_text)=([\'"]).*?\2',
+                r'(text|before|after|candidate|source|translated_text|raw_text|original_text|last_detected_text|last_text|current_text|raw_texts|google_text|offline_text|cache_key)=([\'"]).*?\2',
                 r'\1=\2*** [REDACTED] ***\2',
                 message
             )
