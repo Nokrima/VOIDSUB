@@ -29,8 +29,12 @@ from core.translation.cache import TranslationCache
 from core.translation.google import GoogleTranslationEngine
 from core.translation.offline import OfflineTranslationEngine
 
+logger = get_logger()
+
 def _clip_log_text(text: str, limit: int = 160) -> str:
-    normalized = re.sub(r"\s+", " ", str(text or "")).strip()
+    if logger.level > logging.DEBUG:
+        return "*** [REDACTED] ***"
+    normalized = " ".join((text or "").split())
     return normalized if len(normalized) <= limit else f"{normalized[:limit]}..."
 
 
