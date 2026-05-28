@@ -10,7 +10,7 @@ import sys
 import threading
 import traceback
 
-from config.defaults import BASE_DIR, LOG_BACKUP_COUNT, LOG_FILE, LOG_MAX_BYTES
+from config.defaults import DOCS_DIR, USER_DATA_DIR, LOG_BACKUP_COUNT, LOG_FILE, LOG_MAX_BYTES
 
 PREFIX_OCR = "OCR"
 PREFIX_TRL = "TRL"
@@ -208,7 +208,7 @@ def _crash_handler(exc_type, exc_value, exc_traceback) -> None:
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
         return
     
-    crash_log_path = BASE_DIR / "logs" / "fatal_crash.log"
+    crash_log_path = DOCS_DIR / "logs" / "fatal_crash.log"
     try:
         crash_log_path.parent.mkdir(parents=True, exist_ok=True)
         with open(crash_log_path, "a", encoding="utf-8") as f:
@@ -247,7 +247,7 @@ def _async_exception_handler(loop, context) -> None:
         except Exception:
             pass
 
-    crash_log_path = BASE_DIR / "logs" / "fatal_crash.log"
+    crash_log_path = DOCS_DIR / "logs" / "fatal_crash.log"
     try:
         crash_log_path.parent.mkdir(parents=True, exist_ok=True)
         with open(crash_log_path, "a", encoding="utf-8") as f:

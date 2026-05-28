@@ -9,6 +9,12 @@ import os
 import sys
 from pathlib import Path
 
+# Embedded Python _pth dosyası sys.path hesaplamasını ezer.
+# Scriptin bulunduğu 'app' klasörünü zorla sys.path'e ekliyoruz ki 'core' modülünü bulabilsin.
+_current_dir = str(Path(__file__).resolve().parent)
+if _current_dir not in sys.path:
+    sys.path.insert(0, _current_dir)
+
 # Fix for WinError 1114 (DLL initialization failed)
 # Force load torch and ctranslate2 DLLs into process memory before PySide6/OpenCV
 try:

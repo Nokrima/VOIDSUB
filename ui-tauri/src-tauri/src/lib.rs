@@ -14,7 +14,6 @@ use tauri::{
     AppHandle, Emitter, Manager, Runtime, Wry,
 };
 
-
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::Graphics::Dwm::DwmSetWindowAttribute;
 #[cfg(target_os = "windows")]
@@ -44,6 +43,10 @@ const DWMWCP_ROUND: u32 = 2;
 
 struct TrayState {
     _icon: Mutex<Option<tauri::tray::TrayIcon<Wry>>>,
+}
+
+struct BackendState {
+    port: Mutex<Option<String>>,
 }
 
 #[cfg(target_os = "windows")]
@@ -237,6 +240,19 @@ fn parse_shortcut_string(s: &str) -> Option<(u32, u32)> {
     vk.map(|vk_code| (modifiers, vk_code))
 }
 
+#[tauri::command]
+fn wait_for_backend(state: tauri::State<'_, BackendState>) -> Result<String, String> {
+    loop {
+        {
+            let guard = state.port.lock().unwrap();
+            if let Some(port) = guard.as_ref() {
+                return Ok(port.clone());
+            }
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+}
+
 /// Tum hotkey'leri unregister eder (ayni thread'den cagirilmalidir).
 #[cfg(target_os = "windows")]
 unsafe fn unregister_all_hotkeys() {
@@ -414,6 +430,18 @@ fn get_user_profile_info() -> UserProfileInfo {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default()
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .level(tauri_plugin_log::log::LevelFilter::Info)
+                .build(),
+        )
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_autostart::init(
@@ -432,46 +460,155 @@ pub fn run() {
             restore_main_window,
             update_hotkeys,
             suspend_hotkeys,
-            resume_hotkeys
+            resume_hotkeys,
+            wait_for_backend
         ])
+        .manage(BackendState {
+            port: Mutex::new(None),
+        })
         .setup(|app| {
-            #[cfg(not(debug_assertions))]
-            {
-                let app_handle = app.handle().clone();
-                std::thread::spawn(move || {
-                    use std::io::{BufRead, BufReader};
-                    use std::process::{Command, Stdio};
+            let app_handle = app.handle().clone();
+            std::thread::spawn(move || {
+                use std::io::{BufRead, BufReader};
+                use std::process::{Command, Stdio};
 
-                    if let Ok(resource_dir) = app_handle.path().resource_dir() {
-                        let python_exe = resource_dir.join("python_embedded").join("python.exe");
-                        let main_pyc = resource_dir.join("python_embedded").join("app").join("main.pyc");
+                #[cfg(not(debug_assertions))]
+                let base_dir = app_handle.path().resource_dir().unwrap_or_default();
 
-                        let mut cmd = Command::new(python_exe);
-                        cmd.arg(main_pyc).stdout(Stdio::piped());
+                #[cfg(debug_assertions)]
+                let base_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .join("..")
+                    .join("..")
+                    .join("dist");
 
-                        #[cfg(target_os = "windows")]
-                        {
-                            use std::os::windows::process::CommandExt;
-                            cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+                let python_exe = base_dir.join("python_embedded").join("python.exe");
+                let main_pyc = base_dir
+                    .join("python_embedded")
+                    .join("app")
+                    .join("main.pyc");
+
+                // Geliştirici modunda hata yakalamak için konsola yazdır
+                #[cfg(debug_assertions)]
+                println!("Python Yolu: {:?}", python_exe);
+
+                let app_dir = base_dir.join("python_embedded").join("app");
+                let mut cmd = Command::new(&python_exe);
+                cmd.current_dir(&app_dir)
+                    .arg("main.pyc")
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::piped());
+
+                #[cfg(target_os = "windows")]
+                {
+                    use std::os::windows::process::CommandExt;
+                    cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+                }
+
+                if let Ok(mut child) = cmd.spawn() {
+                    #[cfg(target_os = "windows")]
+                    {
+                        use std::os::windows::io::AsRawHandle;
+
+                        type HANDLE = *mut std::ffi::c_void;
+                        type BOOL = i32;
+
+                        #[repr(C)]
+                        struct JOBOBJECT_BASIC_LIMIT_INFORMATION {
+                            pub PerProcessUserTimeLimit: i64,
+                            pub PerJobUserTimeLimit: i64,
+                            pub LimitFlags: u32,
+                            pub MinimumWorkingSetSize: usize,
+                            pub MaximumWorkingSetSize: usize,
+                            pub ActiveProcessLimit: u32,
+                            pub Affinity: usize,
+                            pub PriorityClass: u32,
+                            pub SchedulingClass: u32,
                         }
 
-                        if let Ok(mut child) = cmd.spawn() {
-                            if let Some(stdout) = child.stdout.take() {
-                                let reader = BufReader::new(stdout);
-                                for line in reader.lines().map_while(Result::ok) {
-                                    if let Some(start) = line.find("[[VOIDSUB_WS_PORT:") {
-                                        let port_str = &line[start + 18..];
-                                        if let Some(end) = port_str.find("]]") {
-                                            let port = &port_str[..end];
-                                            let _ = app_handle.emit("backend-ready", port);
-                                        }
-                                    }
-                                }
+                        #[repr(C)]
+                        struct IO_COUNTERS {
+                            pub ReadOperationCount: u64,
+                            pub WriteOperationCount: u64,
+                            pub OtherOperationCount: u64,
+                            pub ReadTransferCount: u64,
+                            pub WriteTransferCount: u64,
+                            pub OtherTransferCount: u64,
+                        }
+
+                        #[repr(C)]
+                        struct JOBOBJECT_EXTENDED_LIMIT_INFORMATION {
+                            pub BasicLimitInformation: JOBOBJECT_BASIC_LIMIT_INFORMATION,
+                            pub IoInfo: IO_COUNTERS,
+                            pub ProcessMemoryLimit: usize,
+                            pub JobMemoryLimit: usize,
+                            pub PeakProcessMemoryUsed: usize,
+                            pub PeakJobMemoryUsed: usize,
+                        }
+
+                        const JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE: u32 = 0x2000;
+                        const JobObjectExtendedLimitInformation: u32 = 9;
+
+                        extern "system" {
+                            fn CreateJobObjectW(
+                                lpJobAttributes: *const std::ffi::c_void,
+                                lpName: *const u16,
+                            ) -> HANDLE;
+                            fn SetInformationJobObject(
+                                hJob: HANDLE,
+                                JobObjectInformationClass: u32,
+                                lpJobObjectInformation: *const std::ffi::c_void,
+                                cbJobObjectInformationLength: u32,
+                            ) -> BOOL;
+                            fn AssignProcessToJobObject(hJob: HANDLE, hProcess: HANDLE) -> BOOL;
+                        }
+
+                        unsafe {
+                            let job = CreateJobObjectW(std::ptr::null(), std::ptr::null());
+                            if !job.is_null() {
+                                let mut info: JOBOBJECT_EXTENDED_LIMIT_INFORMATION =
+                                    std::mem::zeroed();
+                                info.BasicLimitInformation.LimitFlags =
+                                    JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+                                SetInformationJobObject(
+                                    job,
+                                    JobObjectExtendedLimitInformation,
+                                    &info as *const _ as *const std::ffi::c_void,
+                                    std::mem::size_of_val(&info) as u32,
+                                );
+                                AssignProcessToJobObject(job, child.as_raw_handle() as HANDLE);
                             }
                         }
                     }
-                });
-            }
+
+                    if let Some(stdout) = child.stdout.take() {
+                        let reader = BufReader::new(stdout);
+                        let app_handle_clone = app_handle.clone();
+                        std::thread::spawn(move || {
+                            for line in reader.lines().map_while(Result::ok) {
+                                log::info!("[PYTHON] {}", line);
+                                if let Some(start) = line.find("[[VOIDSUB_WS_PORT:") {
+                                    let port_str = &line[start + 18..];
+                                    if let Some(end) = port_str.find("]]") {
+                                        let port = &port_str[..end];
+                                        let state: tauri::State<'_, BackendState> = app_handle_clone.state();
+                                        *state.port.lock().unwrap() = Some(port.to_string());
+                                        let _ = app_handle_clone.emit("backend-ready", port);
+                                    }
+                                }
+                            }
+                        });
+                    }
+
+                    if let Some(stderr) = child.stderr.take() {
+                        let reader = BufReader::new(stderr);
+                        std::thread::spawn(move || {
+                            for line in reader.lines().map_while(Result::ok) {
+                                log::error!("[PYTHON-ERR] {}", line);
+                            }
+                        });
+                    }
+                }
+            });
 
             let tray_menu = MenuBuilder::new(app)
                 .text("show_main", "VOIDSUB'ı Göster")
@@ -519,6 +656,9 @@ pub fn run() {
             });
 
             let window = app.get_webview_window("main").expect("main window missing");
+
+            #[cfg(debug_assertions)]
+            window.open_devtools();
 
             #[cfg(target_os = "macos")]
             apply_vibrancy(&window, NSVisualEffectMaterial::HudWindow, None, None)

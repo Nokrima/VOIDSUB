@@ -5,7 +5,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from config.defaults import BASE_DIR, DIAGNOSTICS_DIR
+from config.defaults import BASE_DIR, DIAGNOSTICS_DIR, USER_DATA_DIR
 from core.errors import PREFIX_SYS, log_error, log_event
 
 
@@ -30,7 +30,7 @@ def _remove_tree(path: Path) -> None:
 
 
 def cleanup_startup_artifacts() -> None:
-    logs_dir = BASE_DIR / "logs"
+    logs_dir = USER_DATA_DIR / "logs"
     for file_name in (
         "python-core.stdout.log",
         "python-core.stderr.log",
@@ -56,7 +56,7 @@ def cleanup_startup_artifacts() -> None:
 
 
 def cleanup_runtime_artifacts() -> None:
-    logs_dir = BASE_DIR / "logs"
+    logs_dir = USER_DATA_DIR / "logs"
     for file_name in (
         "python-core.stdout.log",
         "python-core.stderr.log",

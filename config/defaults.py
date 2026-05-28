@@ -17,12 +17,24 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 USER_DATA_DIR = Path(os.getenv("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / "VoidSub"
 USER_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
+# DOCS_DIR: Kullanıcının görebileceği, erişebileceği dosyalar (Belgelerim\VoidSub)
+# Hata raporları ve loglar, kullanıcının bize kolayca ulaştırabilmesi için buraya kaydedilir
+try:
+    import ctypes.wintypes
+    CSIDL_PERSONAL = 5  # My Documents
+    SHGFP_TYPE_CURRENT = 0
+    buf = ctypes.create_unicode_buffer(ctypes.wintypes.MAX_PATH)
+    ctypes.windll.shell32.SHGetFolderPathW(None, CSIDL_PERSONAL, None, SHGFP_TYPE_CURRENT, buf)
+    DOCS_DIR = Path(buf.value) / "VoidSub"
+except Exception:
+    DOCS_DIR = Path.home() / "Documents" / "VoidSub"
+DOCS_DIR.mkdir(parents=True, exist_ok=True)
+
 SETTINGS_FILE = USER_DATA_DIR / "settings.json"
-LOG_FILE = USER_DATA_DIR / "logs" / "app.log"
-DIAGNOSTICS_DIR = USER_DATA_DIR / "logs" / "ocr_diagnostics"
+LOG_FILE = DOCS_DIR / "logs" / "app.log"
+DIAGNOSTICS_DIR = DOCS_DIR / "logs" / "ocr_diagnostics"
 
-MODELS_DIR = BASE_DIR / "models"
-
+MODELS_DIR = USER_DATA_DIR / "models"
 WEBSOCKET_HOST = "127.0.0.1"
 WEBSOCKET_PORT = int(os.getenv("VOIDSUB_PORT", "0"))  # Dev ortamında 27491, Production'da 0 (dinamik port) olacak
 
