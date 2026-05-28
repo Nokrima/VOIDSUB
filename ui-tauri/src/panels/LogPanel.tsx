@@ -81,7 +81,7 @@ export const LogPanel: React.FC<{ embedded?: boolean }> = ({ embedded = false })
 
   useEffect(() => {
     // Sadece test/önizleme amacıyla mock veri basıyoruz
-    if (logs.length === 0) {
+    if (import.meta.env.DEV && logs.length === 0) {
       const mockLogs: LogEntry[] = [
         { id: 'mock-1', timestamp: new Date(Date.now() - 15000).toISOString().substring(11, 23), level: 'INFO', prefix: 'CORE', code: 'INIT', message: 'Tercüment_v2 çekirdeği başlatılıyor...' },
         { id: 'mock-2', timestamp: new Date(Date.now() - 14500).toISOString().substring(11, 23), level: 'INFO', prefix: 'SYS', code: 'MEM_ALLOC', message: 'Bellek yönetimi aktif (Max: 512MB)' },
