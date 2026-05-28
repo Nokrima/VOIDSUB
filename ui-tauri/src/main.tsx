@@ -5,11 +5,10 @@ import './styles/global.css';
 
 // Kök seviyede global tuş ve arayüz kısıtlamaları
 document.addEventListener('keydown', (e) => {
-  // F5 (Yenile), Ctrl+R (Yenile), F12 (Geliştirici Araçları) ve Tab (Sekme Gezinmesi) tuşlarını engelle
+  // F5 (Yenile), Ctrl+R (Yenile) ve Tab (Sekme Gezinmesi) tuşlarını engelle. (F12 Test için açık bırakıldı)
   if (
     e.key === 'F5' || 
     (e.ctrlKey && e.key.toLowerCase() === 'r') || 
-    e.key === 'F12' ||
     e.key === 'Tab'
   ) {
     e.preventDefault();
@@ -25,7 +24,8 @@ document.addEventListener('mouseover', (e) => {
 });
 
 // Sağ tık (İçerik Menüsü) penceresini tamamen kapat
-document.addEventListener('contextmenu', (e) => e.preventDefault());
+// (TEST AMACIYLA SAĞ TIK ŞİMDİLİK AÇIK BIRAKILDI)
+// document.addEventListener('contextmenu', (e) => e.preventDefault());
 
 // Orta veya Sağ tık ile butonlara basıldığında oluşan gereksiz 'tıklanma' görsel efektlerini engelle
 document.addEventListener('mousedown', (e) => {

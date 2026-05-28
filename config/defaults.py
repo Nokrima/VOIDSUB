@@ -26,9 +26,14 @@ try:
     buf = ctypes.create_unicode_buffer(ctypes.wintypes.MAX_PATH)
     ctypes.windll.shell32.SHGetFolderPathW(None, CSIDL_PERSONAL, None, SHGFP_TYPE_CURRENT, buf)
     DOCS_DIR = Path(buf.value) / "VoidSub"
+    DOCS_DIR.mkdir(parents=True, exist_ok=True)
 except Exception:
-    DOCS_DIR = Path.home() / "Documents" / "VoidSub"
-DOCS_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        DOCS_DIR = Path.home() / "Documents" / "VoidSub"
+        DOCS_DIR.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        # Fidye yazılım koruması engellerse AppData'ya (USER_DATA_DIR) geri dön
+        DOCS_DIR = USER_DATA_DIR
 
 SETTINGS_FILE = USER_DATA_DIR / "settings.json"
 LOG_FILE = DOCS_DIR / "logs" / "app.log"

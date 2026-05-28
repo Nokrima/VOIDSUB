@@ -48,19 +48,33 @@ def ensure_project_venv() -> None:
 
 ensure_project_venv()
 
-# Nuitka ile konsol devre disi birakildiginda (windows-console-mode=disable),
-# sys.stdout ve sys.stderr None olur. print() cagrilarinin cokmesini onlemek icin bosa yonlendir.
-if sys.stdout is None:
-    sys.stdout = open(os.devnull, "w")
-if sys.stderr is None:
-    sys.stderr = open(os.devnull, "w")
+# Konsol devre disi birakildiginda veya sidecar olarak calistiginda, hatalari "kara delige" (os.devnull)
+# atmak yerine gercek bir log dosyasina yaz ki izini surebilelim.
+try:
+    from config.defaults import DOCS_DIR
+    _log_dir = DOCS_DIR / "logs"
+except Exception:
+    _log_dir = Path(os.getenv("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / "VoidSub" / "logs"
+_log_dir.mkdir(parents=True, exist_ok=True)
 
-from core.bridge import BridgeServer
-from core.capture import ScreenCapturer
-from core.errors import PREFIX_SYS, get_logger, log_error, log_event, set_bridge_emitter, setup_crash_handler
-from core.modern_overlay import ModernOverlay
-from core.processor.pipeline import TranslationPipeline
-from core.runtime_cleanup import cleanup_runtime_artifacts, cleanup_startup_artifacts
+if sys.stdout is None:
+    sys.stdout = open(_log_dir / "python-core.stdout.log", "a", encoding="utf-8")
+if sys.stderr is None:
+    sys.stderr = open(_log_dir / "python-core.stderr.log", "a", encoding="utf-8")
+
+try:
+    from core.bridge import BridgeServer
+    from core.capture import ScreenCapturer
+    from core.errors import PREFIX_SYS, get_logger, log_error, log_event, set_bridge_emitter, setup_crash_handler
+    from core.modern_overlay import ModernOverlay
+    from core.processor.pipeline import TranslationPipeline
+    from core.runtime_cleanup import cleanup_runtime_artifacts, cleanup_startup_artifacts
+except Exception as exc:
+    import traceback
+    with open(_log_dir / "fatal_crash.log", "a", encoding="utf-8") as f:
+        f.write("\n--- TOP LEVEL IMPORT CRASH ---\n")
+        f.write(traceback.format_exc())
+    sys.exit(1)
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")

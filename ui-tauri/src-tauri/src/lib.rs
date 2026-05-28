@@ -474,7 +474,6 @@ pub fn run() {
 
                 #[cfg(not(debug_assertions))]
                 let base_dir = app_handle.path().resource_dir().unwrap_or_default();
-
                 #[cfg(debug_assertions)]
                 let base_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                     .join("..")
@@ -482,19 +481,12 @@ pub fn run() {
                     .join("dist");
 
                 let python_exe = base_dir.join("python_embedded").join("python.exe");
-                let main_pyc = base_dir
-                    .join("python_embedded")
-                    .join("app")
-                    .join("main.pyc");
-
-                // Geliştirici modunda hata yakalamak için konsola yazdır
-                #[cfg(debug_assertions)]
-                println!("Python Yolu: {:?}", python_exe);
-
                 let app_dir = base_dir.join("python_embedded").join("app");
+                let script_name = "main.pyc";
+
                 let mut cmd = Command::new(&python_exe);
                 cmd.current_dir(&app_dir)
-                    .arg("main.pyc")
+                    .arg(script_name)
                     .stdout(Stdio::piped())
                     .stderr(Stdio::piped());
 
@@ -514,39 +506,39 @@ pub fn run() {
 
                         #[repr(C)]
                         struct JOBOBJECT_BASIC_LIMIT_INFORMATION {
-                            pub PerProcessUserTimeLimit: i64,
-                            pub PerJobUserTimeLimit: i64,
-                            pub LimitFlags: u32,
-                            pub MinimumWorkingSetSize: usize,
-                            pub MaximumWorkingSetSize: usize,
-                            pub ActiveProcessLimit: u32,
-                            pub Affinity: usize,
-                            pub PriorityClass: u32,
-                            pub SchedulingClass: u32,
+                            pub per_process_user_time_limit: i64,
+                            pub per_job_user_time_limit: i64,
+                            pub limit_flags: u32,
+                            pub minimum_working_set_size: usize,
+                            pub maximum_working_set_size: usize,
+                            pub active_process_limit: u32,
+                            pub affinity: usize,
+                            pub priority_class: u32,
+                            pub scheduling_class: u32,
                         }
 
                         #[repr(C)]
                         struct IO_COUNTERS {
-                            pub ReadOperationCount: u64,
-                            pub WriteOperationCount: u64,
-                            pub OtherOperationCount: u64,
-                            pub ReadTransferCount: u64,
-                            pub WriteTransferCount: u64,
-                            pub OtherTransferCount: u64,
+                            pub read_operation_count: u64,
+                            pub write_operation_count: u64,
+                            pub other_operation_count: u64,
+                            pub read_transfer_count: u64,
+                            pub write_transfer_count: u64,
+                            pub other_transfer_count: u64,
                         }
 
                         #[repr(C)]
                         struct JOBOBJECT_EXTENDED_LIMIT_INFORMATION {
-                            pub BasicLimitInformation: JOBOBJECT_BASIC_LIMIT_INFORMATION,
-                            pub IoInfo: IO_COUNTERS,
-                            pub ProcessMemoryLimit: usize,
-                            pub JobMemoryLimit: usize,
-                            pub PeakProcessMemoryUsed: usize,
-                            pub PeakJobMemoryUsed: usize,
+                            pub basic_limit_information: JOBOBJECT_BASIC_LIMIT_INFORMATION,
+                            pub io_info: IO_COUNTERS,
+                            pub process_memory_limit: usize,
+                            pub job_memory_limit: usize,
+                            pub peak_process_memory_used: usize,
+                            pub peak_job_memory_used: usize,
                         }
 
                         const JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE: u32 = 0x2000;
-                        const JobObjectExtendedLimitInformation: u32 = 9;
+                        const JOB_OBJECT_EXTENDED_LIMIT_INFORMATION: u32 = 9;
 
                         extern "system" {
                             fn CreateJobObjectW(
@@ -567,11 +559,11 @@ pub fn run() {
                             if !job.is_null() {
                                 let mut info: JOBOBJECT_EXTENDED_LIMIT_INFORMATION =
                                     std::mem::zeroed();
-                                info.BasicLimitInformation.LimitFlags =
+                                info.basic_limit_information.limit_flags =
                                     JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
                                 SetInformationJobObject(
                                     job,
-                                    JobObjectExtendedLimitInformation,
+                                    JOB_OBJECT_EXTENDED_LIMIT_INFORMATION,
                                     &info as *const _ as *const std::ffi::c_void,
                                     std::mem::size_of_val(&info) as u32,
                                 );

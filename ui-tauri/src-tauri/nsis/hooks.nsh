@@ -1,13 +1,13 @@
 !macro preInit
   ; Kurulum baslamadan once arka planda calisan virel-core ve ana uygulamayi zorla kapat
-  ExecWait 'taskkill /F /IM virel-core.exe /T'
-  ExecWait 'taskkill /F /IM virel.exe /T'
+  ExecWait 'taskkill /F /IM voidsub-core.exe /T'
+  ExecWait 'taskkill /F /IM VOIDSUB.exe /T'
 !macroend
 
 !macro preInstall
   ; Dosyalar kopyalanmadan hemen once tekrar kapatalim
-  ExecWait 'taskkill /F /IM virel-core.exe /T'
-  ExecWait 'taskkill /F /IM virel.exe /T'
+  ExecWait 'taskkill /F /IM voidsub-core.exe /T'
+  ExecWait 'taskkill /F /IM VOIDSUB.exe /T'
 !macroend
 
 !macro postInstall
@@ -18,4 +18,7 @@
     ; VC++ kurulu degil — sessizce kur
     ExecWait '"$INSTDIR\bin\vc_redist.x64.exe" /install /quiet /norestart'
   ${EndIf}
+  ; Firewall izinlerini ekle (Sessizce)
+  ExecWait 'netsh advfirewall firewall add rule name="VoidSub Application" dir=in action=allow program="$INSTDIR\VOIDSUB.exe" enable=yes'
+  ExecWait 'netsh advfirewall firewall add rule name="VoidSub Python Engine" dir=in action=allow program="$INSTDIR\python_embedded\python.exe" enable=yes'
 !macroend
