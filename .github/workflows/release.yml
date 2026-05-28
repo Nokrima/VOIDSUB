@@ -60,51 +60,13 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         run: npm run tauri build -- --verbose
 
-      - name: 8. Dinamik update.json Dosyasını Üret (Esnek Kontrol)
-        id: generate-update-json
-        shell: pwsh
-        run: |
-          $VERSION = "${{ github.ref_name }}".TrimStart('v')
-          $BUNDLE_DIR = "ui-tauri/src-tauri/target/release/bundle"
-          
-          $ZIP_FILE = Get-ChildItem -Path $BUNDLE_DIR -Filter "*.zip" -Recurse | Select-Object -First 1
-          $SIG_FILE = Get-ChildItem -Path $BUNDLE_DIR -Filter "*.sig" -Recurse | Select-Object -First 1
-          
-          if ($ZIP_FILE -and $SIG_FILE) {
-            Write-Output "✅ Updater dosyalari bulundu. update.json olusturuluyor..."
-            $SIG_CONTENT = (Get-Content -Path $SIG_FILE.FullName -Raw).Trim()
-            $DOWNLOAD_URL = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/$($ZIP_FILE.Name)"
-            $DATE = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-            
-            $UPDATE_JSON_OBJ = @{
-                version = $VERSION
-                notes = "Otomatik Guncelleme - Surum $VERSION"
-                pub_date = $DATE
-                platforms = @{
-                    "windows-x86_64" = @{
-                        signature = $SIG_CONTENT
-                        url = $DOWNLOAD_URL
-                    }
-                }
-            }
-            $UPDATE_JSON = $UPDATE_JSON_OBJ | ConvertTo-Json -Depth 5
-            Set-Content -Path "$BUNDLE_DIR/update.json" -Value $UPDATE_JSON -Encoding utf8
-            Write-Output $UPDATE_JSON
-          } else {
-            Write-Warning "⚠️ Tauri updater (.zip/.sig) bulunamadi! Eger bu bir BASE RELEASE (Sifir Noktasi) ise bu tamamen normaldir. Sadece .exe yuklenecek."
-            Write-Output "update.json olusturulmadi."
-          }
-
-      - name: 9. GitHub Releases'e Yükle (Hataya Dayanıklı)
+      - name: 8. GitHub Releases'e Yükle (Sadece EXE)
         uses: softprops/action-gh-release@v2
         with:
           name: VOIDSUB ${{ github.ref_name }}
           fail_on_unmatched_files: false
           files: |
             ui-tauri/src-tauri/target/release/bundle/**/*.exe
-            ui-tauri/src-tauri/target/release/bundle/**/*.zip
-            ui-tauri/src-tauri/target/release/bundle/**/*.sig
-            ui-tauri/src-tauri/target/release/bundle/update.json
           draft: false
           prerelease: false
           generate_release_notes: true

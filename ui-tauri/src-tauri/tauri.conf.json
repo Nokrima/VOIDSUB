@@ -1,6 +1,6 @@
 {
   "productName": "VOIDSUB",
-  "version": "2.5.1",
+  "version": "2.5.0",
   "identifier": "com.voidsub.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -38,7 +38,6 @@
     }
   },
   "bundle": {
-    "createUpdaterArtifacts": true,
     "windows": {
       "nsis": {
         "displayLanguageSelector": true,
