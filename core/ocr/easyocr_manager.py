@@ -259,8 +259,10 @@ class EasyOCRManager:
                     self._raise_if_cancelled()
                     
                     # Zip Slip koruması
+                    import os
                     target_path = (self.plugin_dir / member.name).resolve()
-                    if not str(target_path).startswith(str(self.plugin_dir.resolve())):
+                    base_path = self.plugin_dir.resolve()
+                    if os.path.commonpath([str(base_path), str(target_path)]) != str(base_path) or '..' in member.name or member.name.startswith('/') or member.name.startswith('\\'):
                         raise RuntimeError(f"Güvenlik ihlali: Zip slip denemesi engellendi ({member.name})")
                         
                     zip_ref.extract(member, self.plugin_dir)

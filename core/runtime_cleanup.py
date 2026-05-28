@@ -45,18 +45,22 @@ def cleanup_startup_artifacts() -> None:
         try:
             import subprocess
             cflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-            output = subprocess.check_output(f"netstat -ano | findstr :{WEBSOCKET_PORT}", shell=True, text=True, creationflags=cflags)
+            output = subprocess.check_output(["netstat", "-ano"], text=True, creationflags=cflags)
             for line in output.splitlines():
-                if "LISTENING" in line:
+                if f":{WEBSOCKET_PORT}" in line and "LISTENING" in line:
                     parts = line.strip().split()
                     if len(parts) >= 5:
-                        pid = parts[-1]
-                        # Process kimliğini doğrula (sadece python veya uygulamanın kendi processleri)
                         try:
-                            tasklist_out = subprocess.check_output(f'tasklist /FI "PID eq {pid}" /NH', shell=True, text=True, creationflags=cflags).lower()
-                            if "python" in tasklist_out or "voidsub" in tasklist_out:
-                                subprocess.run(f"taskkill /PID {pid} /F", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=cflags)
+                            pid = int(parts[-1])
+                            # Process path'ini al (shell=True olmadan)
+                            ps_cmd = f"Get-Process -Id {pid} -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Path"
+                            path_out = subprocess.check_output(["powershell", "-NoProfile", "-Command", ps_cmd], text=True, creationflags=cflags).strip().lower()
+                            
+                            if "python" in path_out or "voidsub" in path_out:
+                                subprocess.run(["taskkill", "/PID", str(pid), "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=cflags)
                                 log_event(PREFIX_SYS, "012", f"[Ağ Temizliği] -> ZOMBİ İŞLEM (ZOMBIE) TEMİZLENDİ | Port: {WEBSOCKET_PORT} | PID: {pid}")
+                        except ValueError:
+                            pass
                         except Exception:
                             pass
         except Exception:

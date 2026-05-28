@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+import sys
 import time
 import unicodedata
 import uuid
@@ -122,6 +123,13 @@ class TranslationPipeline:
         self._configure_ocr_source_profiles()
 
     def _log_debug(self, prefix: str, code: str, message: str) -> None:
+        if getattr(sys, 'frozen', False):
+            # Maskeleme regex'i: text='...', translated_text="..." gibi alanları bulur ve içini gizler.
+            message = re.sub(
+                r'(text|before|after|candidate|source|translated_text|raw_text|original_text|last_detected_text|last_text|current_text)=([\'"]).*?\2',
+                r'\1=\2*** [REDACTED] ***\2',
+                message
+            )
         self.logger.debug(f"[{prefix}-{code}] {message}")
 
     def _log_ocr(self, code: str, message: str) -> None:
