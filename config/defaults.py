@@ -7,7 +7,7 @@ from pathlib import Path
 import sys
 
 APP_NAME = "VoidSub"
-APP_VERSION = "2.5.0"
+APP_VERSION = "2.0.0"
 
 # BASE_DIR: Read-only uygulama kök dizini (C:\Program Files\VoidSub)
 BASE_DIR = Path(__file__).resolve().parent.parent
