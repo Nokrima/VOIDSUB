@@ -140,10 +140,14 @@ class EasyOCREngine(OCREngine):
                 return []
             img_b64 = base64.b64encode(encoded.tobytes()).decode('ascii')
             payload = json.dumps({"command": "read", "image": img_b64}) + "\n"
+            proc = self.worker_proc
+            if not proc:
+                return []
             
-            if self.worker_proc.stdin:
-                self.worker_proc.stdin.write(payload)
-                self.worker_proc.stdin.flush()
+            stdin = proc.stdin
+            if stdin:
+                stdin.write(payload)
+                stdin.flush()
             
             try:
                 response_line = self._stdout_q.get(timeout=15.0)
