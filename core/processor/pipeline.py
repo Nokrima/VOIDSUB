@@ -130,11 +130,8 @@ class TranslationPipeline:
 
 
 
-    async def start_loop(self):
-        if self.is_running:
-            log_event(PREFIX_SYS, "075", "Start loop request ignored: pipeline already running", level="debug")
-            return
-
+    async def _startup_phase(self) -> bool:
+        """Activate OCR engine and validate capture module. Returns False if startup fails."""
         runtime_engine = self._runtime_engine_id()
         log_event(
             PREFIX_SYS,
@@ -155,22 +152,20 @@ class TranslationPipeline:
             engine_obj = self._get_engine_instance(runtime_engine)
             start_error = getattr(engine_obj, 'start_error', None) if engine_obj else None
             self.bridge.send("translation_state", {
-                "running": False, 
+                "running": False,
                 "reason": "engine_unavailable",
                 "message": str(start_error) if start_error else None
             })
-            return
-
+            return False
         if getattr(self.capturer, "_capture_state", "ready") == "unavailable":
             capture_err = getattr(self.capturer, "_runtime_error", "Bilinmeyen hata")
             self.logger.error(f"[{PREFIX_SYS}-045] [Ekran Yakalama] -> MODÜL BOZUK | Detay: {capture_err}")
             self.bridge.send("translation_state", {
-                "running": False, 
+                "running": False,
                 "reason": "capture_unavailable",
                 "message": str(capture_err)
             })
-            return
-
+            return False
         self.is_running = True
         self.performance_monitor.start()
         self._notify_runtime_engine_fallback(runtime_engine)
@@ -179,6 +174,14 @@ class TranslationPipeline:
         if self.translation_engine == "offline" and hasattr(self.offline_translator, "warmup"):
             await asyncio.get_running_loop().run_in_executor(None, self.offline_translator.warmup)
         self._capture_task = asyncio.create_task(self._capture_loop())
+        return True
+
+    async def start_loop(self):
+        if self.is_running:
+            log_event(PREFIX_SYS, "075", "Start loop request ignored: pipeline already running", level="debug")
+            return
+        if not await self._startup_phase():
+            return
 
         try:
             while self.is_running:
@@ -227,387 +230,20 @@ class TranslationPipeline:
 
                     frame_hash = self._frame_hash(frame)
                     if frame_hash == self._last_frame_hash and self.last_detected_text:
-                        if self.raw_translation_flow_enabled:
-                            self.overlay_publisher._log_ocr(
-                                "032",
-                                (
-                                    f"Raw flow frame reuse allowed: frame_id={frame_id}, reason=hash_match, "
-                                    f"text={self.last_detected_text!r}, quality={self.last_detected_quality}"
-                                ),
-                            )
-                        else:
-                            self._reused_frame_count += 1
-                            self.overlay_publisher._log_ocr(
-                                "002",
-                                (
-                                    f"Frame reused: frame_id={frame_id}, reason=hash_match, "
-                                    f"last_detected_text={self.last_detected_text!r}, quality={self.last_detected_quality}"
-                                ),
-                            )
-                            self._mark_subtitle_activity()
-                            self.slot_manager.push(self.last_detected_text, self.last_detected_quality)
-                            min_slot_samples = self._required_slot_samples(
-                                self.last_detected_text,
-                                self.last_detected_quality,
-                            )
-                            if self._should_skip_reused_frame_reprocess(min_slot_samples):
-                                self.overlay_publisher._log_ocr(
-                                    "026",
-                                    (
-                                        f"Static frame skipped: frame_id={frame_id}, repeat_count={self._reused_frame_count}, "
-                                        f"samples={self.slot_manager.get_sample_count()}, required={min_slot_samples}, "
-                                        f"last_text={self.last_text!r}"
-                                    ),
-                                )
-                                del frame
-                                await asyncio.sleep(min(self.loop_interval, 0.01))
-                                continue
-                            if self.slot_manager.get_sample_count() >= min_slot_samples:
-                                stabilized_text = self.slot_manager.get_slot()
-                            else:
-                                stabilized_text = None
-                            if stabilized_text:
-                                self.overlay_publisher._emit_translation(stabilized_text, frame_started_monotonic=frame_started_monotonic, ocr_duration_ms=0.0)
-                            del frame
-                            await asyncio.sleep(min(self.loop_interval, 0.01))
+                        reused_done = await self._handle_reused_frame(frame_id, frame, frame_started_monotonic)
+                        if reused_done:
                             continue
                     self._last_frame_hash = frame_hash
                     self._reused_frame_count = 0
 
-                    ocr_started = time.perf_counter()
-                    try:
-                        ocr_payload = await asyncio.wait_for(
-                            asyncio.to_thread(self._read_fast_then_refine, frame, frame_id),
-                            timeout=3.5
-                        )
-                    except asyncio.TimeoutError:
-                        self.logger.error(f"[{PREFIX_OCR}-051] [OCR İşlemi] -> ZAMAN AŞIMI (TIMEOUT) | Çerçeve ID: {frame_id}")
-                        ocr_payload = None
-                    ocr_duration_ms = (time.perf_counter() - ocr_started) * 1000
-                    if not ocr_payload:
-                        self.overlay_publisher._log_ocr(
-                            "015",
-                            f"No OCR payload: frame_id={frame_id}, ocr_ms={ocr_duration_ms:.1f}, resolved_region={resolved_region}",
-                        )
-                        # Record no_text rejection for diagnostic tool
-                        self.diagnostics.record(
-                            "rejected",
-                            self.active_engine,
-                            self.ocr_scene_mode,
-                            frame,
-                            frame,
-                            "",
-                            0,
-                            {
-                                "variant": "none",
-                                "result_count": 0,
-                                "frame_id": frame_id,
-                                "reason": "no_text",
-                            },
-                        )
-                        self.overlay_publisher._emit_frame_stat(None, "no_text")
-                        del frame
+                    ocr_frame_done = await self._process_ocr_frame(
+                        frame_id, frame, resolved_region, frame_started_monotonic, ocr_duration_ms=None
+                    )
+                    if ocr_frame_done:
+                        await asyncio.sleep(0)
+                    else:
                         await asyncio.sleep(min(self.loop_interval, 0.01))
-                        continue
-
-                    raw_detected_text = str(ocr_payload["text"])
-                    clean_report = clean_ocr_source_detailed(raw_detected_text) if not self.raw_translation_flow_enabled else None
-                    detected_text = raw_detected_text if self.raw_translation_flow_enabled else str(clean_report["text"])
-                    if self.raw_translation_flow_enabled:
-                        self.overlay_publisher._log_ocr(
-                            "033",
-                            (
-                                f"Raw flow cleanup bypass: frame_id={frame_id}, "
-                                f"raw_text={raw_detected_text!r}, cleaned_candidate=None"
-                            ),
-                        )
-                        self.overlay_publisher._log_ocr(
-                            "013",
-                            f"Source cleanup: frame_id={frame_id}, changed=False, steps=['skipped_raw_mode'], before={raw_detected_text!r}, after={detected_text!r}",
-                        )
-                    else:
-                        self.overlay_publisher._log_ocr(
-                            "013",
-                            (
-                                f"Source cleanup: frame_id={frame_id}, changed={clean_report['changed']}, "
-                                f"steps={clean_report['steps']}, minor_merge_fixes={clean_report.get('minor_merge_fixes', [])}, "
-                                f"before={raw_detected_text!r}, after={detected_text!r}"
-                            ),
-                        )
-                    quality_score = int(ocr_payload["quality"])
-                    self.overlay_publisher._log_ocr(
-                        "016",
-                        (
-                            f"Final OCR text: frame_id={frame_id}, variant={ocr_payload['variant']}, "
-                            f"scene_mode={ocr_payload['scene_mode']}, text={detected_text!r}, "
-                            f"quality={quality_score}, ocr_ms={ocr_duration_ms:.1f}"
-                        ),
-                    )
-                    self._mark_subtitle_activity()
-
-                    if (
-                        not self.raw_translation_flow_enabled
-                        and frame_id != self._latest_frame_id
-                        and self._is_subtitle_active()
-                        and quality_score < max(self.quality_threshold + 6, 50)
-                    ):
-                        del frame
-                        del ocr_payload
-                        await asyncio.sleep(0)
-                        continue
-                    if not self.raw_translation_flow_enabled and detected_text == self.last_text:
-                        del frame
-                        del ocr_payload
-                        await asyncio.sleep(0)
-                        continue
-                    if not self.raw_translation_flow_enabled and len(detected_text.strip()) < self._effective_min_text_chars():
-                        self.overlay_publisher._log_ocr(
-                            "017",
-                            (
-                                f"Min text chars gate: decision=REJECTED, frame_id={frame_id}, "
-                                f"length={len(detected_text.strip())}, threshold={self._effective_min_text_chars()}, "
-                                f"text={detected_text!r}"
-                            ),
-                        )
-                        self.overlay_publisher._emit_frame_stat(ocr_payload, "rejected", "min_text_chars")
-                        del frame
-                        del ocr_payload
-                        await asyncio.sleep(0)
-                        continue
-                    junk_rejected = False
-                    if self.raw_translation_flow_enabled:
-                        self.overlay_publisher._log_ocr(
-                            "018",
-                            f"Junk filter: decision=BYPASSED, frame_id={frame_id}, text={detected_text!r}",
-                        )
-                        self.overlay_publisher._log_ocr(
-                            "014",
-                            f"Tip2 analysis: frame_id={frame_id}, decision=BYPASSED",
-                        )
-                    else:
-                        junk_rejected = JunkFilter.is_junk(detected_text)
-                        text_health = JunkFilter.analyze_text(detected_text)
-                        self.overlay_publisher._log_ocr(
-                            "018",
-                            (
-                                f"Junk filter: decision={'REJECTED' if junk_rejected else 'ACCEPTED'}, "
-                                f"frame_id={frame_id}, text={detected_text!r}, "
-                                f"health={text_health['health_score']}, verdict={text_health['health_verdict']}, "
-                                f"recognized={text_health['recognized_count']}, recognized_ratio={text_health['recognized_ratio']:.2f}, "
-                                f"suspicious={text_health['suspicious_tokens']}, broken={text_health['broken_token_count']}, "
-                                f"unknown_long={text_health['unknown_long_alpha_count']}, merged={text_health['merged_token_hits']}, "
-                                f"minor_merge={text_health['minor_merge_hits']}, "
-                                f"speaker_prefix_suspicious={text_health['speaker_prefix_suspicious']}, "
-                                f"tip2={text_health['tip2_suspect']}"
-                            ),
-                        )
-                        self.overlay_publisher._log_ocr(
-                            "014",
-                            (
-                                f"Tip2 analysis: frame_id={frame_id}, candidate={text_health['tip2_suspect']}, "
-                                f"joined={text_health['joined_word_hits']}, tail_broken={text_health['tail_broken_tokens']}, "
-                                f"malformed_common={text_health['malformed_common_word_hits']}, "
-                                f"merged={text_health['merged_token_hits']}, minor_merge={text_health['minor_merge_hits']}, "
-                                f"broken_tokens={text_health['broken_tokens']}, suspicious_tokens={text_health['suspicious_token_list']}, "
-                                f"connected_noise_runs={text_health['connected_noise_runs']}, connected_noise_tokens={text_health['connected_noise_tokens']}, "
-                                f"unknown_long={text_health['unknown_long_alpha_count']}, speaker_prefix_suspicious={text_health['speaker_prefix_suspicious']}"
-                            ),
-                        )
-                    if junk_rejected:
-                        # Record the junk rejection for diagnostic tool
-                        self.diagnostics.record(
-                            "rejected",
-                            self.active_engine,
-                            str(ocr_payload["scene_mode"]),
-                            frame,
-                            cast(np.ndarray, ocr_payload["processed"]),
-                            detected_text,
-                            quality_score,
-                            {
-                                "variant": ocr_payload["variant"],
-                                "result_count": ocr_payload["result_count"],
-                                "frame_id": frame_id,
-                                "reason": "junk",
-                            },
-                        )
-                        self.overlay_publisher._emit_frame_stat(ocr_payload, "rejected", "junk")
-                        del frame
-                        del ocr_payload
-                        await asyncio.sleep(0)
-                        continue
-                    quality_threshold = self.quality_threshold
-                    quality_reason = "bypassed_raw_mode"
-                    quality_rejected = False
-                    if not self.raw_translation_flow_enabled:
-                        quality_threshold, quality_reason = self._quality_gate_context(detected_text, quality_score)
-                        quality_rejected = self._should_drop_for_quality(detected_text, quality_score)
-                    if self.raw_translation_flow_enabled:
-                        self.overlay_publisher._log_ocr(
-                            "034",
-                            (
-                                f"Raw flow gates bypassed: frame_id={frame_id}, "
-                                f"min_chars=off, junk=off, quality=off, score={quality_score}, threshold={quality_threshold}"
-                            ),
-                        )
-                    self.overlay_publisher._log_ocr(
-                        "019",
-                    (
-                        f"Quality gate: decision={'REJECTED' if quality_rejected else 'ACCEPTED'}, "
-                        f"frame_id={frame_id}, score={quality_score}, threshold={quality_threshold}, "
-                        f"reason={quality_reason}, breakdown={self._quality_gate_breakdown(detected_text)!r}, text={detected_text!r}"
-                    ),
-                )
-                    if quality_rejected:
-                        self.diagnostics.record(
-                            "rejected",
-                            self.active_engine,
-                            str(ocr_payload["scene_mode"]),
-                            frame,
-                            cast(np.ndarray, ocr_payload["processed"]),
-                            detected_text,
-                            quality_score,
-                            {
-                                "variant": ocr_payload["variant"],
-                                "result_count": ocr_payload["result_count"],
-                                "frame_id": frame_id,
-                                "reason": "quality",
-                            },
-                        )
-                        log_event(PREFIX_SYS, "033", "[Görüntü İşleme] -> ATLANDI | Düşük kalite OCR çıktısı", throttle_key="quality_skip", throttle_seconds=2.0)
-                        self.overlay_publisher._emit_frame_stat(ocr_payload, "rejected", "quality")
-                        del frame
-                        del ocr_payload
-                        await asyncio.sleep(0)
-                        continue
-                    self.last_detected_text = detected_text
-                    self.last_detected_quality = quality_score
-
-                    if self.raw_translation_flow_enabled:
-                        self.overlay_publisher._emit_frame_stat(ocr_payload, "accepted")
-                        self.overlay_publisher._log_ocr(
-                            "024",
-                            (
-                                f"Raw flow queued for translation: frame_id={frame_id}, text={detected_text!r}, "
-                                f"ocr_ms={ocr_duration_ms:.1f}"
-                            ),
-                        )
-                        self.overlay_publisher._emit_translation(detected_text, frame_started_monotonic=frame_started_monotonic, ocr_duration_ms=ocr_duration_ms)
-                        del frame
-                        del ocr_payload
-                        await asyncio.sleep(0)
-                        continue
-
-                    push_result = self.slot_manager.push(detected_text, quality_score)
-                    
-                    if push_result in ("new_slot", "rejected"):
-                        self._instability_count = getattr(self, "_instability_count", 0) + 1
-                        if self._instability_count > 5:
-                            from core.errors import emit_bridge_event
-                            self.overlay_publisher._log_ocr("060", "Ekran içeriği çok hızlı değişiyor (Flickering tespit edildi).")
-                            emit_bridge_event("log_entry", {
-                                "timestamp": "", "level": "INFO", "prefix": "OCR", "code": "OCR-060",
-                                "message": "Ekran içeriği çok hızlı değişiyor. Çeviri gecikmeli görünebilir."
-                            })
-                            emit_bridge_event("stability_warning", {})
-                            self._instability_count = 0
-                    elif push_result in ("upgraded", "held") and self.slot_manager.is_stable():
-                        self._instability_count = 0
-
-                    sample_count = self.slot_manager.get_sample_count()
-                    slot_debug = self.slot_manager.get_slot_debug()
-                    min_slot_samples = self._required_slot_samples(detected_text, quality_score)
-                    self.overlay_publisher._log_ocr(
-                        "020",
-                        (
-                            f"Stabilizer push: decision={push_result.upper()}, frame_id={frame_id}, "
-                            f"samples={sample_count}, required={min_slot_samples}, text={detected_text!r}, "
-                            f"slot_health={slot_debug['health']}, slot_recognized={slot_debug['recognized']}, slot_broken={slot_debug['broken']}, "
-                            f"slot_suspicious={slot_debug['suspicious']}, slot_complete={slot_debug['complete']}, "
-                            f"slot_length={slot_debug['length']}"
-                        ),
-                    )
-                    if push_result == "rejected":
-                        self.overlay_publisher._emit_frame_stat(ocr_payload, "rejected", "slot_rejected")
-                        del frame
-                        del ocr_payload
-                        await asyncio.sleep(0)
-                        continue
-                    if self.slot_manager.get_sample_count() < min_slot_samples:
-                        self.overlay_publisher._log_ocr(
-                            "021",
-                            (
-                                f"Stabilizer decision: ACCEPTED=NO, frame_id={frame_id}, "
-                                f"samples={self.slot_manager.get_sample_count()}, required={min_slot_samples}, "
-                                f"reason=slot_wait"
-                            ),
-                        )
-                        self.overlay_publisher._emit_frame_stat(ocr_payload, "rejected", "slot_wait")
-                        del frame
-                        del ocr_payload
-                        await asyncio.sleep(0)
-                        continue
-
-                    stabilized_text = self.slot_manager.get_slot()
-                    if stabilized_text is None:
-                        self.overlay_publisher._log_ocr(
-                            "022",
-                            f"Stabilizer decision: ACCEPTED=NO, frame_id={frame_id}, reason=stabilizer_none, text={detected_text!r}",
-                        )
-                        # Record stabilizer rejection
-                        self.diagnostics.record(
-                            "rejected",
-                            self.active_engine,
-                            str(ocr_payload["scene_mode"]),
-                            frame,
-                            cast(np.ndarray, ocr_payload["processed"]),
-                            detected_text,
-                            quality_score,
-                            {
-                                "variant": ocr_payload["variant"],
-                                "result_count": ocr_payload["result_count"],
-                                "frame_id": frame_id,
-                                "reason": "stabilizer",
-                            },
-                        )
-                        del frame
-                        del ocr_payload
-                        await asyncio.sleep(0)
-                        continue
-
-                    self.overlay_publisher._log_ocr(
-                        "023",
-                        (
-                            f"Stabilizer decision: ACCEPTED=YES, frame_id={frame_id}, "
-                            f"samples={self.slot_manager.get_sample_count()}, required={min_slot_samples}, "
-                            f"final_text={stabilized_text!r}"
-                        ),
-                    )
-                    self.diagnostics.record(
-                        "accepted",
-                        self.active_engine,
-                        str(ocr_payload["scene_mode"]),
-                        frame,
-                        cast(np.ndarray, ocr_payload["processed"]),
-                        stabilized_text,
-                        quality_score,
-                        {
-                            "variant": ocr_payload["variant"],
-                            "result_count": ocr_payload["result_count"],
-                            "frame_id": frame_id,
-                        },
-                    )
-                    self.overlay_publisher._emit_frame_stat(ocr_payload, "accepted")
-                    self.overlay_publisher._log_ocr(
-                        "024",
-                        (
-                            f"Final text queued for translation: frame_id={frame_id}, text={stabilized_text!r}, "
-                            f"ocr_ms={ocr_duration_ms:.1f}"
-                        ),
-                    )
-                    self.overlay_publisher._emit_translation(stabilized_text, frame_started_monotonic=frame_started_monotonic, ocr_duration_ms=ocr_duration_ms)
-                    del frame
-                    del ocr_payload
-                    await asyncio.sleep(0)
+                    continue
                 except asyncio.CancelledError:
                     raise
                 except Exception as loop_exc:
@@ -631,6 +267,223 @@ class TranslationPipeline:
             self.is_running = False
             self.performance_monitor.stop()
             self.bridge.send("translation_state", {"running": False})
+
+    async def _handle_reused_frame(self, frame_id: int, frame, frame_started_monotonic: float) -> bool:
+        """Handle a frame whose hash matches the last seen frame. Returns True if the frame was consumed."""
+        if self.raw_translation_flow_enabled:
+            self.overlay_publisher._log_ocr(
+                "032",
+                (
+                    f"Raw flow frame reuse allowed: frame_id={frame_id}, reason=hash_match, "
+                    f"text={self.last_detected_text!r}, quality={self.last_detected_quality}"
+                ),
+            )
+            return False  # raw mode: fall through to normal OCR path
+        self._reused_frame_count += 1
+        self.overlay_publisher._log_ocr(
+            "002",
+            (
+                f"Frame reused: frame_id={frame_id}, reason=hash_match, "
+                f"last_detected_text={self.last_detected_text!r}, quality={self.last_detected_quality}"
+            ),
+        )
+        self._mark_subtitle_activity()
+        self.slot_manager.push(self.last_detected_text, self.last_detected_quality)
+        min_slot_samples = self._required_slot_samples(self.last_detected_text, self.last_detected_quality)
+        if self._should_skip_reused_frame_reprocess(min_slot_samples):
+            self.overlay_publisher._log_ocr(
+                "026",
+                (
+                    f"Static frame skipped: frame_id={frame_id}, repeat_count={self._reused_frame_count}, "
+                    f"samples={self.slot_manager.get_sample_count()}, required={min_slot_samples}, "
+                    f"last_text={self.last_text!r}"
+                ),
+            )
+            del frame
+            await asyncio.sleep(min(self.loop_interval, 0.01))
+            return True
+        if self.slot_manager.get_sample_count() >= min_slot_samples:
+            stabilized_text = self.slot_manager.get_slot()
+        else:
+            stabilized_text = None
+        if stabilized_text:
+            self.overlay_publisher._emit_translation(stabilized_text, frame_started_monotonic=frame_started_monotonic, ocr_duration_ms=0.0)
+        del frame
+        await asyncio.sleep(min(self.loop_interval, 0.01))
+        return True
+
+    async def _process_ocr_frame(self, frame_id: int, frame, resolved_region, frame_started_monotonic: float, ocr_duration_ms) -> bool:
+        """Run OCR + all quality/junk/stabilizer gates and emit translation. Returns True if processed cleanly."""
+        ocr_started = time.perf_counter()
+        try:
+            ocr_payload = await asyncio.wait_for(
+                asyncio.to_thread(self._read_fast_then_refine, frame, frame_id),
+                timeout=3.5
+            )
+        except asyncio.TimeoutError:
+            self.logger.error(f"[{PREFIX_OCR}-051] [OCR İşlemi] -> ZAMAN AŞIMI (TIMEOUT) | Çerçeve ID: {frame_id}")
+            ocr_payload = None
+        ocr_duration_ms = (time.perf_counter() - ocr_started) * 1000
+        if not ocr_payload:
+            self.overlay_publisher._log_ocr(
+                "015",
+                f"No OCR payload: frame_id={frame_id}, ocr_ms={ocr_duration_ms:.1f}, resolved_region={resolved_region}",
+            )
+            self.diagnostics.record(
+                "rejected", self.active_engine, self.ocr_scene_mode, frame, frame, "",
+                0, {"variant": "none", "result_count": 0, "frame_id": frame_id, "reason": "no_text"},
+            )
+            self.overlay_publisher._emit_frame_stat(None, "no_text")
+            del frame
+            return False
+
+        raw_detected_text = str(ocr_payload["text"])
+        clean_report = clean_ocr_source_detailed(raw_detected_text) if not self.raw_translation_flow_enabled else None
+        detected_text = raw_detected_text if self.raw_translation_flow_enabled else str(clean_report["text"])
+        if self.raw_translation_flow_enabled:
+            self.overlay_publisher._log_ocr("033", f"Raw flow cleanup bypass: frame_id={frame_id}, raw_text={raw_detected_text!r}, cleaned_candidate=None")
+            self.overlay_publisher._log_ocr("013", f"Source cleanup: frame_id={frame_id}, changed=False, steps=['skipped_raw_mode'], before={raw_detected_text!r}, after={detected_text!r}")
+        else:
+            self.overlay_publisher._log_ocr(
+                "013",
+                (
+                    f"Source cleanup: frame_id={frame_id}, changed={clean_report['changed']}, "
+                    f"steps={clean_report['steps']}, minor_merge_fixes={clean_report.get('minor_merge_fixes', [])}, "
+                    f"before={raw_detected_text!r}, after={detected_text!r}"
+                ),
+            )
+        quality_score = int(ocr_payload["quality"])
+        self.overlay_publisher._log_ocr(
+            "016",
+            f"Final OCR text: frame_id={frame_id}, variant={ocr_payload['variant']}, scene_mode={ocr_payload['scene_mode']}, text={detected_text!r}, quality={quality_score}, ocr_ms={ocr_duration_ms:.1f}",
+        )
+        self._mark_subtitle_activity()
+        # --- Early drop gates ---
+        if (
+            not self.raw_translation_flow_enabled
+            and frame_id != self._latest_frame_id
+            and self._is_subtitle_active()
+            and quality_score < max(self.quality_threshold + 6, 50)
+        ):
+            del frame; del ocr_payload; return True
+        if not self.raw_translation_flow_enabled and detected_text == self.last_text:
+            del frame; del ocr_payload; return True
+        if not self.raw_translation_flow_enabled and len(detected_text.strip()) < self._effective_min_text_chars():
+            self.overlay_publisher._log_ocr("017", f"Min text chars gate: decision=REJECTED, frame_id={frame_id}, length={len(detected_text.strip())}, threshold={self._effective_min_text_chars()}, text={detected_text!r}")
+            self.overlay_publisher._emit_frame_stat(ocr_payload, "rejected", "min_text_chars")
+            del frame; del ocr_payload; return True
+        # --- Junk filter ---
+        junk_rejected = False
+        if self.raw_translation_flow_enabled:
+            self.overlay_publisher._log_ocr("018", f"Junk filter: decision=BYPASSED, frame_id={frame_id}, text={detected_text!r}")
+            self.overlay_publisher._log_ocr("014", f"Tip2 analysis: frame_id={frame_id}, decision=BYPASSED")
+        else:
+            junk_rejected = JunkFilter.is_junk(detected_text)
+            text_health = JunkFilter.analyze_text(detected_text)
+            self.overlay_publisher._log_ocr(
+                "018",
+                (
+                    f"Junk filter: decision={'REJECTED' if junk_rejected else 'ACCEPTED'}, "
+                    f"frame_id={frame_id}, text={detected_text!r}, health={text_health['health_score']}, verdict={text_health['health_verdict']}, "
+                    f"recognized={text_health['recognized_count']}, recognized_ratio={text_health['recognized_ratio']:.2f}, "
+                    f"suspicious={text_health['suspicious_tokens']}, broken={text_health['broken_token_count']}, "
+                    f"unknown_long={text_health['unknown_long_alpha_count']}, merged={text_health['merged_token_hits']}, "
+                    f"minor_merge={text_health['minor_merge_hits']}, speaker_prefix_suspicious={text_health['speaker_prefix_suspicious']}, tip2={text_health['tip2_suspect']}"
+                ),
+            )
+            self.overlay_publisher._log_ocr(
+                "014",
+                (
+                    f"Tip2 analysis: frame_id={frame_id}, candidate={text_health['tip2_suspect']}, "
+                    f"joined={text_health['joined_word_hits']}, tail_broken={text_health['tail_broken_tokens']}, "
+                    f"malformed_common={text_health['malformed_common_word_hits']}, merged={text_health['merged_token_hits']}, "
+                    f"minor_merge={text_health['minor_merge_hits']}, broken_tokens={text_health['broken_tokens']}, "
+                    f"suspicious_tokens={text_health['suspicious_token_list']}, connected_noise_runs={text_health['connected_noise_runs']}, "
+                    f"connected_noise_tokens={text_health['connected_noise_tokens']}, unknown_long={text_health['unknown_long_alpha_count']}, "
+                    f"speaker_prefix_suspicious={text_health['speaker_prefix_suspicious']}"
+                ),
+            )
+        if junk_rejected:
+            self.diagnostics.record("rejected", self.active_engine, str(ocr_payload["scene_mode"]), frame,
+                cast(np.ndarray, ocr_payload["processed"]), detected_text, quality_score,
+                {"variant": ocr_payload["variant"], "result_count": ocr_payload["result_count"], "frame_id": frame_id, "reason": "junk"})
+            self.overlay_publisher._emit_frame_stat(ocr_payload, "rejected", "junk")
+            del frame; del ocr_payload; return True
+        # --- Quality gate ---
+        quality_threshold = self.quality_threshold
+        quality_reason = "bypassed_raw_mode"
+        quality_rejected = False
+        if not self.raw_translation_flow_enabled:
+            quality_threshold, quality_reason = self._quality_gate_context(detected_text, quality_score)
+            quality_rejected = self._should_drop_for_quality(detected_text, quality_score)
+        if self.raw_translation_flow_enabled:
+            self.overlay_publisher._log_ocr("034", f"Raw flow gates bypassed: frame_id={frame_id}, min_chars=off, junk=off, quality=off, score={quality_score}, threshold={quality_threshold}")
+        self.overlay_publisher._log_ocr(
+            "019",
+            f"Quality gate: decision={'REJECTED' if quality_rejected else 'ACCEPTED'}, frame_id={frame_id}, score={quality_score}, threshold={quality_threshold}, reason={quality_reason}, breakdown={self._quality_gate_breakdown(detected_text)!r}, text={detected_text!r}",
+        )
+        if quality_rejected:
+            self.diagnostics.record("rejected", self.active_engine, str(ocr_payload["scene_mode"]), frame,
+                cast(np.ndarray, ocr_payload["processed"]), detected_text, quality_score,
+                {"variant": ocr_payload["variant"], "result_count": ocr_payload["result_count"], "frame_id": frame_id, "reason": "quality"})
+            log_event(PREFIX_SYS, "033", "[Görüntü İşleme] -> ATLANDI | Düşük kalite OCR çıktısı", throttle_key="quality_skip", throttle_seconds=2.0)
+            self.overlay_publisher._emit_frame_stat(ocr_payload, "rejected", "quality")
+            del frame; del ocr_payload; return True
+        self.last_detected_text = detected_text
+        self.last_detected_quality = quality_score
+        # --- Raw flow fast path ---
+        if self.raw_translation_flow_enabled:
+            self.overlay_publisher._emit_frame_stat(ocr_payload, "accepted")
+            self.overlay_publisher._log_ocr("024", f"Raw flow queued for translation: frame_id={frame_id}, text={detected_text!r}, ocr_ms={ocr_duration_ms:.1f}")
+            self.overlay_publisher._emit_translation(detected_text, frame_started_monotonic=frame_started_monotonic, ocr_duration_ms=ocr_duration_ms)
+            del frame; del ocr_payload; return True
+        # --- Stabilizer ---
+        push_result = self.slot_manager.push(detected_text, quality_score)
+        if push_result in ("new_slot", "rejected"):
+            self._instability_count = getattr(self, "_instability_count", 0) + 1
+            if self._instability_count > 5:
+                from core.errors import emit_bridge_event
+                self.overlay_publisher._log_ocr("060", "Ekran içeriği çok hızlı değişiyor (Flickering tespit edildi).")
+                emit_bridge_event("log_entry", {"timestamp": "", "level": "INFO", "prefix": "OCR", "code": "OCR-060", "message": "Ekran içeriği çok hızlı değişiyor. Çeviri gecikmeli görünebilir."})
+                emit_bridge_event("stability_warning", {})
+                self._instability_count = 0
+        elif push_result in ("upgraded", "held") and self.slot_manager.is_stable():
+            self._instability_count = 0
+        sample_count = self.slot_manager.get_sample_count()
+        slot_debug = self.slot_manager.get_slot_debug()
+        min_slot_samples = self._required_slot_samples(detected_text, quality_score)
+        self.overlay_publisher._log_ocr(
+            "020",
+            (
+                f"Stabilizer push: decision={push_result.upper()}, frame_id={frame_id}, "
+                f"samples={sample_count}, required={min_slot_samples}, text={detected_text!r}, "
+                f"slot_health={slot_debug['health']}, slot_recognized={slot_debug['recognized']}, slot_broken={slot_debug['broken']}, "
+                f"slot_suspicious={slot_debug['suspicious']}, slot_complete={slot_debug['complete']}, slot_length={slot_debug['length']}"
+            ),
+        )
+        if push_result == "rejected":
+            self.overlay_publisher._emit_frame_stat(ocr_payload, "rejected", "slot_rejected")
+            del frame; del ocr_payload; return True
+        if self.slot_manager.get_sample_count() < min_slot_samples:
+            self.overlay_publisher._log_ocr("021", f"Stabilizer decision: ACCEPTED=NO, frame_id={frame_id}, samples={self.slot_manager.get_sample_count()}, required={min_slot_samples}, reason=slot_wait")
+            self.overlay_publisher._emit_frame_stat(ocr_payload, "rejected", "slot_wait")
+            del frame; del ocr_payload; return True
+        stabilized_text = self.slot_manager.get_slot()
+        if stabilized_text is None:
+            self.overlay_publisher._log_ocr("022", f"Stabilizer decision: ACCEPTED=NO, frame_id={frame_id}, reason=stabilizer_none, text={detected_text!r}")
+            self.diagnostics.record("rejected", self.active_engine, str(ocr_payload["scene_mode"]), frame,
+                cast(np.ndarray, ocr_payload["processed"]), detected_text, quality_score,
+                {"variant": ocr_payload["variant"], "result_count": ocr_payload["result_count"], "frame_id": frame_id, "reason": "stabilizer"})
+            del frame; del ocr_payload; return True
+        self.overlay_publisher._log_ocr("023", f"Stabilizer decision: ACCEPTED=YES, frame_id={frame_id}, samples={self.slot_manager.get_sample_count()}, required={min_slot_samples}, final_text={stabilized_text!r}")
+        self.diagnostics.record("accepted", self.active_engine, str(ocr_payload["scene_mode"]), frame,
+            cast(np.ndarray, ocr_payload["processed"]), stabilized_text, quality_score,
+            {"variant": ocr_payload["variant"], "result_count": ocr_payload["result_count"], "frame_id": frame_id})
+        self.overlay_publisher._emit_frame_stat(ocr_payload, "accepted")
+        self.overlay_publisher._log_ocr("024", f"Final text queued for translation: frame_id={frame_id}, text={stabilized_text!r}, ocr_ms={ocr_duration_ms:.1f}")
+        self.overlay_publisher._emit_translation(stabilized_text, frame_started_monotonic=frame_started_monotonic, ocr_duration_ms=ocr_duration_ms)
+        del frame; del ocr_payload
+        return True
 
     async def _capture_loop(self) -> None:
         while self.is_running:
