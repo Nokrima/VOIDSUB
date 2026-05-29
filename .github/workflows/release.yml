@@ -53,6 +53,15 @@ jobs:
             Write-Output "Imzalama anahtari Github Actions ortaminda mevcut."
           }
 
+      - name: 6.8. Security Audits & Code Checks
+        run: |
+          cd ui-tauri
+          npm audit --audit-level=high
+          cargo check --locked --manifest-path src-tauri/Cargo.toml
+          cd ..
+          python -m pip install pip-audit
+          pip-audit --ignore-vuln PYSEC-2022-252 -r requirements.txt
+
       - name: 7. Tauri Uygulamasını Derle ve İmzala
         working-directory: ./ui-tauri
         env:
@@ -91,8 +100,8 @@ jobs:
             Set-Content -Path "$BUNDLE_DIR/update.json" -Value $UPDATE_JSON -Encoding utf8
             Write-Output $UPDATE_JSON
           } else {
-            Write-Warning "⚠️ Tauri updater (.zip/.sig) bulunamadi! Eger bu bir BASE RELEASE (Sifir Noktasi) ise bu tamamen normaldir. Sadece .exe yuklenecek."
-            Write-Output "update.json olusturulmadi."
+            Write-Error "KRITIK HATA: Tauri updater (.zip/.sig) bulunamadi! Uygulama release oncesi imzalanamadi."
+            exit 1
           }
 
       - name: 8.5. Üretilen Dosyalar için Checksum (SHA256) Oluştur
@@ -110,7 +119,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: VOIDSUB ${{ github.ref_name }}
-          fail_on_unmatched_files: false
+          fail_on_unmatched_files: true
           files: |
             ui-tauri/src-tauri/target/release/bundle/**/*.exe
             ui-tauri/src-tauri/target/release/bundle/**/*.zip
