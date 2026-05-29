@@ -507,7 +507,7 @@ pub fn run() {
         builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
     }
 
-    builder
+    let app = builder
         .invoke_handler(tauri::generate_handler![
             get_user_profile_info,
             restore_main_window,
@@ -757,22 +757,29 @@ pub fn run() {
 
             Ok(())
         })
-        .build(tauri::generate_context!())
-        .expect("Tauri çalıştırılırken bir hata oluştu")
-        .run(|app_handle, event| {
-            if let tauri::RunEvent::Exit = event {
-                #[cfg(target_os = "windows")]
-                {
-                    use tauri::Manager;
-                    const WM_QUIT: u32 = 0x0012;
-                    let state = app_handle.state::<HotkeyState>();
-                    let tid = *state.thread_id.safe_lock();
-                    if tid != 0 {
-                        unsafe {
-                            PostThreadMessageW(tid, WM_QUIT, 0, 0);
+        .build(tauri::generate_context!());
+
+    match app {
+        Ok(app) => {
+            app.run(|app_handle, event| {
+                if let tauri::RunEvent::Exit = event {
+                    #[cfg(target_os = "windows")]
+                    {
+                        use tauri::Manager;
+                        const WM_QUIT: u32 = 0x0012;
+                        let state = app_handle.state::<HotkeyState>();
+                        let tid = *state.thread_id.safe_lock();
+                        if tid != 0 {
+                            unsafe {
+                                PostThreadMessageW(tid, WM_QUIT, 0, 0);
+                            }
                         }
                     }
                 }
-            }
-        });
+            });
+        }
+        Err(e) => {
+            log::error!("Tauri çalıştırılırken bir hata oluştu: {}", e);
+        }
+    }
 }
