@@ -58,9 +58,16 @@ def cleanup_startup_artifacts() -> None:
                             
                             is_our_process = False
                             if path_out:
-                                base_dir_str = str(BASE_DIR).lower()
-                                if (base_dir_str in path_out) or ("voidsub" in path_out) or ("python_embedded" in path_out):
-                                    is_our_process = True
+                                try:
+                                    proc_path = Path(path_out.strip()).resolve()
+                                    is_our_process = (
+                                        proc_path.is_relative_to(BASE_DIR.resolve()) or
+                                        proc_path.is_relative_to(USER_DATA_DIR.resolve()) or
+                                        proc_path.is_relative_to(DOCS_DIR.resolve()) or
+                                        "python_embedded" in proc_path.parts
+                                    )
+                                except Exception:
+                                    pass
                                     
                             if is_our_process:
                                 subprocess.run(["taskkill", "/PID", str(pid), "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=cflags)
