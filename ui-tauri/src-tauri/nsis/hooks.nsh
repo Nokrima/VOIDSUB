@@ -22,3 +22,9 @@
   ExecWait 'netsh advfirewall firewall add rule name="VoidSub Application" dir=in action=allow program="$INSTDIR\VOIDSUB.exe" enable=yes'
   ExecWait 'netsh advfirewall firewall add rule name="VoidSub Python Engine" dir=in action=allow program="$INSTDIR\python_embedded\python.exe" enable=yes'
 !macroend
+
+!macro customUnInstall
+  ; Kalinti firewall izinlerini temizle
+  ExecWait 'netsh advfirewall firewall delete rule name="VoidSub Application"'
+  ExecWait 'netsh advfirewall firewall delete rule name="VoidSub Python Engine"'
+!macroend
