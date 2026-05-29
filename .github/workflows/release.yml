@@ -39,7 +39,7 @@ jobs:
 
       - name: 6. Frontend Bağımlılıklarını Yükle
         working-directory: ./ui-tauri
-        run: npm install
+        run: npm ci
 
       - name: 6.5. Github Secrets Akil Sagligi Kontrolu
         shell: pwsh
@@ -95,6 +95,17 @@ jobs:
             Write-Output "update.json olusturulmadi."
           }
 
+      - name: 8.5. Üretilen Dosyalar için Checksum (SHA256) Oluştur
+        shell: pwsh
+        run: |
+          $BUNDLE_DIR = "ui-tauri/src-tauri/target/release/bundle"
+          Get-ChildItem -Path $BUNDLE_DIR -Include *.exe, *.zip -Recurse | ForEach-Object {
+            $hash = Get-FileHash -Path $_.FullName -Algorithm SHA256
+            "$($hash.Hash)  $($hash.Path | Split-Path -Leaf)" | Out-File -Append -Encoding utf8 "$BUNDLE_DIR/checksums.txt"
+          }
+          Write-Output "Checksums generated:"
+          Get-Content "$BUNDLE_DIR/checksums.txt" -ErrorAction SilentlyContinue
+
       - name: 9. GitHub Releases'e Yükle (Hataya Dayanıklı)
         uses: softprops/action-gh-release@v2
         with:
@@ -105,6 +116,7 @@ jobs:
             ui-tauri/src-tauri/target/release/bundle/**/*.zip
             ui-tauri/src-tauri/target/release/bundle/**/*.sig
             ui-tauri/src-tauri/target/release/bundle/update.json
+            ui-tauri/src-tauri/target/release/bundle/checksums.txt
           draft: false
           prerelease: false
           generate_release_notes: true
