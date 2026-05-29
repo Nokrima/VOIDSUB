@@ -3,5 +3,6 @@
   "venv": ".venv",
   "pythonVersion": "3.11",
   "reportMissingModuleSource": "warning",
-  "reportMissingImports": "warning"
+  "reportMissingImports": "warning",
+  "exclude": ["dist"]
 }
