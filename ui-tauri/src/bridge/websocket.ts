@@ -11,30 +11,121 @@ let reconnectTimeout: ReturnType<typeof setTimeout>;
 const MAX_PENDING = 64;
 const pendingMessages: string[] = [];
 
-type EventPayload = Record<string, unknown>;
-export type EventHandler<T = any> = (data: T) => void;
+import type {
+  AppSettings,
+  HardwareResult,
+  OverlaySettingsState,
+  OfflineStatusResult,
+  TranslationPreview,
+  TranslationState,
+  ErrorPayload,
+  EngineRepairResult,
+  FallbackPayload,
+  OcrFrameStat,
+  RegionState
+} from './useWebSocket';
 
-const listeners: Record<string, Set<EventHandler>> = {};
-const eventHistory: Record<string, EventPayload[]> = {};
+export interface WebSocketEventMap {
+  'app_settings_loaded': AppSettings;
+  'hardware_result': HardwareResult;
+  'overlay_settings_loaded': OverlaySettingsState;
+  'offline_model_status': OfflineStatusResult;
+  'new_translation': TranslationPreview;
+  'translation_state': TranslationState;
+  'engine_change_denied': ErrorPayload;
+  'settings_save_failed': ErrorPayload;
+  'engine_repair_result': EngineRepairResult;
+  'offline_model_error': ErrorPayload;
+  'offline_model_complete': Record<string, unknown>;
+  'translation_engine_fallback': FallbackPayload;
+  'ocr_engine_runtime_fallback': FallbackPayload;
+  'ocr_frame_stat': OcrFrameStat;
+  'region_selected': RegionState;
+  'region_selection_cancelled': void;
+  'region_selection_failed': ErrorPayload;
+  'async_error': ErrorPayload;
+  'log_entry': Record<string, unknown>;
+  
+  // Outbound / Misc
+  'get_settings': void;
+  'get_hardware': void;
+  'get_offline_status': void;
+  'get_overlay_settings': void;
+  'update_settings': Record<string, unknown>;
+  'save_settings': Record<string, unknown>;
+  'change_engine': { engine: string };
+  'change_ocr_scene_mode': { mode: string };
+  'download_offline_models': { model: string };
+  'cancel_offline_models': { model?: string } | void;
+  'remove_offline_models': { model: string };
+  'offline_model_progress': Record<string, unknown>;
+  'offline_model_cancelled': Record<string, unknown>;
+  'download_easyocr': void;
+  'cancel_easyocr': void;
+  'remove_easyocr': void;
+  'easyocr_plugin_progress': Record<string, unknown>;
+  'easyocr_plugin_complete': Record<string, unknown>;
+  'easyocr_plugin_cancelled': Record<string, unknown>;
+  'easyocr_plugin_error': Record<string, unknown>;
+  'download_cuda': void;
+  'cancel_cuda': void;
+  'remove_cuda': void;
+  'cuda_progress': Record<string, unknown>;
+  'cuda_complete': Record<string, unknown>;
+  'cuda_cancelled': Record<string, unknown>;
+  'cuda_error': Record<string, unknown>;
+  'save_overlay_settings': Record<string, unknown>;
+  'clear_overlay': void;
+  'test_overlay_push': void;
+  'request_debug_preview': void;
+  'confirm_debug_region': void;
+  'set_capture_region': Record<string, unknown>;
+  'clear_capture_region': void;
+  'request_region_selection': void;
+  'repair_engine': { engine: string };
+  'shutdown_core': void;
+  'start_translation': void;
+  'stop_translation': void;
+  'set_runtime_region': Record<string, unknown>;
+  'calibration_select_region': void;
+  'calibration_region_selected': Record<string, unknown>;
+  'calibration_region_cancelled': void;
+  'calibration_region_failed': ErrorPayload;
+  'temporary_region_state': Record<string, unknown>;
+  'temporary_region_selected': Record<string, unknown>;
+  'temporary_region_cancelled': void;
+  'temporary_region_failed': ErrorPayload;
+  'shortcut_feedback': Record<string, unknown>;
+  'toggle_overlay_visibility': void;
+  'toggle_temporary_region': void;
+  'calibration_preview_request': Record<string, unknown>;
+  'calibration_preview_result': Record<string, unknown>;
+}
 
-const pushEventHistory = (event: string, payload: EventPayload) => {
+export type EventHandler<T = unknown> = (data: T) => void;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const listeners: Record<string, Set<EventHandler<any>>> = {};
+const eventHistory: Record<string, unknown[]> = {};
+
+const pushEventHistory = <K extends keyof WebSocketEventMap>(event: K, payload: WebSocketEventMap[K]) => {
   const limit = event === 'log_entry' ? 500 : 12;
   const next = [...(eventHistory[event] ?? []), payload];
   eventHistory[event] = next.slice(-limit);
 };
 
-export const injectEvent = (event: string, payload: EventPayload) => {
+export const injectEvent = <K extends keyof WebSocketEventMap>(event: K, payload: WebSocketEventMap[K]) => {
   pushEventHistory(event, payload);
   if (listeners[event]) {
     listeners[event].forEach((handler) => handler(payload));
   }
 };
 
-export const getEventHistory = (event: string) => {
-  return [...(eventHistory[event] ?? [])];
+export const getEventHistory = <K extends keyof WebSocketEventMap>(event: K): WebSocketEventMap[K][] => {
+  return [...(eventHistory[event] ?? [])] as WebSocketEventMap[K][];
 };
 
-export const clearEventHistory = (event?: string) => {
+export const clearEventHistory = (event?: keyof WebSocketEventMap) => {
   if (event) {
     delete eventHistory[event];
     return;
@@ -100,7 +191,7 @@ export const connect = async () => {
         return;
       }
 
-      pushEventHistory(eventName, payload);
+      pushEventHistory(eventName as keyof WebSocketEventMap, payload as any);
       if (listeners[eventName]) {
         listeners[eventName].forEach((handler) => handler(payload));
       }
@@ -133,7 +224,7 @@ export const disconnect = () => {
   pendingMessages.length = 0;
 };
 
-export const send = (event: string, data?: Record<string, unknown>) => {
+export const send = <K extends keyof WebSocketEventMap>(event: K, data?: Record<string, unknown>) => {
   const message = JSON.stringify({ event, data: data ?? {} });
 
   if (socket?.readyState === WebSocket.OPEN) {
@@ -153,15 +244,17 @@ export const send = (event: string, data?: Record<string, unknown>) => {
   console.warn('Bağlantı hazır değil. Paket gönderilemedi:', event);
 };
 
-export const onEvent = <T = any>(event: string, handler: EventHandler<T>) => {
+export const onEvent = <K extends keyof WebSocketEventMap>(event: K, handler: EventHandler<WebSocketEventMap[K]>) => {
   if (!listeners[event]) {
     listeners[event] = new Set();
   }
 
-  listeners[event].add(handler as EventHandler);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  listeners[event].add(handler as EventHandler<any>);
 
   return () => {
-    listeners[event].delete(handler as EventHandler);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    listeners[event].delete(handler as EventHandler<any>);
     if (listeners[event].size === 0) {
       delete listeners[event];
     }

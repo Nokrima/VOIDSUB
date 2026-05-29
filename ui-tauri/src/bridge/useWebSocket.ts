@@ -48,22 +48,34 @@ export interface AppSettings {
   ocr_engine: string;
   translation_engine: string;
   ocr_scene_mode: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface HardwareResult {
-  cpu_model?: string;
-  ram_gb?: number;
-  gpu_available?: boolean;
-  [key: string]: any;
+  recommended_engine: string;
+  available_engines: string[];
+  engine_details?: Record<string, { available: boolean; reason: string; repair_available?: boolean; repair_kind?: string | null }>;
+  cpu: { name: string; cores: number; threads: number };
+  gpu: { available: boolean; name: string };
+  ram_gb: number;
+  cuda_available: boolean;
+  winrt_available?: boolean;
 }
 
 export interface OfflineStatusResult {
-  installed: boolean;
-  model?: string;
-  downloading?: boolean;
-  progress?: number;
-  [key: string]: unknown;
+  available: boolean;
+  busy?: boolean;
+  selected_model?: 'opus_mt_en_tr' | 'nllb';
+  models_ready?: Record<string, boolean>;
+  active_install_model?: string | null;
+  active_model?: string | null;
+  active_action?: 'install' | 'remove' | null;
+  queued_models?: string[];
+  state?: string;
+  percent?: number;
+  detail?: string;
+  bytes_label?: string;
+  model_details?: Record<string, unknown>;
 }
 
 export interface ErrorPayload {
