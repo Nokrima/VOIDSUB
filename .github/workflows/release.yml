@@ -57,10 +57,13 @@ jobs:
         run: |
           cd ui-tauri
           npm audit --audit-level=high
+          echo "::notice::npm audit passed successfully."
           cargo check --locked --manifest-path src-tauri/Cargo.toml
+          echo "::notice::cargo check passed successfully."
           cd ..
           python -m pip install pip-audit
           pip-audit --ignore-vuln PYSEC-2022-252 -r requirements.txt
+          echo "::notice::pip-audit passed successfully. All security gates cleared."
 
       - name: 7. Tauri Uygulamasını Derle ve İmzala
         working-directory: ./ui-tauri

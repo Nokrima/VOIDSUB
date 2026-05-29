@@ -34,6 +34,8 @@
 
 **Date:** 2026-05-29
 
+**Release Protocol:** It is mandatory that all security gates (`npm audit`, `cargo check --locked`, `pip-audit`) pass successfully both in local verification before tagging and within the CI/CD Release workflow (`release.yml`). Releases that fail these gates in CI will not be distributed.
+
 The following security gates have been successfully verified locally to ensure the integrity of the `v2.0.0` release:
 
 ### 1. `npm audit` (Frontend Dependencies)
