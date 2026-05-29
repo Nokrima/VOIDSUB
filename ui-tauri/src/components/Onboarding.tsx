@@ -22,27 +22,41 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const [welcomeActionReady, setWelcomeActionReady] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onEvent('hardware_result', (data) => {
+    const unsubscribeHello = onEvent('hello', (data) => {
+      const payload = data as Record<string, any>;
+      if (payload && payload.hw_info) {
+        setHwData(payload.hw_info as HardwareData);
+        setSelectedEngine(payload.hw_info.recommended_engine || payload.hw_info.available_engines[0] || 'easy');
+      }
+    });
+
+    // Fallback for legacy
+    const unsubscribeHardwareLegacy = onEvent('hardware_result', (data) => {
       const payload = data as HardwareData;
       setHwData(payload);
       setSelectedEngine(payload.recommended_engine || payload.available_engines[0] || 'easy');
     });
 
     send('get_hardware');
-    return () => unsubscribe();
+    return () => { unsubscribeHello(); unsubscribeHardwareLegacy(); };
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onEvent('app_settings_loaded', (data) => {
+    const checkSettings = (data: any) => {
       if (!pendingFinish) {
         return;
       }
-      if (data.onboarding_completed && data.ocr_engine === selectedEngine) {
+      const settingsWrapper = data.settings || data;
+      const appData = settingsWrapper.app || settingsWrapper;
+      if (appData.onboarding_completed && appData.ocr_engine === selectedEngine) {
         setPendingFinish(false);
         onComplete(selectedEngine);
       }
-    });
-    return () => unsubscribe();
+    };
+    const unsubscribe1 = onEvent('app_settings', checkSettings);
+    const unsubscribe2 = onEvent('app_settings_loaded', checkSettings);
+    
+    return () => { unsubscribe1(); unsubscribe2(); };
   }, [onComplete, pendingFinish, selectedEngine]);
 
   useEffect(() => {

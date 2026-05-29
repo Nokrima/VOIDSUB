@@ -221,9 +221,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useAppWebSocket({
     onSettings: (data) => {
-      // Handle both nested {app, overlay} and flat structure
+      // Handle both nested {settings: {app, overlay}} and flat structure
       const payloadObj = data as Record<string, any>;
-      const appData = payloadObj.app || payloadObj;
+      const settingsWrapper = payloadObj.settings || payloadObj;
+      const appData = settingsWrapper.app || settingsWrapper;
       
       const nextSettings = { 
         ...appData, 
@@ -232,8 +233,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       
       setSettings(nextSettings);
       
-      if (payloadObj.overlay) {
-        setOverlaySettings(payloadObj.overlay as OverlaySettingsState);
+      if (settingsWrapper.overlay) {
+        setOverlaySettings(settingsWrapper.overlay as OverlaySettingsState);
       }
       
       restoreWindowSettingRef.current = nextSettings.restore_window_after_region_selection ?? true;

@@ -132,8 +132,17 @@ export function useAppWebSocket(bindings: AppWebSocketBindings) {
   useEffect(() => {
     wsClient.connect();
 
-    const unsubscribeSettings = onEvent('app_settings_loaded', bindings.onSettings);
-    const unsubscribeHardware = onEvent('hardware_result', bindings.onHardware);
+    const unsubscribeSettings = onEvent('app_settings', (data) => bindings.onSettings(data as AppSettings));
+    const unsubscribeSettingsLegacy = onEvent('app_settings_loaded', (data) => bindings.onSettings(data as AppSettings));
+    
+    const unsubscribeHello = onEvent('hello', (data) => {
+      const payload = data as Record<string, any>;
+      if (payload && payload.hw_info) {
+        bindings.onHardware(payload.hw_info as HardwareResult);
+      }
+    });
+    const unsubscribeHardwareLegacy = onEvent('hardware_result', bindings.onHardware);
+    
     const unsubscribeOverlaySettings = onEvent('overlay_settings_loaded', bindings.onOverlaySettings);
     const unsubscribeOfflineStatus = onEvent('offline_model_status', bindings.onOfflineStatus);
     const unsubscribeTranslation = onEvent('new_translation', (data) => bindings.onTranslation(data as TranslationPreview));
@@ -157,7 +166,9 @@ export function useAppWebSocket(bindings: AppWebSocketBindings) {
 
     return () => {
       unsubscribeSettings();
-      unsubscribeHardware();
+      unsubscribeSettingsLegacy();
+      unsubscribeHello();
+      unsubscribeHardwareLegacy();
       unsubscribeOverlaySettings();
       unsubscribeOfflineStatus();
       unsubscribeTranslation();
