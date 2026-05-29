@@ -263,8 +263,10 @@ class BridgeServer:
     def _normalize_region(self, region: Any) -> dict[str, Any] | None:
         if not isinstance(region, dict): return None
         try:
-            x = int(region.get("left", region.get("x", 0)))
-            y = int(region.get("top", region.get("y", 0)))
+            left_val = region.get("left")
+            x = int(left_val if left_val is not None else region.get("x", 0))
+            top_val = region.get("top")
+            y = int(top_val if top_val is not None else region.get("y", 0))
             w = int(region["width"])
             h = int(region["height"])
             

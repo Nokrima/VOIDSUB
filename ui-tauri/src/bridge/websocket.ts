@@ -39,6 +39,9 @@ export interface RegionSelectedPayload {
 }
 
 export interface WebSocketEventMap {
+  'hello': { message: string; hw_info: HardwareResult | Record<string, unknown> };
+  'app_settings': { settings: AppSettings | Record<string, unknown> };
+  'saved_regions_update': { regions: Record<string, unknown> };
   'app_settings_loaded': AppSettings;
   'hardware_result': HardwareResult;
   'overlay_settings_loaded': OverlaySettingsState;
@@ -187,6 +190,12 @@ const flushPendingMessages = () => {
 
 const validatePayload = (eventName: string, payload: Record<string, unknown>): boolean => {
   switch (eventName) {
+    case 'hello':
+      return 'message' in payload && 'hw_info' in payload;
+    case 'app_settings':
+      return 'settings' in payload;
+    case 'saved_regions_update':
+      return 'regions' in payload;
     case 'hardware_result':
       return 'cpu' in payload && 'gpu' in payload && 'ram_gb' in payload && Array.isArray(payload.available_engines);
     case 'app_settings_loaded':
