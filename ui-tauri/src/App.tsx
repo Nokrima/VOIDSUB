@@ -1,10 +1,10 @@
-import { type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode, useMemo, useState } from 'react';
+import { type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode, useMemo, useState, lazy, Suspense } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Sidebar, type PageType } from './components/Sidebar';
-import { WorkspacePanel } from './panels/WorkspacePanel';
-import { OverlayPanel } from './panels/OverlayPanel';
-import { EnginesPanel } from './panels/EnginesPanel';
-import { SettingsPanel } from './panels/SettingsPanel';
+const WorkspacePanel = lazy(() => import('./panels/WorkspacePanel').then(m => ({ default: m.WorkspacePanel })));
+const OverlayPanel = lazy(() => import('./panels/OverlayPanel').then(m => ({ default: m.OverlayPanel })));
+const EnginesPanel = lazy(() => import('./panels/EnginesPanel').then(m => ({ default: m.EnginesPanel })));
+const SettingsPanel = lazy(() => import('./panels/SettingsPanel').then(m => ({ default: m.SettingsPanel })));
 import Onboarding from './components/Onboarding';
 import StartupIntro from './components/intro/StartupIntro';
 import { usePanelTransition } from './hooks/usePanelTransition';
@@ -437,7 +437,11 @@ function AppShell() {
             >
               {(Object.keys(renderPanel) as PageType[]).map((page) => {
                 const isVisible = page === activeDisplayPanel;
-                return <div key={page} style={{ ...getPanelStyle(page), position: 'absolute', inset: 0, pointerEvents: isVisible ? 'auto' : 'none', visibility: isVisible ? 'visible' : 'hidden', zIndex: isVisible ? 1 : 0 }}>{renderPanel[page]}</div>;
+                return <div key={page} style={{ ...getPanelStyle(page), position: 'absolute', inset: 0, pointerEvents: isVisible ? 'auto' : 'none', visibility: isVisible ? 'visible' : 'hidden', zIndex: isVisible ? 1 : 0 }}>
+                  <Suspense fallback={null}>
+                    {renderPanel[page]}
+                  </Suspense>
+                </div>;
               })}
             </div>
           </div>
