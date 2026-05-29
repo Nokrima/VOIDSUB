@@ -1,11 +1,16 @@
 import asyncio
 import time
 import uuid
+import re
+from typing import TYPE_CHECKING
 from core.errors import PREFIX_SYS, log_event
 from core.processor.utils import _clip_log_text
 
+if TYPE_CHECKING:
+    from core.processor.utils import IPipelineState
+
 class TranslationQueueMixin:
-    async def _translate_pending_loop(self) -> None:
+    async def _translate_pending_loop(self: "IPipelineState") -> None:
         while self._pending_translations:
             # Drain the queue to eliminate latency from intermediate OCR updates.
             # If there are multiple queued translations, only the most recent one matters.
@@ -155,13 +160,13 @@ class TranslationQueueMixin:
         self._active_translation_task = None
         self._active_translation_source = ""
 
-    def _translate_with_engine(self, engine_kind: str, detected_text: str, effective_src: str) -> tuple[str, str]:
+    def _translate_with_engine(self: "IPipelineState", engine_kind: str, detected_text: str, effective_src: str) -> tuple[str, str]:
         if engine_kind == "offline":
             return self.offline_translator.translate(detected_text, effective_src, self.tgt_language)
         return self.translator.translate(detected_text, src=effective_src, tgt=self.tgt_language)
 
     def _select_translation_result(
-        self,
+        self: "IPipelineState",
         *,
         google_result: tuple[str, str] | None,
         offline_result: tuple[str, str] | None,
@@ -194,7 +199,7 @@ class TranslationQueueMixin:
 
         return "", "error"
 
-    def _translate_text(self, detected_text: str) -> tuple[str, str]:
+    def _translate_text(self: "IPipelineState", detected_text: str) -> tuple[str, str]:
         effective_src = self._resolve_translation_source_language(detected_text, log_decision=True)
         if self.translation_engine == "offline":
             offline_engine = "offline-nllb" if self.offline_model_key == "nllb" else "offline-opus"
@@ -243,7 +248,7 @@ class TranslationQueueMixin:
                 })
         return translated_text, source
 
-    def _get_cached_translation(self, text: str) -> str | None:
+    def _get_cached_translation(self: "IPipelineState", text: str) -> str | None:
         effective_src = self._resolve_translation_source_language(text)
         google_key = f"google:{effective_src}:{self.tgt_language}:{text}"
         if self.translation_engine == "google":
@@ -252,11 +257,11 @@ class TranslationQueueMixin:
             return None
         return self.tr_cache.get(google_key, exact_only=True)
 
-    def _cache_key_for_source(self, text: str, source: str) -> str:
+    def _cache_key_for_source(self: "IPipelineState", text: str, source: str) -> str:
         prefix = "offline" if "offline" in str(source or "").lower() else "google"
         return f"{prefix}:{self._resolve_translation_source_language(text)}:{self.tgt_language}:{text}"
 
-    def _resolve_translation_source_language(self, text: str, *, log_decision: bool = False) -> str:
+    def _resolve_translation_source_language(self: "IPipelineState", text: str, *, log_decision: bool = False) -> str:
         if self.src_language != "auto":
             return self.src_language
         detected = self._detect_text_language(text)
@@ -270,7 +275,7 @@ class TranslationQueueMixin:
             )
         return detected
 
-    def _detect_text_language(self, text: str) -> str:
+    def _detect_text_language(self: "IPipelineState", text: str) -> str:
         compact = str(text or "").strip()
         cyrillic_count = len(re.findall(r"[\u0400-\u04FF]", compact))
         latin_count = len(re.findall(r"[A-Za-z]", compact))
@@ -278,7 +283,7 @@ class TranslationQueueMixin:
             return "ru"
         return "en"
 
-    def _describe_source_reaction(self) -> str:
+    def _describe_source_reaction(self: "IPipelineState") -> str:
         runtime_engine = self._runtime_engine_id()
         if runtime_engine == "easy":
             return "easy=en+ru karma OCR"

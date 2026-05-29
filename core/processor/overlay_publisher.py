@@ -3,12 +3,16 @@ import time
 import uuid
 import re
 from difflib import SequenceMatcher
+from typing import TYPE_CHECKING
 from core.errors import PREFIX_SYS, PREFIX_CFG, log_event
 from core.processor.junk_filter import JunkFilter
 from core.processor.utils import _clip_log_text, _quick_normalize, _strip_speaker
 
+if TYPE_CHECKING:
+    from core.processor.utils import IPipelineState
+
 class OverlayPublisherMixin:
-    def _emit_translation(self, stabilized_text: str, *, frame_started_monotonic: float | None = None, ocr_duration_ms: float = 0.0) -> None:
+    def _emit_translation(self: "IPipelineState", stabilized_text: str, *, frame_started_monotonic: float | None = None, ocr_duration_ms: float = 0.0) -> None:
         if not stabilized_text:
             return
         if self.raw_translation_flow_enabled:
@@ -198,7 +202,7 @@ class OverlayPublisherMixin:
         if self._active_translation_task is None or self._active_translation_task.done():
             self._active_translation_task = asyncio.create_task(self._translate_pending_loop())
 
-    def _emit_frame_stat(self, payload: dict | None, result: str, reason: str = "") -> None:
+    def _emit_frame_stat(self: "IPipelineState", payload: dict | None, result: str, reason: str = "") -> None:
         """Throttled (max 1/sn) OCR cerceve tanilama eventi. UI'da gercek zamanli izleme saglar."""
         now = time.monotonic()
         if now - self._last_stat_emit_time < 0.85:
@@ -221,16 +225,16 @@ class OverlayPublisherMixin:
             },
         )
 
-    def _log_ui(self, code: str, message: str) -> None:
+    def _log_ui(self: "IPipelineState", code: str, message: str) -> None:
         self._log_debug("SYS", code, message)
 
-    def _log_trl(self, code: str, message: str) -> None:
+    def _log_trl(self: "IPipelineState", code: str, message: str) -> None:
         self._log_debug("TRL", code, message)
 
-    def _log_ocr(self, code: str, message: str) -> None:
+    def _log_ocr(self: "IPipelineState", code: str, message: str) -> None:
         self._log_debug("OCR", code, message)
 
-    def _log_perf(self, frame_to_overlay_ms: float, ocr_ms: float, translation_ms: float) -> None:
+    def _log_perf(self: "IPipelineState", frame_to_overlay_ms: float, ocr_ms: float, translation_ms: float) -> None:
         overhead_ms = max(frame_to_overlay_ms - ocr_ms - translation_ms, 0.0)
         self._last_perf_stats = {
             "frame_to_overlay_ms": float(frame_to_overlay_ms),
@@ -248,7 +252,7 @@ class OverlayPublisherMixin:
             ),
         )
 
-    def _log_translation_policy(self, tier: dict) -> None:
+    def _log_translation_policy(self: "IPipelineState", tier: dict) -> None:
         repeat_window = int(tier.get("translated_repeat_window_ms", 0))
         log_event(
             PREFIX_CFG,
