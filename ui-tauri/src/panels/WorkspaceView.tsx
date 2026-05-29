@@ -1,11 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { PanelStage } from './PanelStage';
 import { ValueRail } from '../components/ValueRail';
-import { useAppContext } from '../context/AppContext';
-import { wsClient } from '../bridge/websocket';
 import { motion } from 'framer-motion';
 import { conceptABasePerformanceOptions, type ConceptAPerformanceOption } from '../config/workspacePerformance';
-import { type ConceptAEngineOption, workspaceEngineLabels } from '../config/workspaceEngine';
+import { type ConceptAEngineOption } from '../config/workspaceEngine';
+import { useWorkspaceState } from './workspace/useWorkspaceState';
 
 const labelStyle: React.CSSProperties = {
   fontSize: 11,
@@ -68,7 +67,11 @@ const emptyPreviewStyle: React.CSSProperties = {
   lineHeight: 1.55,
 };
 
-let hasReceivedTranslationPreviewThisRun = false;
+type SessionStatus = 'idle' | 'active' | 'loading' | 'error';
+const statusColor = (s: SessionStatus) =>
+  s === 'active' ? '#86efac' : s === 'loading' ? '#7dd3fc' : s === 'idle' ? '#fcd34d' : '#fca5a5';
+const statusLabel = (s: SessionStatus, active: string, idle: string, error: string, loading?: string) =>
+  s === 'active' ? active : s === 'loading' ? (loading ?? active) : s === 'idle' ? idle : error;
 
 const LayerGlyph = ({ path, size = 18 }: { path: string, size?: number }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" style={{ width: size, height: size }}>
@@ -144,25 +147,6 @@ const LayerBlock = ({
   );
 };
 
-type SessionStatus = 'idle' | 'active' | 'loading' | 'error';
-const statusColor = (s: SessionStatus) =>
-  s === 'active' ? '#86efac' : s === 'loading' ? '#7dd3fc' : s === 'idle' ? '#fcd34d' : '#fca5a5';
-const statusLabel = (s: SessionStatus, active: string, idle: string, error: string, loading?: string) =>
-  s === 'active' ? active : s === 'loading' ? (loading ?? active) : s === 'idle' ? idle : error;
-
-const serviceLabels = {
-  auto: 'Auto',
-  google: 'Google',
-  offline: 'Offline',
-} as const;
-
-const offlineModelLabels = {
-  opus_mt_en_tr: 'Opus MT',
-  nllb: 'NLLB',
-} as const;
-
-type ServiceKey = 'auto' | 'google' | 'offline';
-type OfflineModelKey = 'opus_mt_en_tr' | 'nllb';
 
 export const WorkspaceView: React.FC<{
   performanceOptions?: ConceptAPerformanceOption[];
@@ -180,180 +164,70 @@ export const WorkspaceView: React.FC<{
   onEngineChange,
 }) => {
   const {
-    translationPreview,
-    settings,
-    offlineStatus,
     hasSelectedRegion,
     isTranslating,
     isLoadingEngine,
     handleStartRegionSelect,
     handleToggleTranslation,
-    notify,
-  } = useAppContext();
-  const [sceneType, setSceneType] = useState<'floating' | 'striped'>('striped');
-  const [hasSeenTranslationPreview, setHasSeenTranslationPreview] = useState(hasReceivedTranslationPreviewThisRun);
-  const [performanceArrowHover, setPerformanceArrowHover] = useState<'up' | 'down' | null>(null);
-  const [motorArrowHover, setMotorArrowHover] = useState<'up' | 'down' | null>(null);
-  const [serviceArrowHover, setServiceArrowHover] = useState<'up' | 'down' | null>(null);
-  const [modelArrowHover, setModelArrowHover] = useState<'up' | 'down' | null>(null);
+    isFloating,
+    sceneModeName,
+    sceneModeBest,
+    applySceneType,
+    currentPerformance,
+    previousPerformance,
+    nextPerformance,
+    shiftPerformance,
+    performanceArrowHover,
+    setPerformanceArrowHover,
+    currentMotor,
+    previousMotor,
+    nextMotor,
+    shiftMotor,
+    motorArrowHover,
+    setMotorArrowHover,
+    activeService,
+    previousService,
+    nextService,
+    shiftService,
+    serviceArrowHover,
+    setServiceArrowHover,
+    activeModel,
+    previousModel,
+    nextModel,
+    shiftModel,
+    modelEnabled,
+    modelArrowHover,
+    setModelArrowHover,
+    sourceLanguage,
+    targetLanguage,
+    shiftSourceLanguage,
+    shiftTargetLanguage,
+    swapLanguages,
+    languageArrowHover,
+    setLanguageArrowHover,
+    languageSwapHover,
+    setLanguageSwapHover,
+    scanStatus,
+    motorStatus,
+    loopStatus,
+    regionActionLabel,
+    translationActionLabel,
+    sourcePreviewText,
+    translatedPreviewText,
+    shouldShowSourcePreviewHelp,
+    shouldShowTargetPreviewHelp,
+  } = useWorkspaceState({
+    performanceOptions,
+    currentPerformanceId,
+    onPerformanceChange,
+    engineOptions,
+    currentEngineId,
+    onEngineChange,
+  });
+
   const languageOrder = ['EN', 'TR'] as const;
-  const [sourceLanguageIndex, setSourceLanguageIndex] = useState(0);
-  const [targetLanguageIndex, setTargetLanguageIndex] = useState(1);
-  const [languageArrowHover, setLanguageArrowHover] = useState<'source-up' | 'source-down' | 'target-up' | 'target-down' | null>(null);
-  const [languageSwapHover, setLanguageSwapHover] = useState(false);
-  const isFloating = sceneType === 'floating';
-  const sceneModeName = isFloating ? 'Saha Metni' : 'Altyazı Şeridi';
-  const sceneModeBest = isFloating ? 'HUD ve sahne üstü yazılarda güçlü' : 'Sabit diyalog ve alt bantta güçlü';
-  const availableServices = React.useMemo<ServiceKey[]>(
-    () => (offlineStatus?.available ? ['auto', 'google', 'offline'] : ['auto', 'google']),
-    [offlineStatus?.available],
-  );
-  const requestedService: ServiceKey = settings?.translation_engine === 'offline' || settings?.translation_engine === 'google'
-    ? settings.translation_engine
-    : 'auto';
-  const safeService = availableServices.includes(requestedService)
-    ? requestedService
-    : 'auto';
-  const offlineModelOrder: OfflineModelKey[] = ['opus_mt_en_tr', 'nllb'];
-  const safeOfflineModel: OfflineModelKey = settings?.offline_model_key === 'nllb' ? 'nllb' : 'opus_mt_en_tr';
-  const serviceIndex = Math.max(0, availableServices.findIndex((item) => item === safeService));
-  const activeService = serviceLabels[safeService];
-  const modelEnabled = safeService === 'offline';
-  const modelIndex = Math.max(0, offlineModelOrder.findIndex((item) => item === safeOfflineModel));
-  const activeModel = offlineModelLabels[safeOfflineModel];
-  const currentPerformanceIndex = performanceOptions.findIndex((item) => item.id === currentPerformanceId);
-  const safePerformanceIndex = currentPerformanceIndex >= 0 ? currentPerformanceIndex : Math.max(0, performanceOptions.findIndex((item) => item.id === 'Performans'));
-  const currentPerformance = performanceOptions[safePerformanceIndex]?.name ?? 'Performans';
-  const previousPerformance = performanceOptions[(safePerformanceIndex - 1 + performanceOptions.length) % performanceOptions.length]?.name ?? null;
-  const nextPerformance = performanceOptions[(safePerformanceIndex + 1) % performanceOptions.length]?.name ?? null;
-  const shiftPerformance = (dir: -1 | 1) => {
-    if (isLoadingEngine) return notify('warning', 'Motor yüklenirken performans ayarı değiştirilemez', 'settings_lock');
-    if (isTranslating) return notify('warning', 'Çeviri aktifken performans ayarı değiştirilemez', 'settings_lock');
-    if (performanceOptions.length === 0) return;
-    const nextIndex = (safePerformanceIndex + dir + performanceOptions.length) % performanceOptions.length;
-    onPerformanceChange?.(performanceOptions[nextIndex].id);
-  };
-  const currentMotorIndex = engineOptions.findIndex((item) => item.id === currentEngineId);
-  const safeMotorIndex = currentMotorIndex >= 0 ? currentMotorIndex : 0;
-  const currentMotor = engineOptions[safeMotorIndex]?.label ?? workspaceEngineLabels.easy;
-  const previousMotor = engineOptions.length > 1
-    ? engineOptions[(safeMotorIndex - 1 + engineOptions.length) % engineOptions.length]?.label ?? null
-    : null;
-  const nextMotor = engineOptions.length > 1
-    ? engineOptions[(safeMotorIndex + 1) % engineOptions.length]?.label ?? null
-    : null;
-  const shiftMotor = (dir: -1 | 1) => {
-    if (isLoadingEngine) return notify('warning', 'Motor yüklenirken OCR motoru değiştirilemez', 'settings_lock');
-    if (isTranslating) return notify('warning', 'Çeviri aktifken OCR motoru değiştirilemez', 'settings_lock');
-    if (engineOptions.length === 0) return;
-    const nextIndex = (safeMotorIndex + dir + engineOptions.length) % engineOptions.length;
-    const nextEngine = engineOptions[nextIndex];
-    if (nextEngine) onEngineChange?.(nextEngine.id);
-  };
-  const previousService = availableServices.length > 1
-    ? serviceLabels[availableServices[(serviceIndex - 1 + availableServices.length) % availableServices.length]]
-    : null;
-  const nextService = availableServices.length > 1
-    ? serviceLabels[availableServices[(serviceIndex + 1) % availableServices.length]]
-    : null;
-  const shiftService = (dir: -1 | 1) => {
-    if (isLoadingEngine) return notify('warning', 'Motor yüklenirken çeviri servisi değiştirilemez', 'settings_lock');
-    if (isTranslating) return notify('warning', 'Çeviri aktifken çeviri servisi değiştirilemez', 'settings_lock');
-    const nextIndex = (serviceIndex + dir + availableServices.length) % availableServices.length;
-    const nextServiceId = availableServices[nextIndex];
-    wsClient.send('save_settings', nextServiceId === 'offline'
-      ? {
-        translation_engine: nextServiceId,
-        src_language: safeOfflineModel === 'opus_mt_en_tr' ? 'en' : (settings?.src_language === 'tr' ? 'tr' : 'en'),
-      }
-      : { translation_engine: nextServiceId });
-  };
-  const previousModel = offlineModelOrder.length > 1
-    ? offlineModelLabels[offlineModelOrder[(modelIndex - 1 + offlineModelOrder.length) % offlineModelOrder.length]]
-    : null;
-  const nextModel = offlineModelOrder.length > 1
-    ? offlineModelLabels[offlineModelOrder[(modelIndex + 1) % offlineModelOrder.length]]
-    : null;
-  const shiftModel = (dir: -1 | 1) => {
-    if (isLoadingEngine) return notify('warning', 'Motor yüklenirken çevrimdışı model değiştirilemez', 'settings_lock');
-    if (isTranslating) return notify('warning', 'Çeviri aktifken çevrimdışı model değiştirilemez', 'settings_lock');
-    if (!modelEnabled) return;
-    const nextIndex = (modelIndex + dir + offlineModelOrder.length) % offlineModelOrder.length;
-    const nextModelId = offlineModelOrder[nextIndex];
-    wsClient.send('save_settings', nextModelId === 'opus_mt_en_tr'
-      ? { offline_model_key: nextModelId, src_language: 'en' }
-      : { offline_model_key: nextModelId });
-  };
-  const sourceLanguage = languageOrder[sourceLanguageIndex];
-  const targetLanguage = languageOrder[targetLanguageIndex];
-  const shiftSourceLanguage = (dir: -1 | 1) => {
-    if (isLoadingEngine) return notify('warning', 'Motor yüklenirken dil değiştirilemez', 'settings_lock');
-    if (isTranslating) return notify('warning', 'Çeviri aktifken dil değiştirilemez', 'settings_lock');
-    const nextIndex = (sourceLanguageIndex + dir + languageOrder.length) % languageOrder.length;
-    const nextSource = languageOrder[nextIndex];
-    setSourceLanguageIndex(nextIndex);
-    saveLanguageSettings(nextSource, targetLanguage);
-  };
-  const shiftTargetLanguage = (dir: -1 | 1) => {
-    if (isLoadingEngine) return notify('warning', 'Motor yüklenirken dil değiştirilemez', 'settings_lock');
-    if (isTranslating) return notify('warning', 'Çeviri aktifken dil değiştirilemez', 'settings_lock');
-    const nextIndex = (targetLanguageIndex + dir + languageOrder.length) % languageOrder.length;
-    const nextTarget = languageOrder[nextIndex];
-    setTargetLanguageIndex(nextIndex);
-    saveLanguageSettings(sourceLanguage, nextTarget);
-  };
-  const swapLanguages = () => {
-    if (isLoadingEngine) return notify('warning', 'Motor yüklenirken dil değiştirilemez', 'settings_lock');
-    if (isTranslating) return notify('warning', 'Çeviri aktifken dil değiştirilemez', 'settings_lock');
-    const nextSource = targetLanguage;
-    const nextTarget = sourceLanguage;
-    setSourceLanguageIndex(targetLanguageIndex);
-    setTargetLanguageIndex(sourceLanguageIndex);
-    saveLanguageSettings(nextSource, nextTarget);
-  };
-  const scanStatus: SessionStatus = hasSelectedRegion ? 'active' : 'idle';
-  const motorStatus: SessionStatus = isLoadingEngine ? 'loading' : engineOptions.length > 0 ? 'active' : 'error';
-  const loopStatus: SessionStatus = isLoadingEngine ? 'loading' : isTranslating ? 'active' : 'idle';
-  const regionActionLabel = hasSelectedRegion ? 'Alan Seçildi' : 'Alan Seç';
-  const translationActionLabel = isLoadingEngine ? 'Motor Yükleniyor...' : isTranslating ? 'Çeviriyi Durdur' : 'Çeviri Başlat';
-
-  useEffect(() => {
-    setSceneType(settings?.ocr_scene_mode === 'floating' ? 'floating' : 'striped');
-  }, [settings?.ocr_scene_mode]);
-
-  const applySceneType = (nextSceneType: 'floating' | 'striped') => {
-    if (isLoadingEngine) return notify('warning', 'Motor yüklenirken sahne tipi değiştirilemez', 'settings_lock');
-    if (isTranslating) return notify('warning', 'Çeviri aktifken sahne tipi değiştirilemez', 'settings_lock');
-    if (nextSceneType === sceneType) return;
-    setSceneType(nextSceneType);
-    wsClient.send('change_ocr_scene_mode', { mode: nextSceneType });
-    wsClient.send('save_settings', { ocr_scene_mode: nextSceneType });
-  };
-
-  const sourcePreviewText = translationPreview?.original_text?.trim() ?? '';
-  const translatedPreviewText = translationPreview?.translated_text?.trim() ?? '';
-  const shouldShowSourcePreviewHelp = !hasSeenTranslationPreview && !sourcePreviewText;
-  const shouldShowTargetPreviewHelp = !hasSeenTranslationPreview && !translatedPreviewText;
-
-  useEffect(() => {
-    if (!translatedPreviewText || hasReceivedTranslationPreviewThisRun) return;
-    hasReceivedTranslationPreviewThisRun = true;
-    setHasSeenTranslationPreview(true);
-  }, [translatedPreviewText]);
-
-  useEffect(() => {
-    const src = settings?.src_language === 'tr' ? 'TR' : 'EN';
-    const tgt = settings?.tgt_language === 'en' ? 'EN' : 'TR';
-    setSourceLanguageIndex(languageOrder.findIndex((item) => item === src));
-    setTargetLanguageIndex(languageOrder.findIndex((item) => item === tgt));
-  }, [settings?.src_language, settings?.tgt_language]);
-
-  const saveLanguageSettings = (nextSource: 'EN' | 'TR', nextTarget: 'EN' | 'TR') => {
-    wsClient.send('save_settings', {
-      src_language: nextSource === 'TR' ? 'tr' : 'en',
-      tgt_language: nextTarget === 'EN' ? 'en' : 'tr',
-    });
-  };
+  const sourceLanguageIndex = languageOrder.findIndex((l) => l === sourceLanguage);
+  const targetLanguageIndex = languageOrder.findIndex((l) => l === targetLanguage);
 
   return (
   <PanelStage
@@ -1035,7 +909,7 @@ export const WorkspaceView: React.FC<{
                   <div
                     onWheel={(event) => {
                       event.preventDefault();
-                      if (modelEnabled && offlineModelOrder.length > 1) shiftModel(event.deltaY > 0 ? 1 : -1);
+                      if (modelEnabled && previousModel != null) shiftModel(event.deltaY > 0 ? 1 : -1);
                     }}
                     style={{
                       minHeight: '100%',
@@ -1060,15 +934,15 @@ export const WorkspaceView: React.FC<{
                     >
                       <button
                         type="button"
-                        onClick={() => { if (modelEnabled && offlineModelOrder.length > 1) shiftModel(-1); }}
-                        onMouseEnter={() => { if (modelEnabled && offlineModelOrder.length > 1) setModelArrowHover('up'); }}
+                        onClick={() => { if (modelEnabled && previousModel != null) shiftModel(-1); }}
+                        onMouseEnter={() => { if (modelEnabled && previousModel != null) setModelArrowHover('up'); }}
                         onMouseLeave={() => setModelArrowHover(null)}
                         aria-label="Önceki model"
                         style={{
                           border: 'none',
                           background: 'transparent',
-                          color: modelArrowHover === 'up' && offlineModelOrder.length > 1 ? '#7dd3fc' : 'rgba(159, 183, 207, 0.64)',
-                          cursor: modelEnabled && offlineModelOrder.length > 1 ? 'pointer' : 'default',
+                          color: modelArrowHover === 'up' && previousModel != null ? '#7dd3fc' : 'rgba(159, 183, 207, 0.64)',
+                          cursor: modelEnabled && previousModel != null ? 'pointer' : 'default',
                           padding: 0,
                           height: 14,
                           width: 22,
@@ -1076,8 +950,8 @@ export const WorkspaceView: React.FC<{
                           alignItems: 'center',
                           justifyContent: 'center',
                           transition: 'color 160ms ease, transform 160ms ease, opacity 160ms ease',
-                          transform: modelArrowHover === 'up' && offlineModelOrder.length > 1 ? 'translateY(-1px)' : 'none',
-                          opacity: modelArrowHover === 'up' && offlineModelOrder.length > 1 ? 1 : 0.82,
+                          transform: modelArrowHover === 'up' && previousModel != null ? 'translateY(-1px)' : 'none',
+                          opacity: modelArrowHover === 'up' && previousModel != null ? 1 : 0.82,
                         }}
                       >
                         <LayerGlyph path="M8 14.5 12 10.5l4 4" size={16} />
@@ -1092,15 +966,15 @@ export const WorkspaceView: React.FC<{
                       </div>
                       <button
                         type="button"
-                        onClick={() => { if (modelEnabled && offlineModelOrder.length > 1) shiftModel(1); }}
-                        onMouseEnter={() => { if (modelEnabled && offlineModelOrder.length > 1) setModelArrowHover('down'); }}
+                        onClick={() => { if (modelEnabled && previousModel != null) shiftModel(1); }}
+                        onMouseEnter={() => { if (modelEnabled && previousModel != null) setModelArrowHover('down'); }}
                         onMouseLeave={() => setModelArrowHover(null)}
                         aria-label="Sonraki model"
                         style={{
                           border: 'none',
                           background: 'transparent',
-                          color: modelArrowHover === 'down' && offlineModelOrder.length > 1 ? '#7dd3fc' : 'rgba(159, 183, 207, 0.64)',
-                          cursor: modelEnabled && offlineModelOrder.length > 1 ? 'pointer' : 'default',
+                          color: modelArrowHover === 'down' && previousModel != null ? '#7dd3fc' : 'rgba(159, 183, 207, 0.64)',
+                          cursor: modelEnabled && previousModel != null ? 'pointer' : 'default',
                           padding: 0,
                           height: 14,
                           width: 22,
@@ -1108,8 +982,8 @@ export const WorkspaceView: React.FC<{
                           alignItems: 'center',
                           justifyContent: 'center',
                           transition: 'color 160ms ease, transform 160ms ease, opacity 160ms ease',
-                          transform: modelArrowHover === 'down' && offlineModelOrder.length > 1 ? 'translateY(1px)' : 'none',
-                          opacity: modelArrowHover === 'down' && offlineModelOrder.length > 1 ? 1 : 0.82,
+                          transform: modelArrowHover === 'down' && previousModel != null ? 'translateY(1px)' : 'none',
+                          opacity: modelArrowHover === 'down' && previousModel != null ? 1 : 0.82,
                         }}
                       >
                         <LayerGlyph path="M8 9.5 12 13.5l4-4" size={16} />
