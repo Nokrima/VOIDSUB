@@ -2,9 +2,25 @@ use serde::{Deserialize, Serialize};
 use std::{
     env, fs,
     path::{Path, PathBuf},
-    sync::Mutex,
+    sync::{Mutex, MutexGuard},
     time::SystemTime,
 };
+
+trait SafeLock<T> {
+    fn safe_lock(&self) -> MutexGuard<'_, T>;
+}
+
+impl<T> SafeLock<T> for Mutex<T> {
+    fn safe_lock(&self) -> MutexGuard<'_, T> {
+        match self.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                log::warn!("Mutex poisoned, recovering data.");
+                poisoned.into_inner()
+            }
+        }
+    }
+}
 
 #[cfg(target_os = "windows")]
 use std::sync::Arc;
@@ -266,13 +282,13 @@ fn wait_for_backend(state: tauri::State<'_, BackendState>) -> Result<String, Str
     let start = std::time::Instant::now();
     loop {
         {
-            let guard = state.port.lock().unwrap();
+            let guard = state.port.safe_lock();
             if let Some(port) = guard.as_ref() {
                 return Ok(port.clone());
             }
         }
         {
-            let guard = state.error.lock().unwrap();
+            let guard = state.error.safe_lock();
             if let Some(err) = guard.as_ref() {
                 return Err(err.clone());
             }
@@ -325,8 +341,8 @@ unsafe fn register_shortcuts(shortcuts: &ShortcutsMap) {
 #[cfg(target_os = "windows")]
 fn update_hotkeys(app: AppHandle, shortcuts: ShortcutsMap) -> Result<String, String> {
     let state = app.state::<HotkeyState>();
-    *state.pending_shortcuts.lock().unwrap() = Some(shortcuts);
-    let thread_id = *state.thread_id.lock().unwrap();
+    *state.pending_shortcuts.safe_lock() = Some(shortcuts);
+    let thread_id = *state.thread_id.safe_lock();
     if thread_id != 0 {
         unsafe {
             PostThreadMessageW(thread_id, WM_HOTKEY_UPDATE, 0, 0);
@@ -340,7 +356,7 @@ fn update_hotkeys(app: AppHandle, shortcuts: ShortcutsMap) -> Result<String, Str
 #[cfg(target_os = "windows")]
 fn suspend_hotkeys(app: AppHandle) -> Result<String, String> {
     let state = app.state::<HotkeyState>();
-    let thread_id = *state.thread_id.lock().unwrap();
+    let thread_id = *state.thread_id.safe_lock();
     if thread_id != 0 {
         unsafe {
             PostThreadMessageW(thread_id, WM_HOTKEY_SUSPEND, 0, 0);
@@ -354,7 +370,7 @@ fn suspend_hotkeys(app: AppHandle) -> Result<String, String> {
 #[cfg(target_os = "windows")]
 fn resume_hotkeys(app: AppHandle) -> Result<String, String> {
     let state = app.state::<HotkeyState>();
-    let thread_id = *state.thread_id.lock().unwrap();
+    let thread_id = *state.thread_id.safe_lock();
     if thread_id != 0 {
         unsafe {
             PostThreadMessageW(thread_id, WM_HOTKEY_RESUME, 0, 0);
@@ -396,7 +412,7 @@ fn register_global_hotkeys(app_handle: tauri::AppHandle) {
         let thread_id = GetCurrentThreadId();
         {
             let state = app_handle.state::<HotkeyState>();
-            *state.thread_id.lock().unwrap() = thread_id;
+            *state.thread_id.safe_lock() = thread_id;
         }
 
         // Varsayilan tuslari kaydet (F9-F12).
@@ -408,7 +424,7 @@ fn register_global_hotkeys(app_handle: tauri::AppHandle) {
         };
         register_shortcuts(&default_shortcuts);
         // Mevcut tuslari suspended'a kaydet (resume icin).
-        *suspended.lock().unwrap() = Some(default_shortcuts);
+        *suspended.safe_lock() = Some(default_shortcuts);
 
         let mut msg: MSG = std::mem::zeroed();
         while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) != 0 {
@@ -425,10 +441,10 @@ fn register_global_hotkeys(app_handle: tauri::AppHandle) {
                 }
                 m if m == WM_HOTKEY_UPDATE => {
                     // Yeni tuslari pending'den al, register et.
-                    if let Some(shortcuts) = pending.lock().unwrap().take() {
+                    if let Some(shortcuts) = pending.safe_lock().take() {
                         unregister_all_hotkeys();
                         register_shortcuts(&shortcuts);
-                        *suspended.lock().unwrap() = Some(shortcuts);
+                        *suspended.safe_lock() = Some(shortcuts);
                     }
                 }
                 m if m == WM_HOTKEY_SUSPEND => {
@@ -437,7 +453,7 @@ fn register_global_hotkeys(app_handle: tauri::AppHandle) {
                 }
                 m if m == WM_HOTKEY_RESUME => {
                     // Son bilinen tuslari geri yukle.
-                    if let Some(ref shortcuts) = *suspended.lock().unwrap() {
+                    if let Some(ref shortcuts) = *suspended.safe_lock() {
                         register_shortcuts(shortcuts);
                     }
                 }
@@ -619,7 +635,7 @@ pub fn run() {
 
                                 if set_info_res != 0 && assign_res != 0 {
                                     let state: tauri::State<'_, BackendState> = app_handle.state();
-                                    *state.job_handle.lock().unwrap() = Some(job as isize);
+                                    *state.job_handle.safe_lock() = Some(job as isize);
                                 } else {
                                     extern "system" {
                                         fn CloseHandle(hObject: HANDLE) -> BOOL;
@@ -641,7 +657,7 @@ pub fn run() {
                                     if let Some(end) = port_str.find("]]") {
                                         let port = &port_str[..end];
                                         let state: tauri::State<'_, BackendState> = app_handle_clone.state();
-                                        *state.port.lock().unwrap() = Some(port.to_string());
+                                        *state.port.safe_lock() = Some(port.to_string());
                                         let _ = app_handle_clone.emit("backend-ready", port);
                                     }
                                 }
@@ -661,7 +677,7 @@ pub fn run() {
                 Err(e) => {
                     log::error!("[PYTHON-SPAWN-ERR] Backend baslatilamadi: {}", e);
                     let state: tauri::State<'_, BackendState> = app_handle.state();
-                    *state.error.lock().unwrap() = Some(format!("Backend baslatilamadi: {}", e));
+                    *state.error.safe_lock() = Some(format!("Backend baslatilamadi: {}", e));
                 }
             }
         });
@@ -750,7 +766,7 @@ pub fn run() {
                     use tauri::Manager;
                     const WM_QUIT: u32 = 0x0012;
                     let state = app_handle.state::<HotkeyState>();
-                    let tid = *state.thread_id.lock().unwrap();
+                    let tid = *state.thread_id.safe_lock();
                     if tid != 0 {
                         unsafe {
                             PostThreadMessageW(tid, WM_QUIT, 0, 0);
