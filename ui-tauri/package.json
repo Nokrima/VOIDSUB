@@ -4,9 +4,9 @@
     "version": "2.0.0",
     "type": "module",
     "scripts": {
-        "predev": "node -e \"const fs=require('fs'); fs.mkdirSync('../dist/python_embedded', {recursive:true}); fs.writeFileSync('../dist/python_embedded/.gitkeep', '')\"",
+        "predev": "node -e \"const fs=require('fs'); if (!fs.existsSync('../dist/python_embedded/python.exe')) { console.log('Embedded Python bulunamadi, indiriliyor...'); require('child_process').execSync('python ../scripts/build_embedded.py', {stdio: 'inherit'}); }\"",
         "dev": "vite",
-        "prebuild": "node -e \"const fs=require('fs'); fs.mkdirSync('../dist/python_embedded', {recursive:true}); fs.writeFileSync('../dist/python_embedded/.gitkeep', '')\"",
+        "prebuild": "node -e \"const fs=require('fs'); if (!fs.existsSync('../dist/python_embedded/python.exe')) { console.log('Embedded Python bulunamadi, indiriliyor...'); require('child_process').execSync('python ../scripts/build_embedded.py', {stdio: 'inherit'}); }\"",
         "build": "tsc && vite build",
         "preview": "vite preview",
         "tauri": "tauri"

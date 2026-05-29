@@ -47,6 +47,7 @@ struct TrayState {
 
 struct BackendState {
     port: Mutex<Option<String>>,
+    error: Mutex<Option<String>>,
 }
 
 #[cfg(target_os = "windows")]
@@ -242,12 +243,22 @@ fn parse_shortcut_string(s: &str) -> Option<(u32, u32)> {
 
 #[tauri::command]
 fn wait_for_backend(state: tauri::State<'_, BackendState>) -> Result<String, String> {
+    let start = std::time::Instant::now();
     loop {
         {
             let guard = state.port.lock().unwrap();
             if let Some(port) = guard.as_ref() {
                 return Ok(port.clone());
             }
+        }
+        {
+            let guard = state.error.lock().unwrap();
+            if let Some(err) = guard.as_ref() {
+                return Err(err.clone());
+            }
+        }
+        if start.elapsed().as_secs() > 15 {
+            return Err("Backend baglanti suresi asildi (Timeout). Python sureci baslatilamadi veya yanit vermedi.".to_string());
         }
         std::thread::sleep(std::time::Duration::from_millis(50));
     }
@@ -463,6 +474,7 @@ pub fn run() {
         ])
         .manage(BackendState {
             port: Mutex::new(None),
+            error: Mutex::new(None),
         })
         .setup(|app| {
             let app_handle = app.handle().clone();
@@ -494,8 +506,9 @@ pub fn run() {
                     cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
                 }
 
-                if let Ok(mut child) = cmd.spawn() {
-                    #[cfg(target_os = "windows")]
+                match cmd.spawn() {
+                    Ok(mut child) => {
+                        #[cfg(target_os = "windows")]
                     {
                         use std::os::windows::io::AsRawHandle;
 
@@ -598,7 +611,13 @@ pub fn run() {
                         });
                     }
                 }
-            });
+                Err(e) => {
+                    log::error!("[PYTHON-SPAWN-ERR] Backend baslatilamadi: {}", e);
+                    let state: tauri::State<'_, BackendState> = app_handle.state();
+                    *state.error.lock().unwrap() = Some(format!("Backend baslatilamadi: {}", e));
+                }
+            }
+        });
 
             let tray_menu = MenuBuilder::new(app)
                 .text("show_main", "VOIDSUB'ı Göster")

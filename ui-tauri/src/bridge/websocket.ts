@@ -69,6 +69,10 @@ export const connect = async () => {
     }
   } catch (err) {
     console.error("Backend beklenirken hata:", err);
+    isConnecting = false;
+    // Hata mesajını UI'a taşı
+    injectEvent('log_entry', { level: 'error', prefix: 'SYS', code: '000', message: String(err) });
+    return; // Backend başlamadıysa bağlanmaya çalışma
   }
 
   socket = new WebSocket(WS_URL);
