@@ -158,13 +158,13 @@ export interface MotorDurumuProps {
   height?: number | string;
   hardwareInfo: { cpu: string; gpu: string; ram: string; activeEngine: string; cuda_available?: boolean; engine_details?: any };
   healthChecks: Record<string, { label: string; value: string; state: 'ok' | 'warn' | 'error' }[]>;
-  models: Record<string, { id: string; name: string; subtitle: string; status: 'active' | 'installed' | 'available' }[]>;
+  models: Record<string, { id: string; name: string; subtitle: string; status: string }[]>;
   perfEstimate: Record<string, any>;
   onEngineSelect: (engineId: string) => void;
   selectedEngineId: string;
   isAvailable: (engineId: string) => boolean;
   modelActions: Record<string, { type: 'install' | 'remove'; progress: number; detail: string; stage: string; bytes_label: string }>;
-  offlineLangModels: { id: string; name: string; desc: string; size: string; status: 'active' | 'installed' | 'available' }[];
+  offlineLangModels: { id: string; name: string; desc: string; size: string; status: string }[];
   offlineBusy: boolean;
   completedModelId?: string | null;
   onLangDownload: (modelId: string) => void;
@@ -855,3 +855,6 @@ export const MotorDurumu: React.FC<MotorDurumuProps> = ({ height = '100%', hardw
 };
 
 // --- App Integration Wrapper ---
+
+
+

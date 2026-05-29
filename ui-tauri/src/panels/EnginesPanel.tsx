@@ -143,7 +143,7 @@ export const EnginesPanel: React.FC = () => {
     const offFrameStat = onEvent('ocr_frame_stat', (data) => setFrameStat(data as OcrFrameStatPayload));
     
     // EasyOCR Plugin Events
-    const offEasyProgress = onEvent('easyocr_plugin_progress', (data: any) => {
+    const offEasyProgress = onEvent('easyocr_plugin_progress', (data: { stage?: string; percent?: number; detail?: string; bytes_label?: string }) => {
       const isRemove = data.stage === 'remove';
       setEasyocrAction({
         type: isRemove ? 'remove' : 'install',
@@ -162,13 +162,13 @@ export const EnginesPanel: React.FC = () => {
     const offEasyCancel = onEvent('easyocr_plugin_cancelled', () => {
       setEasyocrAction(null);
     });
-    const offEasyError = onEvent('easyocr_plugin_error', (data: any) => {
+    const offEasyError = onEvent('easyocr_plugin_error', (data: { detail?: string }) => {
       setEasyocrAction(null);
       notify('error', String(data?.detail ?? 'EasyOCR indirme hatasi.'));
     });
 
     // CUDA Plugin Events
-    const offCudaProgress = onEvent('cuda_progress', (data: any) => {
+    const offCudaProgress = onEvent('cuda_progress', (data: { percent?: number; detail?: string; stage?: string; bytes_label?: string }) => {
       setCudaAction({
         type: 'install',
         progress: data.percent ?? 0,
@@ -187,7 +187,7 @@ export const EnginesPanel: React.FC = () => {
     const offCudaCancel = onEvent('cuda_cancelled', () => {
       setCudaAction(null);
     });
-    const offCudaError = onEvent('cuda_error', (data: any) => {
+    const offCudaError = onEvent('cuda_error', (data: { message?: string }) => {
       setCudaAction(null);
       notify('error', String(data?.message ?? 'CUDA indirme hatası.'));
     });
@@ -229,7 +229,8 @@ export const EnginesPanel: React.FC = () => {
     activeEngine: selectedEngine
   };
 
-  const realHealthChecks: Record<string, any> = {
+  type HealthCheckItem = { label: string; value: string; state: 'ok' | 'warn' | 'error' };
+  const realHealthChecks: Record<string, HealthCheckItem[]> = {
     winonly: [
       { label: 'Windows API', value: hardware?.available_engines.includes('winonly') ? 'Hazır' : 'Eksik', state: hardware?.available_engines.includes('winonly') ? 'ok' : 'error' },
       { label: 'WinRT Capture', value: hardware?.winrt_available ? 'Hazır' : 'Eksik', state: hardware?.winrt_available ? 'ok' : 'error' },
@@ -242,7 +243,8 @@ export const EnginesPanel: React.FC = () => {
     ],
   };
 
-  const realEngineModelsData: Record<string, any> = {
+  type EngineModelItem = { id: string; name: string; subtitle: string; status: 'active' | 'available' | 'installed' | string };
+  const realEngineModelsData: Record<string, EngineModelItem[]> = {
     winonly: [
       { id: 'w1', name: 'Windows OCR', subtitle: hardware?.engine_details?.winonly?.reason || 'Sistem OCR bileşeni', status: hardware?.available_engines.includes('winonly') ? 'active' : 'available' },
       { id: 'w2', name: 'WinRT Capture', subtitle: hardware?.winrt_available ? 'Ekran yakalama hazır' : 'Ekran yakalama eksik', status: hardware?.winrt_available ? 'installed' : 'available' },
@@ -326,12 +328,13 @@ export const EnginesPanel: React.FC = () => {
     injectInfoLog('UI-007', `Yerel model kaldırma başlatıldı: ${modelId}`);
   };
 
-  const mockPerfEstimate: Record<string, any> = {
+  type PerfEstimate = { fps: string; latency: string; gpuUsage: string; fpsBar: number; latencyBar: number; gpuBar: number };
+  const mockPerfEstimate: Record<string, PerfEstimate> = {
     winonly: { fps: '30+', latency: '< 45ms', gpuUsage: '~5%', fpsBar: 40, latencyBar: 60, gpuBar: 5 },
     easy: { fps: '60+', latency: '< 15ms', gpuUsage: '~25%', fpsBar: 95, latencyBar: 90, gpuBar: 25 },
   };
 
-  const realPerfEstimate: Record<string, any> = {
+  const realPerfEstimate: Record<string, PerfEstimate> = {
     winonly: frameStat?.engine === 'winonly'
       ? { fps: frameStat.result === 'accepted' ? 'Canlı' : 'Beklemede', latency: `Kalite ${frameStat.quality}`, gpuUsage: hardware?.winrt_available ? 'Düşük' : '--', fpsBar: frameStat.result === 'accepted' ? 72 : 28, latencyBar: Math.max(10, Math.min(100, frameStat.quality)), gpuBar: 8 }
       : mockPerfEstimate.winonly,
@@ -614,6 +617,7 @@ export const EnginesPanel: React.FC = () => {
     </PanelStage>
   );
 };
+
 
 
 

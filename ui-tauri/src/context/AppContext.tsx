@@ -405,11 +405,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const offCalibrationRegion = onEvent('calibration_region_selected', () => {
       restoreFromCalibration().catch(() => undefined);
     });
-    const offCalibrationCancel = onEvent('calibration_region_cancelled', (data: any) => {
+    const offCalibrationCancel = onEvent('calibration_region_cancelled', () => {
       restoreFromCalibration().catch(() => undefined);
-      enqueueNotice('info', String(data?.message ?? 'Kalibrasyon alanı seçimi iptal edildi.'));
+      enqueueNotice('info', 'Kalibrasyon alanı seçimi iptal edildi.');
     });
-    const offCalibrationFailed = onEvent('calibration_region_failed', (data: any) => {
+    const offCalibrationFailed = onEvent('calibration_region_failed', (data: { message?: string }) => {
       restoreFromCalibration().catch(() => undefined);
       enqueueNotice('error', String(data?.message ?? 'Kalibrasyon alanı seçimi başarısız oldu.'));
     });
@@ -421,7 +421,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const offTempState = onEvent('temporary_region_state', (data: any) => {
+    const offTempState = onEvent('temporary_region_state', (data: { active?: boolean }) => {
       temporaryRegionActiveRef.current = Boolean(data?.active);
     });
     const offTempSelected = onEvent('temporary_region_selected', () => {
@@ -433,16 +433,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       resumeTranslationAfterTempSelectRef.current = false;
     });
-    const offTempCancelled = onEvent('temporary_region_cancelled', (data: any) => {
+    const offTempCancelled = onEvent('temporary_region_cancelled', () => {
       temporaryRegionActiveRef.current = false;
       restoreAfterRegionSelection().catch(() => undefined);
-      enqueueNotice('info', String(data?.message ?? 'Geçici çeviri alanı kapatıldı.'));
+      enqueueNotice('info', 'Geçici çeviri alanı kapatıldı.');
       if (hasSelectedRegionRef.current && resumeTranslationAfterTempSelectRef.current) {
         wsClient.send('start_translation');
       }
       resumeTranslationAfterTempSelectRef.current = false;
     });
-    const offTempFailed = onEvent('temporary_region_failed', (data: any) => {
+    const offTempFailed = onEvent('temporary_region_failed', (data: { message?: string }) => {
       temporaryRegionActiveRef.current = false;
       restoreAfterRegionSelection().catch(() => undefined);
       enqueueNotice('warning', String(data?.message ?? 'Geçici çeviri alanı başlatılamadı.'));

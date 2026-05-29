@@ -53,7 +53,7 @@ const getLevelBadgeStyle = (level: LogEntry['level']): React.CSSProperties => {
   return { color: 'rgba(255,255,255,0.5)' };
 };
 
-const toLogEntry = (data: any): LogEntry => ({
+const toLogEntry = (data: { timestamp?: string | number, level?: string, prefix?: string, code?: string, message?: string }): LogEntry => ({
   id: `${data.timestamp ?? 'x'}-${data.code ?? 'x'}-${++_logCounter}`,
   timestamp: String(data.timestamp ?? '--:--:--').substring(11, 23) || String(data.timestamp),
   level: String(data.level ?? 'INFO').toUpperCase() as LogEntry['level'],
@@ -93,7 +93,7 @@ export const LogPanel: React.FC<{ embedded?: boolean }> = ({ embedded = false })
       setLogs(mockLogs);
     }
 
-    const unsubscribe = onEvent('log_entry', (data: any) => {
+    const unsubscribe = onEvent('log_entry', (data: { timestamp?: string | number, level?: string, prefix?: string, code?: string, message?: string }) => {
       const nextLog = toLogEntry(data);
       const dedupeKey = `${nextLog.level}|${nextLog.prefix}|${nextLog.code ?? ''}|${nextLog.message}`;
       const now = Date.now();
@@ -322,3 +322,4 @@ export const LogPanel: React.FC<{ embedded?: boolean }> = ({ embedded = false })
     </div>
   );
 };
+

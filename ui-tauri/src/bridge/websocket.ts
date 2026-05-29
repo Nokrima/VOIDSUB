@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 
+// Tauri runtime global — not typed in @tauri-apps/api, safe to declare here.
+declare global { interface Window { __TAURI_INTERNALS__?: unknown } }
+
 let WS_URL = 'ws://127.0.0.1:27491'; // Fallback / Dev default
 let socket: WebSocket | null = null;
 let isConnecting = false;
@@ -153,7 +156,7 @@ export const connect = async () => {
   isConnecting = true;
 
   try {
-    if ((window as any).__TAURI_INTERNALS__) {
+    if (window.__TAURI_INTERNALS__) {
       const dynamicPort = await invoke<string>('wait_for_backend');
       console.log(`[Tauri] backend hazir, port: ${dynamicPort}`);
       WS_URL = `ws://127.0.0.1:${dynamicPort}`;
@@ -191,7 +194,10 @@ export const connect = async () => {
         return;
       }
 
-      pushEventHistory(eventName as keyof WebSocketEventMap, payload as any);
+      pushEventHistory(
+        eventName as keyof WebSocketEventMap,
+        payload as WebSocketEventMap[keyof WebSocketEventMap]
+      );
       if (listeners[eventName]) {
         listeners[eventName].forEach((handler) => handler(payload));
       }
