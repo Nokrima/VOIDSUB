@@ -18,6 +18,12 @@
 
 ---
 
+## License Compliance
+
+A full breakdown of open-source software dependencies and their licenses is maintained in the [DEPENDENCY_LICENSES.md](./DEPENDENCY_LICENSES.md) report. There are currently **no copyleft (GPL/AGPL)** dependencies in the application bundle. All components are governed by permissive licenses (MIT, Apache 2.0, BSD).
+
+---
+
 ## CSP Policy Rationale
 
 `style-src 'unsafe-inline'` is retained in the Tauri CSP because:
