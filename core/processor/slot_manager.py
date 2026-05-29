@@ -4,6 +4,7 @@ import re
 from difflib import SequenceMatcher
 
 from core.processor.junk_filter import JunkFilter
+from core.processor.types import TextAnalysisResult
 
 
 class SlotManager:
@@ -47,10 +48,10 @@ class SlotManager:
             self._slot_is_complete = self._check_complete(candidate)
             self._slot_is_open_ended = self._ends_open_ended(candidate)
             self._slot_line_count = max(1, candidate.count("\n") + 1)
-            self._slot_health = int(analysis.get("health_score", 0))
-            self._slot_recognized = int(analysis.get("recognized_count", 0))
-            self._slot_suspicious = int(analysis.get("suspicious_tokens", 0))
-            self._slot_broken = int(analysis.get("broken_token_count", 0))
+            self._slot_health = analysis["health_score"]
+            self._slot_recognized = analysis["recognized_count"]
+            self._slot_suspicious = analysis["suspicious_tokens"]
+            self._slot_broken = analysis["broken_token_count"]
             self._slot_sample_count += 1
             return "upgraded"
 
@@ -116,7 +117,7 @@ class SlotManager:
         cleaned = re.sub(r"[^\w\s]", "", cleaned, flags=re.UNICODE)
         return cleaned.strip()
 
-    def _open_new_slot(self, text: str, normalized: str, quality: int, analysis: dict[str, object]) -> None:
+    def _open_new_slot(self, text: str, normalized: str, quality: int, analysis: TextAnalysisResult) -> None:
         self._slot_text = text
         self._slot_normalized = normalized
         self._slot_quality = int(quality)
@@ -124,10 +125,10 @@ class SlotManager:
         self._slot_is_complete = self._check_complete(text)
         self._slot_is_open_ended = self._ends_open_ended(text)
         self._slot_line_count = max(1, text.count("\n") + 1)
-        self._slot_health = int(analysis.get("health_score", 0))
-        self._slot_recognized = int(analysis.get("recognized_count", 0))
-        self._slot_suspicious = int(analysis.get("suspicious_tokens", 0))
-        self._slot_broken = int(analysis.get("broken_token_count", 0))
+        self._slot_health = analysis["health_score"]
+        self._slot_recognized = analysis["recognized_count"]
+        self._slot_suspicious = analysis["suspicious_tokens"]
+        self._slot_broken = analysis["broken_token_count"]
         self._slot_sample_count = 1
 
     def _is_same_family(self, norm_new: str, norm_slot: str) -> bool:
@@ -160,16 +161,16 @@ class SlotManager:
         similarity = SequenceMatcher(a=norm_slot, b=norm_new).ratio()
         return similarity >= 0.82
 
-    def _is_upgrade(self, text: str, normalized: str, quality: int, analysis: dict[str, object]) -> bool:
+    def _is_upgrade(self, text: str, normalized: str, quality: int, analysis: TextAnalysisResult) -> bool:
         normalized_length = len(normalized)
         if int(quality) < self._MINIMUM_UPGRADE_QUALITY:
             return False
         candidate_complete = self._check_complete(text)
         candidate_open_ended = self._ends_open_ended(text)
-        candidate_health = int(analysis.get("health_score", 0))
-        candidate_recognized = int(analysis.get("recognized_count", 0))
-        candidate_suspicious = int(analysis.get("suspicious_tokens", 0))
-        candidate_broken = int(analysis.get("broken_token_count", 0))
+        candidate_health = analysis["health_score"]
+        candidate_recognized = analysis["recognized_count"]
+        candidate_suspicious = analysis["suspicious_tokens"]
+        candidate_broken = analysis["broken_token_count"]
         if self._slot_is_complete and not candidate_complete:
             return False
         if candidate_complete and not self._slot_is_complete:

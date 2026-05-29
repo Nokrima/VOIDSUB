@@ -6,6 +6,8 @@ from collections import deque
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 
+from core.processor.types import TextAnalysisResult
+
 
 def _normalize_family(text: str) -> str:
     cleaned = str(text or "").strip()
@@ -72,15 +74,15 @@ class SourceStateMachine:
         self.recent_dirty_family_order: deque[str] = deque()
         self.recent_dirty_families: dict[str, DirtyMemoryEntry] = {}
 
-    def consider(self, text: str, analysis: dict[str, object], *, now: float | None = None) -> SourceDecision:
+    def consider(self, text: str, analysis: TextAnalysisResult, *, now: float | None = None) -> SourceDecision:
         now = float(now if now is not None else time.monotonic())
         family = _normalize_family(text)
-        current_health = int(analysis.get("health_score", 0))
-        current_recognized = int(analysis.get("recognized_count", 0))
-        current_suspicious = int(analysis.get("suspicious_tokens", 0))
-        current_broken = int(analysis.get("broken_token_count", 0))
-        current_connected_noise = int(analysis.get("connected_noise_runs", 0))
-        tip2_suspect = bool(analysis.get("tip2_suspect", False))
+        current_health = analysis["health_score"]
+        current_recognized = analysis["recognized_count"]
+        current_suspicious = analysis["suspicious_tokens"]
+        current_broken = analysis["broken_token_count"]
+        current_connected_noise = analysis["connected_noise_runs"]
+        tip2_suspect = analysis["tip2_suspect"]
         memory_entry, memory_similarity = self._find_dirty_memory_match(family, now)
         memory_hit = memory_entry is not None
         memory_age_ms = ((now - memory_entry.seen_at) * 1000.0) if memory_entry is not None else 0.0
@@ -139,7 +141,7 @@ class SourceStateMachine:
                 self.pending_recognized or current_recognized,
                 self.pending_suspicious or current_suspicious,
                 self.pending_broken or current_broken,
-                int(analysis.get("connected_noise_runs", 0)),
+                analysis["connected_noise_runs"],
                 now,
             )
             return SourceDecision(True, self.state, "tip2_confirmed_best", similarity, False, selected, memory_hit, memory_age_ms, memory_reason)

@@ -8,7 +8,7 @@ import unicodedata
 import uuid
 from collections import deque
 from difflib import SequenceMatcher
-from typing import cast
+from typing import Any, cast
 
 import cv2
 import numpy as np
@@ -33,6 +33,7 @@ from core.translation.offline import OfflineTranslationEngine
 logger = get_logger()
 
 from core.processor.utils import _clip_log_text, _quick_normalize, _strip_speaker
+from core.processor.types import TextAnalysisResult
 
 from core.processor.translation_queue import TranslationQueueService
 from core.processor.overlay_publisher import OverlayPublisherService
@@ -331,15 +332,15 @@ class TranslationPipeline:
         """Cleanup OCR text and apply early-drop gates. Returns (detected_text, quality_score) or None."""
         raw_detected_text = str(ocr_payload["text"])
         clean_report = clean_ocr_source_detailed(raw_detected_text) if not self.raw_translation_flow_enabled else None
-        detected_text = raw_detected_text if self.raw_translation_flow_enabled else str(clean_report["text"])
+        detected_text = raw_detected_text if self.raw_translation_flow_enabled or not clean_report else str(clean_report["text"])
         if self.raw_translation_flow_enabled:
             self.overlay_publisher._log_ocr("033", f"Raw flow cleanup bypass: frame_id={frame_id}, raw_text={raw_detected_text!r}, cleaned_candidate=None")
             self.overlay_publisher._log_ocr("013", f"Source cleanup: frame_id={frame_id}, changed=False, steps=['skipped_raw_mode'], before={raw_detected_text!r}, after={detected_text!r}")
         else:
             self.overlay_publisher._log_ocr(
                 "013",
-                (f"Source cleanup: frame_id={frame_id}, changed={clean_report['changed']}, "
-                 f"steps={clean_report['steps']}, minor_merge_fixes={clean_report.get('minor_merge_fixes', [])}, "
+                (f"Source cleanup: frame_id={frame_id}, changed={clean_report['changed'] if clean_report else False}, "
+                 f"steps={clean_report['steps'] if clean_report else []}, minor_merge_fixes={clean_report.get('minor_merge_fixes', []) if clean_report else []}, "
                  f"before={raw_detected_text!r}, after={detected_text!r}"),
             )
         quality_score = int(ocr_payload["quality"])
@@ -943,6 +944,8 @@ class TranslationPipeline:
         ocr_frame = processed_frame
         if getattr(processed_frame, "ndim", 0) == 2:
             ocr_frame = np.stack([processed_frame] * 3, axis=-1)
+        if not self.ocr_engine:
+            return None
         ocr_results = self.ocr_engine.read(cast(np.ndarray, ocr_frame))
         if not ocr_results:
             self.overlay_publisher._log_ocr(
@@ -1041,18 +1044,18 @@ class TranslationPipeline:
         return build_detected_text(ocr_results, self.ocr_scene_mode, self.target_region)
 
 
-    def _evaluate_tip2_best_variant_gate(self, analysis: dict[str, Any]) -> dict[str, Any]:
-        health = int(analysis.get("health_score", 0))
-        suspicious = int(analysis.get("suspicious_tokens", 0))
-        broken = int(analysis.get("broken_token_count", 0))
-        connected_noise = int(analysis.get("connected_noise_runs", 0))
-        recognized_ratio = float(analysis.get("recognized_ratio", 0.0))
-        unknown_long = int(analysis.get("unknown_long_alpha_count", 0))
-        speaker_prefix_suspicious = bool(analysis.get("speaker_prefix_suspicious", False))
-        joined_hits = list(analysis.get("joined_word_hits", []))
-        merged_hits = list(analysis.get("merged_token_hits", []))
-        minor_merge_hits = list(analysis.get("minor_merge_hits", []))
-        tail_broken = list(analysis.get("tail_broken_tokens", []))
+    def _evaluate_tip2_best_variant_gate(self, analysis: TextAnalysisResult) -> dict[str, Any]:
+        health = analysis["health_score"]
+        suspicious = analysis["suspicious_tokens"]
+        broken = analysis["broken_token_count"]
+        connected_noise = analysis["connected_noise_runs"]
+        recognized_ratio = analysis["recognized_ratio"]
+        unknown_long = analysis["unknown_long_alpha_count"]
+        speaker_prefix_suspicious = analysis["speaker_prefix_suspicious"]
+        joined_hits = analysis["joined_word_hits"]
+        merged_hits = analysis["merged_token_hits"]
+        minor_merge_hits = analysis["minor_merge_hits"]
+        tail_broken = analysis["tail_broken_tokens"]
 
         if speaker_prefix_suspicious and broken >= 1:
             return {"would_emit": False, "reason": "speaker_prefix_corruption"}
@@ -1108,12 +1111,12 @@ class TranslationPipeline:
             return False
         last_analysis = JunkFilter.analyze_text(self.last_text)
         if (
-            bool(last_analysis.get("tip2_suspect"))
-            and int(last_analysis.get("broken_token_count", 0)) >= 1
+            last_analysis["tip2_suspect"]
+            and last_analysis["broken_token_count"] >= 1
             and (
-                bool(last_analysis.get("speaker_prefix_suspicious"))
-                or int(last_analysis.get("unknown_long_alpha_count", 0)) >= 2
-                or float(last_analysis.get("recognized_ratio", 0.0)) < 0.42
+                last_analysis["speaker_prefix_suspicious"]
+                or last_analysis["unknown_long_alpha_count"] >= 2
+                or last_analysis["recognized_ratio"] < 0.42
             )
         ):
             return True
@@ -1158,16 +1161,16 @@ class TranslationPipeline:
         similarity = SequenceMatcher(a=last_normalized, b=current_normalized).ratio()
         if similarity < threshold:
             return False
-        current_analysis: dict[str, Any] = JunkFilter.analyze_text(stabilized_text)
-        last_analysis: dict[str, Any] = JunkFilter.analyze_text(self._last_emitted_source_text)
-        current_health = int(current_analysis["health_score"])
-        last_health = int(last_analysis["health_score"])
-        current_recognized = int(current_analysis["recognized_count"])
-        last_recognized = int(last_analysis["recognized_count"])
-        current_mojibake = int(current_analysis["mojibake_count"])
-        last_mojibake = int(last_analysis["mojibake_count"])
-        current_suspicious = int(current_analysis["suspicious_tokens"])
-        last_suspicious = int(last_analysis["suspicious_tokens"])
+        current_analysis = JunkFilter.analyze_text(stabilized_text)
+        last_analysis = JunkFilter.analyze_text(self._last_emitted_source_text)
+        current_health = current_analysis["health_score"]
+        last_health = last_analysis["health_score"]
+        current_recognized = current_analysis["recognized_count"]
+        last_recognized = last_analysis["recognized_count"]
+        current_mojibake = current_analysis["mojibake_count"]
+        last_mojibake = last_analysis["mojibake_count"]
+        current_suspicious = current_analysis["suspicious_tokens"]
+        last_suspicious = last_analysis["suspicious_tokens"]
         if (
             current_health + 10 < last_health
             and current_recognized <= last_recognized

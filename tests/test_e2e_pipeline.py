@@ -66,6 +66,7 @@ async def test_e2e_pipeline_loop(caplog):
     task = asyncio.create_task(pipeline.start_loop())
     
     # Wait until it processes the first frame (capture -> queue -> translation)
+    calls = []
     for _ in range(10):
         await asyncio.sleep(0.1)
         print("take latest called?", pipeline._take_latest_frame.called)

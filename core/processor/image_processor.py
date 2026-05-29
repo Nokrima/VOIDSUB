@@ -293,4 +293,4 @@ class ImageProcessor:
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
         closed = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
         contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        return [cv2.boundingRect(contour) for contour in contours if cv2.contourArea(contour) > min_area]
+        return [cv2.boundingRect(contour) for contour in contours if cv2.contourArea(contour) > min_area]  # type: ignore

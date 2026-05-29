@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 
 from core.errors import PREFIX_OCR, log_event
+from core.processor.types import TextAnalysisResult
 
 COMMON_ENGLISH_WORDS = {
     "the", "be", "to", "of", "and", "a", "in", "that", "have", "i",
@@ -77,7 +78,7 @@ _ALPHA_ONLY_RE = re.compile(r"^[A-Za-z]+$")
 
 class JunkFilter:
     @classmethod
-    def analyze_text(cls, text: str) -> dict[str, object]:
+    def analyze_text(cls, text: str) -> TextAnalysisResult:
         cleaned = re.sub(r"\s+", " ", str(text or "").strip())
         visible = "".join(ch for ch in cleaned if not ch.isspace())
         visible_length = max(len(visible), 1)
@@ -259,16 +260,16 @@ class JunkFilter:
             return reject("only_digit_or_single_char")
 
         analysis = cls.analyze_text(cleaned)
-        alpha_ratio = float(analysis["alpha_ratio"])
-        recognized_count = int(analysis["recognized_count"])
-        suspicious_tokens = int(analysis["suspicious_tokens"])
-        broken_token_count = int(analysis["broken_token_count"])
-        mojibake_ratio = float(analysis["mojibake_ratio"])
-        proper_name_like = bool(analysis["proper_name_like"])
-        looks_like_sentence = bool(analysis["looks_like_sentence"])
-        vowel_ratio = float(analysis["vowel_ratio"])
-        health_score = int(analysis["health_score"])
-        tokens = list(analysis["tokens"])
+        alpha_ratio = analysis["alpha_ratio"]
+        recognized_count = analysis["recognized_count"]
+        suspicious_tokens = analysis["suspicious_tokens"]
+        broken_token_count = analysis["broken_token_count"]
+        mojibake_ratio = analysis["mojibake_ratio"]
+        proper_name_like = analysis["proper_name_like"]
+        looks_like_sentence = analysis["looks_like_sentence"]
+        vowel_ratio = analysis["vowel_ratio"]
+        health_score = analysis["health_score"]
+        tokens = analysis["tokens"]
 
         if alpha_ratio < 0.55:
             return reject(f"Tip1_low_alpha_{int(alpha_ratio * 100)}%")
@@ -301,13 +302,13 @@ class JunkFilter:
             len(tokens) >= 6
             and recognized_count >= 4
             and (
-                (len(analysis["merged_token_hits"]) >= 1 and float(analysis["recognized_ratio"]) < 0.45)
+                (len(analysis["merged_token_hits"]) >= 1 and analysis["recognized_ratio"] < 0.45)
                 or
                 (len(analysis["malformed_common_word_hits"]) >= 2 and (broken_token_count >= 1 or suspicious_tokens >= 1))
                 or (broken_token_count >= 2 and suspicious_tokens >= 1)
                 or (broken_token_count >= 1 and len(analysis["joined_word_hits"]) >= 2)
-                or (bool(analysis["speaker_prefix_suspicious"]) and broken_token_count >= 1)
-                or (int(analysis["unknown_long_alpha_count"]) >= 2 and float(analysis["recognized_ratio"]) < 0.42)
+                or (analysis["speaker_prefix_suspicious"] and broken_token_count >= 1)
+                or (analysis["unknown_long_alpha_count"] >= 2 and analysis["recognized_ratio"] < 0.42)
             )
             and health_score < 92
             and not proper_name_like
@@ -316,8 +317,8 @@ class JunkFilter:
         if (
             len(cleaned) >= 35
             and len(tokens) >= 6
-            and int(analysis["unknown_long_alpha_count"]) >= 1
-            and float(analysis["recognized_ratio"]) < 0.32
+            and analysis["unknown_long_alpha_count"] >= 1
+            and analysis["recognized_ratio"] < 0.32
             and (broken_token_count >= 1 or suspicious_tokens >= 1)
             and health_score < 88
             and not proper_name_like
@@ -326,8 +327,8 @@ class JunkFilter:
         if (
             len(cleaned) >= 40
             and len(tokens) >= 6
-            and int(analysis["unknown_long_alpha_count"]) >= 2
-            and float(analysis["recognized_ratio"]) < 0.20
+            and analysis["unknown_long_alpha_count"] >= 2
+            and analysis["recognized_ratio"] < 0.20
             and recognized_count <= 1
             and health_score < 90
             and not proper_name_like

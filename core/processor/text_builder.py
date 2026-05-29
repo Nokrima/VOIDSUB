@@ -5,7 +5,7 @@ from statistics import median
 from typing import Any
 
 
-def normalize_text(text: str) -> str:
+def normalize_text(text: Any) -> str:
     cleaned = re.sub(r"[\u200b\u200c\u200d\ufeff]", "", str(text))
     cleaned = re.sub(r"(?:(?<=\s)|^)[\[\]!](?=\s+[A-Za-z])", "I", cleaned)
     bar_chars = r"[|¦ǀ∣❘⎪]"

@@ -16,6 +16,7 @@ def test_bridge_normalize_region():
         
         # Test out of bounds
         res2 = bridge._normalize_region({"left": -50, "top": -50, "width": 3000, "height": 2000})
+        assert res2 is not None
         assert res2["left"] == 0
         assert res2["top"] == 0
         assert res2["width"] <= 1920

@@ -4,15 +4,20 @@ from __future__ import annotations
 import re
 from collections import OrderedDict
 from threading import Lock
+from typing import TypedDict
 
 from core.errors import PREFIX_CFG, log_event
 
+class TranslationCacheEntry(TypedDict):
+    translation: str
+    confidence: float
+    source: str
 
 class TranslationCache:
     def __init__(self, capacity: int = 300):
         self.capacity = capacity
-        self.cache: OrderedDict[str, dict[str, object]] = OrderedDict()
-        self.normalized_cache: OrderedDict[str, dict[str, object]] = OrderedDict()
+        self.cache: OrderedDict[str, TranslationCacheEntry] = OrderedDict()
+        self.normalized_cache: OrderedDict[str, TranslationCacheEntry] = OrderedDict()
         self.lock = Lock()
 
     def get(self, text: str, exact_only: bool = False) -> str | None:
@@ -33,7 +38,7 @@ class TranslationCache:
             return None if float(entry["confidence"]) < 0.3 else str(entry["translation"])
 
     def put(self, text: str, translated: str, confidence: float = 1.0, source: str = "") -> None:
-        entry = {"translation": translated, "confidence": float(confidence), "source": str(source or "")}
+        entry: TranslationCacheEntry = {"translation": translated, "confidence": float(confidence), "source": str(source or "")}
         with self.lock:
             self.cache[text] = entry
             self.cache.move_to_end(text)
@@ -72,7 +77,7 @@ class TranslationCache:
         cleaned = cleaned.replace("“", '"').replace("”", '"')
         return re.sub(r"\s+", " ", cleaned)
 
-    def _coerce(self, entry: object) -> dict[str, object] | None:
+    def _coerce(self, entry: object) -> TranslationCacheEntry | None:
         if entry is None:
             return None
         if isinstance(entry, dict):
