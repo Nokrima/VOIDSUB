@@ -23,7 +23,7 @@ class EasyOCREngine(OCREngine):
     def __init__(self):
         super().__init__()
         self.logger = get_logger()
-        self.reader = None
+        self.reader: Any = None
         self.worker_proc: subprocess.Popen | None = None
         self._stdout_q = queue.Queue(maxsize=30)
         self.source_language = "auto"
@@ -136,8 +136,9 @@ class EasyOCREngine(OCREngine):
             img_b64 = base64.b64encode(encoded.tobytes()).decode('ascii')
             payload = json.dumps({"command": "read", "image": img_b64}) + "\n"
             
-            self.worker_proc.stdin.write(payload)
-            self.worker_proc.stdin.flush()
+            if self.worker_proc.stdin:
+                self.worker_proc.stdin.write(payload)
+                self.worker_proc.stdin.flush()
             
             try:
                 response_line = self._stdout_q.get(timeout=15.0)

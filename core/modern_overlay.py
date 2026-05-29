@@ -6,58 +6,65 @@ import queue
 import threading
 from collections import deque
 
-try:
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
     from PySide6.QtWidgets import QApplication, QWidget
     from PySide6.QtCore import Qt, QTimer, Signal, QObject, QRect, QRectF, QPoint
     from PySide6.QtGui import QPainter, QColor, QFont, QPainterPath, QPen, QFontMetrics
-except ImportError:
-    class _MissingPySide6:
-        def __init__(self, *args, **kwargs):
-            raise RuntimeError("PySide6 kullanilabilir degil.")
+else:
+    try:
+        from PySide6.QtWidgets import QApplication, QWidget
+        from PySide6.QtCore import Qt, QTimer, Signal, QObject, QRect, QRectF, QPoint
+        from PySide6.QtGui import QPainter, QColor, QFont, QPainterPath, QPen, QFontMetrics
+    except ImportError:
+        class _MissingPySide6:
+            def __init__(self, *args, **kwargs):
+                raise RuntimeError("PySide6 kullanilabilir degil.")
 
-    class _MissingQt:
-        FramelessWindowHint = 0
-        WindowStaysOnTopHint = 0
-        Tool = 0
-        WindowDoesNotAcceptFocus = 0
-        WA_TranslucentBackground = 0
-        LeftButton = 0
-        RightButton = 0
-        NoPen = 0
-        AlignCenter = 0
-        AlignLeft = 0
-        AlignTop = 0
-        TextWordWrap = 0
+        class _MissingQt:
+            FramelessWindowHint = 0
+            WindowStaysOnTopHint = 0
+            Tool = 0
+            WindowDoesNotAcceptFocus = 0
+            WA_TranslucentBackground = 0
+            LeftButton = 0
+            RightButton = 0
+            NoPen = 0
+            AlignCenter = 0
+            AlignLeft = 0
+            AlignTop = 0
+            TextWordWrap = 0
 
-    class _MissingSignal:
-        def __init__(self, *args, **kwargs):
+        class _MissingSignal:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def connect(self, *args, **kwargs):
+                pass
+
+            def emit(self, *args, **kwargs):
+                pass
+
+        class QObject:
             pass
 
-        def connect(self, *args, **kwargs):
+        class QWidget:
             pass
 
-        def emit(self, *args, **kwargs):
-            pass
-
-    class QObject:
-        pass
-
-    class QWidget:
-        pass
-
-    QApplication = _MissingPySide6
-    QTimer = _MissingPySide6
-    Signal = _MissingSignal
-    Qt = _MissingQt()
-    QRect = _MissingPySide6
-    QRectF = _MissingPySide6
-    QPoint = _MissingPySide6
-    QPainter = _MissingPySide6
-    QColor = _MissingPySide6
-    QFont = _MissingPySide6
-    QPainterPath = _MissingPySide6
-    QPen = _MissingPySide6
-    QFontMetrics = _MissingPySide6
+        QApplication = _MissingPySide6
+        QTimer = _MissingPySide6
+        Signal = _MissingSignal
+        Qt = _MissingQt()
+        QRect = _MissingPySide6
+        QRectF = _MissingPySide6
+        QPoint = _MissingPySide6
+        QPainter = _MissingPySide6
+        QColor = _MissingPySide6
+        QFont = _MissingPySide6
+        QPainterPath = _MissingPySide6
+        QPen = _MissingPySide6
+        QFontMetrics = _MissingPySide6
 
 import win32gui
 import win32con

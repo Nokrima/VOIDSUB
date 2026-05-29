@@ -6,24 +6,24 @@ import ctypes.wintypes
 import threading
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Any
 
 import cv2
 import numpy as np
 
 from core.errors import PREFIX_SYS, get_logger, log_error
 
-Direct3D11CaptureFramePool = None
-GraphicsCaptureAccess = None
-GraphicsCaptureAccessKind = None
-GraphicsCaptureItem = None
-GraphicsCaptureSession = None
-DirectXPixelFormat = None
-create_direct3d11_device_from_dxgi_device = None
-BitmapAlphaMode = None
-BitmapPixelFormat = None
-SoftwareBitmap = None
-Buffer = None
+Direct3D11CaptureFramePool: Any = None
+GraphicsCaptureAccess: Any = None
+GraphicsCaptureAccessKind: Any = None
+GraphicsCaptureItem: Any = None
+GraphicsCaptureSession: Any = None
+DirectXPixelFormat: Any = None
+create_direct3d11_device_from_dxgi_device: Any = None
+BitmapAlphaMode: Any = None
+BitmapPixelFormat: Any = None
+SoftwareBitmap: Any = None
+Buffer: Any = None
 
 D3D_DRIVER_TYPE_HARDWARE = 1
 D3D11_CREATE_DEVICE_BGRA_SUPPORT = 0x20
@@ -320,6 +320,8 @@ class ScreenCapturer:
         pool = None
         session = None
         try:
+            if GraphicsCaptureAccess is None or Direct3D11CaptureFramePool is None or GraphicsCaptureItem is None:
+                raise RuntimeError("WinRT sembolleri yuklenemedi (globals None).")
             winrt_device = self._create_winrt_device()
             access = GraphicsCaptureAccess.request_access_async(GraphicsCaptureAccessKind.BORDERLESS).get()
             if int(access) != 4:
@@ -433,6 +435,8 @@ class ScreenCapturer:
         hr = query_interface(unknown, ctypes.byref(IID_IDXGIDevice), ctypes.byref(dxgi_device))
         if hr != 0 or not dxgi_device.value:
             raise RuntimeError(f"IDXGIDevice alinamadi: 0x{hr & 0xFFFFFFFF:08X}")
+        if create_direct3d11_device_from_dxgi_device is None:
+            raise RuntimeError("create_direct3d11_device_from_dxgi_device is None")
         return create_direct3d11_device_from_dxgi_device(dxgi_device.value)
 
     def _virtual_bounds(self) -> dict[str, int]:
