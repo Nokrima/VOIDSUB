@@ -33,11 +33,57 @@ class EventRouter:
         self.validators["repair_engine"] = lambda p: isinstance(p.get("engine"), str) and bool(p["engine"])
         self.validators["download_offline_models"] = lambda p: isinstance(p.get("model"), str) or isinstance(p.get("models"), list)
         self.validators["remove_offline_models"] = lambda p: isinstance(p.get("model"), str)
-        self.validators["test_overlay_push"] = lambda p: isinstance(p, dict)
-        self.validators["save_settings"] = lambda p: isinstance(p, dict)
-        self.validators["save_overlay_settings"] = lambda p: isinstance(p, dict)
+        self.validators["test_overlay_push"] = lambda p: isinstance(p, dict) and isinstance(p.get("text", ""), str)
+        self.validators["save_settings"] = self._validate_save_settings
+        self.validators["save_overlay_settings"] = self._validate_save_overlay_settings
         self.validators["debug_preview_request"] = lambda p: isinstance(p, dict)
         self.validators["calibration_preview_request"] = lambda p: isinstance(p, dict)
+
+    # Field types for save_settings — only validated when the key is present.
+    _SETTINGS_FIELD_TYPES: dict[str, type | tuple] = {
+        "performance_tier": str,
+        "ocr_scene_mode": str,
+        "src_language": str,
+        "tgt_language": str,
+        "translation_engine": str,
+        "offline_model_key": str,
+        "active_calibration_profile_id": (str, type(None)),
+        "reading_speed_cps": (int, float),
+        "ocr_filters_enabled": bool,
+        "raw_translation_flow_enabled": bool,
+        "shortcut_start": (str, type(None)),
+        "shortcut_stop": (str, type(None)),
+    }
+
+    def _validate_save_settings(self, payload: dict) -> bool:
+        if not isinstance(payload, dict):
+            return False
+        for key, expected in self._SETTINGS_FIELD_TYPES.items():
+            if key in payload and not isinstance(payload[key], expected):
+                return False
+        return True
+
+    # Required fields and their types for save_overlay_settings
+    _OVERLAY_FIELD_TYPES: dict[str, type | tuple] = {
+        "font_family": str,
+        "font_size": (int, float),
+        "font_color": str,
+        "font_bold": bool,
+        "alpha": (int, float),
+        "bg_visible": bool,
+    }
+
+    def _validate_save_overlay_settings(self, payload: dict) -> bool:
+        if not isinstance(payload, dict):
+            return False
+        for key, expected in self._OVERLAY_FIELD_TYPES.items():
+            if key in payload and not isinstance(payload[key], expected):
+                return False
+        # font_color must be a hex string if present
+        color = payload.get("font_color")
+        if color is not None and not (isinstance(color, str) and color.startswith("#") and len(color) in (4, 7, 9)):
+            return False
+        return True
 
     def _validate_region(self, payload: dict) -> bool:
         region = payload.get("region")
