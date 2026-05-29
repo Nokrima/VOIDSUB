@@ -1,4 +1,4 @@
-import pytest
+import pytest  # pyright: ignore[reportMissingImports]
 import time
 from pathlib import Path
 from unittest.mock import MagicMock

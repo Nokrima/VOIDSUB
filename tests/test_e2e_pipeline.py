@@ -1,6 +1,6 @@
 import logging
 logging.basicConfig(level=logging.DEBUG)
-import pytest
+import pytest  # pyright: ignore[reportMissingImports]
 import asyncio
 from unittest.mock import MagicMock, AsyncMock
 from core.processor.pipeline import TranslationPipeline

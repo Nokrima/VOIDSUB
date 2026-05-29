@@ -1,4 +1,4 @@
-import pytest
+import pytest  # pyright: ignore[reportMissingImports]
 import zipfile
 import time
 from unittest.mock import MagicMock

@@ -110,7 +110,7 @@ class EasyOCREngine(OCREngine):
     def _start_native_mode(self) -> bool:
         try:
             import torch
-            import easyocr
+            import easyocr  # pyright: ignore[reportMissingImports]
             self.use_gpu = torch.cuda.is_available()
             self.logger.info(f"[{PREFIX_OCR}-032] EasyOCR Native {self.lang_list} dilleriyle yükleniyor (GPU: {self.use_gpu})")
             self.reader = easyocr.Reader(self.lang_list, gpu=self.use_gpu)
@@ -240,7 +240,7 @@ class EasyOCREngine(OCREngine):
             return status
             
         try:
-            import easyocr  # noqa: F401
+            import easyocr  # pyright: ignore[reportMissingImports]  # noqa: F401
             status["available"] = True
             if not self.use_gpu:
                 status["reason"] = "GPU yok. CPU modu aşırı yavaş çalışacaktır."

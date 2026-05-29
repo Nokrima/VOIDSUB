@@ -1,4 +1,4 @@
-import pytest
+import pytest  # pyright: ignore[reportMissingImports]
 from unittest.mock import patch, MagicMock
 from core.bridge import BridgeServer
 from core.capture import ScreenCapturer

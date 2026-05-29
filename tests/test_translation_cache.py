@@ -1,4 +1,4 @@
-import pytest
+import pytest  # pyright: ignore[reportMissingImports]
 from core.translation.cache import TranslationCache
 
 def test_translation_cache():

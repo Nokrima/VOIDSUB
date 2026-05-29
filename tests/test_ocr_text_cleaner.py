@@ -1,4 +1,4 @@
-import pytest
+import pytest  # pyright: ignore[reportMissingImports]
 from core.processor.ocr_text_cleaner import clean_ocr_source_detailed
 
 def test_clean_ocr_source_detailed():

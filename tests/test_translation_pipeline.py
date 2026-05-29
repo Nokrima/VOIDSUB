@@ -1,4 +1,4 @@
-import pytest
+import pytest  # pyright: ignore[reportMissingImports]
 import asyncio
 from unittest.mock import MagicMock
 from core.processor.pipeline import TranslationPipeline

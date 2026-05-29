@@ -1,4 +1,4 @@
-import pytest
+import pytest  # pyright: ignore[reportMissingImports]
 from core.processor.junk_filter import JunkFilter
 
 def test_is_junk():
