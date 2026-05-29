@@ -62,7 +62,6 @@ class TranslationQueueService:
                     )
                 else:
                     translated_text, source = await loop.run_in_executor(None, self._translate_text, text)
-                    print(f"DEBUG: translated_text={translated_text}")
                 translation_duration_ms = (time.perf_counter() - translation_started) * 1000
                 self.p.logger.info(f"[OCR-036] translate_out ({source}): {_clip_log_text(translated_text)}")
                 self.p.overlay_publisher._log_trl(

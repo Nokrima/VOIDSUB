@@ -85,3 +85,5 @@ async def test_e2e_pipeline_loop(caplog):
     assert payload["original_text"] == "Detected Hello"
     assert payload["translated_text"] == "Merhaba çeviri"
     assert payload["translation_source"] == "google"
+    assert "correlation_id" in payload
+    assert payload["correlation_id"] != ""

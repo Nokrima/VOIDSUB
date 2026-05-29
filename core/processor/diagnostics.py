@@ -85,8 +85,16 @@ class OCRDiagnostics:
             target.chmod(0o700) # Sadece gecerli kullanici (Gizlilik)
         except Exception:
             pass
-        cv2.imwrite(str(target / "frame.png"), frame)
-        cv2.imwrite(str(target / "processed.png"), processed)
+        frame_path = target / "frame.png"
+        frame_tmp = frame_path.with_suffix(".png.tmp")
+        cv2.imwrite(str(frame_tmp), frame)
+        os.replace(frame_tmp, frame_path)
+        
+        processed_path = target / "processed.png"
+        processed_tmp = processed_path.with_suffix(".png.tmp")
+        cv2.imwrite(str(processed_tmp), processed)
+        os.replace(processed_tmp, processed_path)
+
         payload_path = target / "payload.json"
         tmp_path = payload_path.with_suffix(".json.tmp")
         with open(tmp_path, "w", encoding="utf-8") as handle:

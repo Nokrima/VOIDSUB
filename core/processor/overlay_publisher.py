@@ -174,7 +174,7 @@ class OverlayPublisherService:
                     "translated_text": cached_translation,
                     "translation_source": f"{self.p.translation_engine}-cache",
                     "timestamp": time.time(),
-                    "correlation_id": correlation_id or getattr(self, "current_correlation_id", ""),
+                    "correlation_id": correlation_id or getattr(self.p, "current_correlation_id", ""),
                 },
             )
             return
@@ -203,7 +203,7 @@ class OverlayPublisherService:
                 queued_at_monotonic,
                 frame_started_monotonic or queued_at_monotonic,
                 ocr_duration_ms,
-                correlation_id or getattr(self, "current_correlation_id", ""),
+                correlation_id or getattr(self.p, "current_correlation_id", ""),
             )
         )
         if self.p._active_translation_task is None or self.p._active_translation_task.done():
