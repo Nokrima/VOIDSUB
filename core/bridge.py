@@ -449,9 +449,9 @@ class BridgeServer:
                     data = json.loads(message)
                     event = data.get("event")
                     payload = data.get("data", {})
-                    # Hassas event maskeleme
-                    safe_payload = "*** [REDACTED] ***" if event in ("update_settings", "save_settings", "ocr_result", "translation_result") else _clip_log_text(json.dumps(payload, ensure_ascii=False), limit=200)
-                    
+                    from core.processor.utils import redact_sensitive_fields
+                    redacted = redact_sensitive_fields(payload)
+                    safe_payload = _clip_log_text(json.dumps(redacted, ensure_ascii=False), limit=200)
                     log_event(
                         PREFIX_SYS,
                         "022",

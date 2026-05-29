@@ -18,3 +18,22 @@ def _quick_normalize(text: str) -> str:
 
 def _strip_speaker(text: str) -> str:
     return re.sub(r"^[A-ZÇĞİÖŞÜa-zçğıöşü\.\•\s]*:\s*", "", str(text or "").strip())
+
+def redact_sensitive_fields(payload: dict | str) -> dict | str:
+    import sys
+    if not getattr(sys, 'frozen', False) or logger.level <= logging.DEBUG:
+        return payload
+    
+    if isinstance(payload, str):
+        return "*** [REDACTED] ***"
+    
+    if isinstance(payload, dict):
+        redacted_payload = payload.copy()
+        sensitive_keys = {"original_text", "translated_text", "raw_texts", "cache_key", "source_text", "text", "selected"}
+        for k, v in redacted_payload.items():
+            if k in sensitive_keys and v:
+                redacted_payload[k] = "*** [REDACTED] ***"
+            elif isinstance(v, dict):
+                redacted_payload[k] = redact_sensitive_fields(v)
+        return redacted_payload
+    return payload
