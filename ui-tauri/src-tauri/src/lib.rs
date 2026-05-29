@@ -537,12 +537,30 @@ pub fn run() {
                     .join("dist");
 
                 let python_exe = base_dir.join("python_embedded").join("python.exe");
-                let app_dir = base_dir.join("python_embedded").join("app");
-                let script_name = "main.pyc";
+                let mut app_dir = base_dir.join("python_embedded").join("app");
+                let mut script_name = "main.pyc".to_string();
+
+                #[cfg(debug_assertions)]
+                {
+                    if !app_dir.join(&script_name).exists() {
+                        // Fallback to repo root main.py
+                        app_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                            .join("..")
+                            .join("..");
+                        script_name = "main.py".to_string();
+                    }
+                }
+
+                log::info!("[SPAWN] python_exe: {:?}", python_exe);
+                log::info!("[SPAWN] python_exe exists: {}", python_exe.exists());
+                log::info!("[SPAWN] app_dir: {:?}", app_dir);
+                log::info!("[SPAWN] app_dir exists: {}", app_dir.exists());
+                log::info!("[SPAWN] script path: {:?}", app_dir.join(&script_name));
+                log::info!("[SPAWN] script exists: {}", app_dir.join(&script_name).exists());
 
                 let mut cmd = Command::new(&python_exe);
                 cmd.current_dir(&app_dir)
-                    .arg(script_name)
+                    .arg(&script_name)
                     .stdout(Stdio::piped())
                     .stderr(Stdio::piped());
 
