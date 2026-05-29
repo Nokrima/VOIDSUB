@@ -18,7 +18,7 @@ class TranslationQueueMixin:
                 skipped = self._pending_translations.popleft()
                 self._log_trl("015", f"Queue drain: skipped request_id={skipped[1]}")
                 
-            text, request_id, queued_at_monotonic, frame_started_monotonic, ocr_duration_ms = self._pending_translations.popleft()
+            text, request_id, queued_at_monotonic, frame_started_monotonic, ocr_duration_ms, correlation_id = self._pending_translations.popleft()
             loop = asyncio.get_running_loop()
             try:
                 self._active_translation_source = text
@@ -30,6 +30,7 @@ class TranslationQueueMixin:
                         f"Translation requested: request_id={request_id}, text={_clip_log_text(text)}, "
                         f"queue_wait_ms={queue_wait_ms:.1f}"
                     ),
+                    correlation_id=correlation_id,
                 )
                 translation_started = time.perf_counter()
                 if self.raw_translation_flow_enabled:
@@ -50,6 +51,7 @@ class TranslationQueueMixin:
                             f"offline_source={offline_result[1]!r}, google_text={_clip_log_text(google_result[0])}, "
                             f"offline_text={_clip_log_text(offline_result[0])}"
                         ),
+                        correlation_id=correlation_id,
                     )
                     translated_text, source = self._select_translation_result(
                         google_result=google_result,
@@ -65,6 +67,7 @@ class TranslationQueueMixin:
                         f"Translation result: request_id={request_id}, source={source}, "
                         f"duration_ms={translation_duration_ms:.1f}, text={_clip_log_text(translated_text)}"
                     ),
+                    correlation_id=correlation_id,
                 )
             except Exception as exc:
                 self.logger.error(f"[{PREFIX_SYS}-046] [Asenkron Çeviri Görevi] -> GÖREV HATASI | Detay: {exc}")
@@ -82,6 +85,7 @@ class TranslationQueueMixin:
                         f"Output filter: decision=BLOCKED, request_id={request_id}, source={source}, "
                         f"running={self.is_running}, translated_text={_clip_log_text(translated_text)}, reason=empty_or_error"
                     ),
+                    correlation_id=correlation_id,
                 )
                 if source == "error" and self.is_running:
                     from core.errors import emit_bridge_event
@@ -111,6 +115,7 @@ class TranslationQueueMixin:
                         f"Output filter: decision=BLOCKED, request_id={request_id}, source={source}, "
                         f"reason=same_last, cache_key={_clip_log_text(cache_key)}, translated_text={_clip_log_text(translated_text)}"
                     ),
+                    correlation_id=correlation_id,
                 )
                 self._active_translation_source = ""
                 continue
@@ -120,6 +125,7 @@ class TranslationQueueMixin:
                     f"Output filter: decision=PASSED, request_id={request_id}, source={source}, "
                     f"translated_text={_clip_log_text(translated_text)}"
                 ),
+                correlation_id=correlation_id,
             )
             if self.raw_translation_flow_enabled:
                 self._log_trl(
@@ -128,6 +134,7 @@ class TranslationQueueMixin:
                         f"Raw flow output bypass: request_id={request_id}, source={source}, "
                         "translated_repeat_filter=guarded, overlay_chunking=single"
                     ),
+                    correlation_id=correlation_id,
                 )
             self._last_translated_text = self._normalize_translated_text(translated_text)
             self._last_translated_emit_time = time.monotonic()
@@ -140,12 +147,14 @@ class TranslationQueueMixin:
                     f"Overlay update: source={source}, original_text={_clip_log_text(text)}, "
                     f"translated_text={_clip_log_text(translated_text)}, display_mode=single, chunk_count=1"
                 ),
+                correlation_id=correlation_id,
             )
             self._log_ui(
                 "002",
                 f"Overlay chunk: index=1/1, text={_clip_log_text(translated_text)}, display_duration_ms={frame_to_overlay_ms:.1f}",
+                correlation_id=correlation_id,
             )
-            self._log_perf(frame_to_overlay_ms, ocr_duration_ms, translation_duration_ms)
+            self._log_perf(frame_to_overlay_ms, ocr_duration_ms, translation_duration_ms, correlation_id=correlation_id)
             self.bridge.send(
                 "new_translation",
                 {
@@ -154,6 +163,7 @@ class TranslationQueueMixin:
                     "translated_text": translated_text,
                     "translation_source": source,
                     "timestamp": time.time(),
+                    "correlation_id": correlation_id,
                 },
             )
             self._active_translation_source = ""

@@ -13,7 +13,7 @@ async def test_pipeline_mixin_smoke():
     # Simulate a translation being queued
     pipeline._translation_request_id = 1
     pipeline._pending_translations.append(
-        ("Hello world", 1, 0.0, 0.0, 0.0)
+        ("Hello world", 1, 0.0, 0.0, 0.0, "test-cid-123")
     )
     
     # Mock translation engine methods to prevent real network calls

@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from core.processor.utils import IPipelineState
 
 class OverlayPublisherMixin:
-    def _emit_translation(self: "IPipelineState", stabilized_text: str, *, frame_started_monotonic: float | None = None, ocr_duration_ms: float = 0.0) -> None:
+    def _emit_translation(self: "IPipelineState", stabilized_text: str, *, frame_started_monotonic: float | None = None, ocr_duration_ms: float = 0.0, correlation_id: str = "") -> None:
         if not stabilized_text:
             return
         if self.raw_translation_flow_enabled:
@@ -43,6 +43,7 @@ class OverlayPublisherMixin:
                     queued_at_monotonic,
                     frame_started_monotonic or queued_at_monotonic,
                     ocr_duration_ms,
+                    correlation_id or getattr(self, "current_correlation_id", ""),
                 )
             )
             self._last_raw_source_text = self._normalize_translated_text(stabilized_text)
@@ -170,6 +171,7 @@ class OverlayPublisherMixin:
                     "translated_text": cached_translation,
                     "translation_source": f"{self.translation_engine}-cache",
                     "timestamp": time.time(),
+                    "correlation_id": correlation_id or getattr(self, "current_correlation_id", ""),
                 },
             )
             return
@@ -197,6 +199,7 @@ class OverlayPublisherMixin:
                 queued_at_monotonic,
                 frame_started_monotonic or queued_at_monotonic,
                 ocr_duration_ms,
+                correlation_id or getattr(self, "current_correlation_id", ""),
             )
         )
         if self._active_translation_task is None or self._active_translation_task.done():
@@ -225,16 +228,16 @@ class OverlayPublisherMixin:
             },
         )
 
-    def _log_ui(self: "IPipelineState", code: str, message: str) -> None:
-        self._log_debug("SYS", code, message)
+    def _log_ui(self: "IPipelineState", code: str, message: str, correlation_id: str = "") -> None:
+        self._log_debug("SYS", code, message, correlation_id=correlation_id)
 
-    def _log_trl(self: "IPipelineState", code: str, message: str) -> None:
-        self._log_debug("TRL", code, message)
+    def _log_trl(self: "IPipelineState", code: str, message: str, correlation_id: str = "") -> None:
+        self._log_debug("TRL", code, message, correlation_id=correlation_id)
 
-    def _log_ocr(self: "IPipelineState", code: str, message: str) -> None:
-        self._log_debug("OCR", code, message)
+    def _log_ocr(self: "IPipelineState", code: str, message: str, correlation_id: str = "") -> None:
+        self._log_debug("OCR", code, message, correlation_id=correlation_id)
 
-    def _log_perf(self: "IPipelineState", frame_to_overlay_ms: float, ocr_ms: float, translation_ms: float) -> None:
+    def _log_perf(self: "IPipelineState", frame_to_overlay_ms: float, ocr_ms: float, translation_ms: float, correlation_id: str = "") -> None:
         overhead_ms = max(frame_to_overlay_ms - ocr_ms - translation_ms, 0.0)
         self._last_perf_stats = {
             "frame_to_overlay_ms": float(frame_to_overlay_ms),
@@ -250,6 +253,7 @@ class OverlayPublisherMixin:
                 f"ocr={ocr_ms:.1f}ms, translation={translation_ms:.1f}ms, "
                 f"overhead={overhead_ms:.1f}ms"
             ),
+            correlation_id=correlation_id,
         )
 
     def _log_translation_policy(self: "IPipelineState", tier: dict) -> None:

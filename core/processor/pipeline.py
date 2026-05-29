@@ -109,9 +109,11 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
         self._latest_capture_probe: dict | None = None
         self.performance_monitor = PerformanceMonitor(bridge=bridge, pipeline=self)
         self.source_state = SourceStateMachine(hold_window_ms=int(self._profile_value("source_family_hold_ms", 1600)))
+        self.current_correlation_id = ""
         self._configure_ocr_source_profiles()
 
-    def _log_debug(self, prefix: str, code: str, message: str) -> None:
+    def _log_debug(self, prefix: str, code: str, message: str, correlation_id: str = "") -> None:
+        cid = correlation_id or getattr(self, "current_correlation_id", "")
         if getattr(sys, 'frozen', False):
             # Maskeleme regex'i: text='...', translated_text="..." gibi alanları bulur ve içini gizler.
             message = re.sub(
@@ -119,7 +121,8 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
                 r'\1=\2*** [REDACTED] ***\2',
                 message
             )
-        self.logger.debug(f"[{prefix}-{code}] {message}")
+        cid_str = f" [CID:{cid}]" if cid else ""
+        self.logger.debug(f"[{prefix}-{code}]{cid_str} {message}")
 
 
 
@@ -207,6 +210,7 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
                         continue
 
                     frame_id, frame, resolved_region, capture_probe = snapshot
+                    self.current_correlation_id = f"{frame_id}-{uuid.uuid4().hex[:8]}"
                     frame_started_monotonic = float((capture_probe or {}).get("captured_monotonic", time.monotonic()))
                     if frame_id <= self._processed_frame_id:
                         del frame
