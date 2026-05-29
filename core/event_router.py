@@ -19,10 +19,34 @@ class EventRouter:
     def __init__(self, bridge: Any):
         self.bridge = bridge
         self.routes = {}
+        self.validators = {}
         self._register_routes()
+        self._register_validators()
 
     def route(self, event_name: str, handler: callable):
         self.routes[event_name] = handler
+
+    def _register_validators(self):
+        self.validators["update_region"] = self._validate_region
+        self.validators["set_runtime_region"] = self._validate_region
+        self.validators["change_engine"] = lambda p: isinstance(p.get("engine"), str) and bool(p["engine"])
+        self.validators["repair_engine"] = lambda p: isinstance(p.get("engine"), str) and bool(p["engine"])
+        self.validators["download_offline_models"] = lambda p: isinstance(p.get("model"), str) or isinstance(p.get("models"), list)
+        self.validators["remove_offline_models"] = lambda p: isinstance(p.get("model"), str)
+        self.validators["test_overlay_push"] = lambda p: isinstance(p, dict)
+        self.validators["save_settings"] = lambda p: isinstance(p, dict)
+        self.validators["save_overlay_settings"] = lambda p: isinstance(p, dict)
+        self.validators["debug_preview_request"] = lambda p: isinstance(p, dict)
+        self.validators["calibration_preview_request"] = lambda p: isinstance(p, dict)
+
+    def _validate_region(self, payload: dict) -> bool:
+        region = payload.get("region")
+        if not isinstance(region, dict):
+            return False
+        for k in ("top", "left", "width", "height"):
+            if k not in region or not isinstance(region[k], (int, float)):
+                return False
+        return True
 
     def _register_routes(self):
         self.route("start_translation", self.handle_start_translation)
@@ -68,6 +92,19 @@ class EventRouter:
         handler = self.routes.get(event)
         if not handler:
             return
+            
+        validator = self.validators.get(event)
+        if validator:
+            try:
+                if not validator(payload):
+                    from core.errors import log_error
+                    log_error(PREFIX_SYS, "050", f"Event validation failed: {event}")
+                    return
+            except Exception as e:
+                from core.errors import log_error
+                log_error(PREFIX_SYS, "050", f"Event validation error: {event} - {e}", str(e))
+                return
+                
         if asyncio.iscoroutinefunction(handler):
             await handler(payload)
         else:
