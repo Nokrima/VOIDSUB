@@ -29,4 +29,26 @@ export default defineConfig(async () => ({
       ignored: ["**/src-tauri/**"],
     },
   },
+  build: {
+    // Raise the warning threshold slightly and split into meaningful vendor chunks
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks: (id: string) => {
+          // React core
+          if (id.includes("node_modules/react") || id.includes("node_modules/react-dom")) {
+            return "vendor-react";
+          }
+          // Animation library
+          if (id.includes("node_modules/framer-motion")) {
+            return "vendor-framer";
+          }
+          // Tauri API + plugins
+          if (id.includes("node_modules/@tauri-apps")) {
+            return "vendor-tauri";
+          }
+        },
+      },
+    },
+  },
 }));
