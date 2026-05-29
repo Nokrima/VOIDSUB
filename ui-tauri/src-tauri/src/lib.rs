@@ -602,15 +602,30 @@ pub fn run() {
                                     std::mem::zeroed();
                                 info.basic_limit_information.limit_flags =
                                     JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-                                SetInformationJobObject(
+                                let set_info_res = SetInformationJobObject(
                                     job,
                                     JOB_OBJECT_EXTENDED_LIMIT_INFORMATION,
                                     &info as *const _ as *const std::ffi::c_void,
                                     std::mem::size_of_val(&info) as u32,
                                 );
-                                AssignProcessToJobObject(job, child.as_raw_handle() as HANDLE);
-                                let state: tauri::State<'_, BackendState> = app_handle.state();
-                                *state.job_handle.lock().unwrap() = Some(job as isize);
+                                if set_info_res == 0 {
+                                    log::error!("SetInformationJobObject basarisiz oldu.");
+                                }
+                                
+                                let assign_res = AssignProcessToJobObject(job, child.as_raw_handle() as HANDLE);
+                                if assign_res == 0 {
+                                    log::error!("AssignProcessToJobObject basarisiz oldu.");
+                                }
+
+                                if set_info_res != 0 && assign_res != 0 {
+                                    let state: tauri::State<'_, BackendState> = app_handle.state();
+                                    *state.job_handle.lock().unwrap() = Some(job as isize);
+                                } else {
+                                    extern "system" {
+                                        fn CloseHandle(hObject: HANDLE) -> BOOL;
+                                    }
+                                    CloseHandle(job);
+                                }
                             }
                         }
                     }

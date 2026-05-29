@@ -23,6 +23,7 @@ class OCRDiagnostics:
         self.root = Path(DIAGNOSTICS_DIR)
         self.max_folders = 50
         self.max_age_days = 7
+        self.max_mb = 100 # Maximum 100MB
         if self.enabled:
             self._cleanup_old_diagnostics()
 
@@ -50,11 +51,29 @@ class OCRDiagnostics:
         if len(valid_dirs) > self.max_folders:
             valid_dirs.sort(key=lambda x: x.stat().st_mtime)
             to_delete = valid_dirs[:-self.max_folders]
+            valid_dirs = valid_dirs[-self.max_folders:]
             for d in to_delete:
                 try:
                     shutil.rmtree(d)
                 except Exception as e:
                     self.logger.error(f"[DIAG] Klasor silinirken hata: {e}")
+
+        # Boyut Limiti Temizligi
+        def get_dir_size(path: Path) -> int:
+            return sum(f.stat().st_size for f in path.rglob('*') if f.is_file())
+
+        valid_dirs.sort(key=lambda x: x.stat().st_mtime)
+        total_size = sum(get_dir_size(d) for d in valid_dirs)
+        max_bytes = self.max_mb * 1024 * 1024
+
+        while total_size > max_bytes and valid_dirs:
+            oldest = valid_dirs.pop(0)
+            try:
+                size = get_dir_size(oldest)
+                shutil.rmtree(oldest)
+                total_size -= size
+            except Exception as e:
+                self.logger.error(f"[DIAG] Klasor silinirken hata: {e}")
 
     def record(self, phase: str, engine: str, scene_mode: str, frame: np.ndarray, processed: np.ndarray, text: str, score: int, metadata: dict[str, Any] | None = None) -> None:
         if not self.enabled:
