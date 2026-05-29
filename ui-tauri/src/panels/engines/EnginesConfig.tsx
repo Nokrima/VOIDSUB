@@ -1,7 +1,4 @@
-import type { HardwareResult, AppSettingsPayload, TranslationStatePayload, OcrFrameStatPayload, OfflineModelDetails, OfflineStatusPayload, OfflineModelAction, EngineHardwareInfo, HealthCheckItem, EngineModelItem, PerfEstimateItem, OfflineLangModelItem, MotorDurumuProps, EngineInfoKey } from './EnginesTypes';
-import {EngineInfoDock} from './components/EngineInfoDock';
-import {MotorDurumu} from './components/MotorDurumu';
-
+import { EngineInfoKey } from './EnginesTypes';
 export const colors = {
   accent: '#7dd3fc',
   success: '#86efac',
@@ -10,16 +7,14 @@ export const colors = {
   muted: 'rgba(159,183,207,0.6)',
   textPrimary: '#fff',
   bgGlass: 'rgba(255,255,255,0.03)',
-  borderGlass: '1px solid rgba(255,255,255,0.05)',
-};
+  borderGlass: '1px solid rgba(255,255,255,0.05)' };
 
 
 export const TS = {
   boxTitle: { fontSize: 11, textTransform: 'uppercase' as const, letterSpacing: '0.14em', fontWeight: 700, color: 'rgba(191,215,242,0.72)' },
   pageTitle: { fontSize: 11, textTransform: 'uppercase' as const, letterSpacing: '0.18em', fontWeight: 700, color: 'rgba(125,211,252,0.55)', margin: 0 },
   pageSub: { fontSize: 13, fontWeight: 400, color: 'rgba(159,183,207,0.55)', marginTop: 4 },
-  primary: { color: colors.textPrimary, fontWeight: 600, fontSize: 13 },
-};
+  primary: { color: colors.textPrimary, fontWeight: 600, fontSize: 13 } };
 
 
 export const G = ({ p, stroke = colors.accent }: { p: string; stroke?: string }) => (

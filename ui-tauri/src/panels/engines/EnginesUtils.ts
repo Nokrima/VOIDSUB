@@ -1,8 +1,5 @@
-import {getEventHistory} from '../../bridge/websocket';
-import type { HardwareResult, AppSettingsPayload, TranslationStatePayload, OcrFrameStatPayload, OfflineModelDetails, OfflineStatusPayload, OfflineModelAction, EngineHardwareInfo, HealthCheckItem, EngineModelItem, PerfEstimateItem, OfflineLangModelItem, MotorDurumuProps, EngineInfoKey } from './EnginesTypes';
-import {EngineInfoDock} from './components/EngineInfoDock';
-import {MotorDurumu} from './components/MotorDurumu';
-
+import { getEventHistory } from '../../bridge/websocket';
+import { HardwareResult, AppSettingsPayload, TranslationStatePayload, OcrFrameStatPayload, OfflineStatusPayload, OfflineModelAction } from './EnginesTypes';
 export const getLast = <T,>(items: T[]) => (items.length > 0 ? items[items.length - 1] : undefined);
 
 export const lastHardware = () => (getLast(getEventHistory('hardware_result')) as HardwareResult | undefined) ?? null;
@@ -38,8 +35,7 @@ export const normalizeOfflineStatus = (status: OfflineStatusPayload | null): Off
     models_ready: normalizedModelsReady,
     active_model: activeModel,
     active_install_model: activeModel,
-    active_action: status.active_action ?? inferredAction,
-  };
+    active_action: status.active_action ?? inferredAction };
 };
 
 
@@ -55,8 +51,7 @@ export const buildOfflineActionMap = (status: OfflineStatusPayload | null): Reco
           progress: Math.max(0, Math.min(100, Number(details.percent ?? 0))),
           detail: 'İndirme duraklatıldı.',
           stage: 'paused',
-          bytes_label: details.bytes_label || '',
-        };
+          bytes_label: details.bytes_label || '' };
       }
     }
   }
@@ -70,8 +65,7 @@ export const buildOfflineActionMap = (status: OfflineStatusPayload | null): Reco
           progress: Math.max(0, Math.min(100, Number(details.percent ?? 0))),
           detail: 'Sırada bekliyor...',
           stage: 'queued',
-          bytes_label: details.bytes_label || '',
-        };
+          bytes_label: details.bytes_label || '' };
       }
     });
   }
@@ -82,8 +76,7 @@ export const buildOfflineActionMap = (status: OfflineStatusPayload | null): Reco
       progress: Math.max(0, Math.min(100, Number(status.percent ?? 0))),
       detail: status.detail || (status.active_action === 'remove' ? 'Kaldırılıyor...' : 'Kurulum sürüyor...'),
       stage: status.state || (status.active_action === 'remove' ? 'remove' : 'downloading'),
-      bytes_label: status.bytes_label || '',
-    };
+      bytes_label: status.bytes_label || '' };
   }
   
   return map;

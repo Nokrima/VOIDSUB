@@ -1,6 +1,6 @@
-import type { CalibrationRuntimeValues } from '../../config/calibrationPresets';
-import type { HoverState, CalibrationPreviewResult, CalibrationControlKey, CalibrationControlConfig, ConceptCalibrationSnapshot, CalibrationValues, ConceptCalibrationDraftProfile, CalibrationInfoKey, CalibrationInfoContent, ImprovementMode, CalibrationAreaMode } from './CalibrationTypes';
-import {calibrationControls} from './CalibrationConfig';
+import { CalibrationRuntimeValues } from '../../config/calibrationPresets';
+import { CalibrationControlKey, CalibrationControlConfig, ConceptCalibrationSnapshot, CalibrationValues } from './CalibrationTypes';
+import { calibrationControls } from './CalibrationConfig';
 
 export const conceptValuesFromRuntime = (values: Partial<CalibrationRuntimeValues>): CalibrationValues => ({
   sensitivity: Number(values.quality_threshold ?? calibrationControls.sensitivity.initial),

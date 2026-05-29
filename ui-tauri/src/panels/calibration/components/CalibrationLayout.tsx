@@ -1,15 +1,12 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import {ValueRail} from '../../../components/ValueRail';
-import type { CalibrationRuntimeValues } from '../../../config/calibrationPresets';
-import type { HoverState, CalibrationPreviewResult, CalibrationControlKey, CalibrationControlConfig, ConceptCalibrationSnapshot, CalibrationValues, ConceptCalibrationDraftProfile, CalibrationInfoKey, CalibrationInfoContent, ImprovementMode, CalibrationAreaMode } from '../CalibrationTypes';
-import {labelStyle, shellStyle} from '../CalibrationConfig';
-import {qualityColor, qualityLabel} from '../CalibrationUtils';
-import {LayerGlyph} from './BaseBlocks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { CalibrationInfoContent, CalibrationAreaMode } from '../CalibrationTypes';
+import { labelStyle, shellStyle } from '../CalibrationConfig';
+import { qualityColor, qualityLabel } from '../CalibrationUtils';
+import { LayerGlyph } from './BaseBlocks';
 
 export const InfoButton = ({
   enabled,
-  onToggle,
-}: {
+  onToggle }: {
   enabled: boolean;
   onToggle: () => void;
 }) => (
@@ -37,8 +34,7 @@ export const InfoButton = ({
       justifyContent: 'center',
       opacity: enabled ? 1 : 0.78,
       filter: enabled ? 'drop-shadow(0 0 8px rgba(56,189,248,0.34))' : 'none',
-      transition: 'color 180ms ease, opacity 180ms ease, filter 180ms ease',
-    }}
+      transition: 'color 180ms ease, opacity 180ms ease, filter 180ms ease' }}
   >
     <LayerGlyph path="M12 17v-6M12 8h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
   </button>
@@ -49,8 +45,7 @@ export const CalibrationHeaderIconButton = ({
   label,
   icon,
   tone,
-  onClick,
-}: {
+  onClick }: {
   label: string;
   icon: string;
   tone: string;
@@ -87,8 +82,7 @@ export const CalibrationHeaderIconButton = ({
         opacity: prs ? 0.6 : (hov ? 1 : 0.82),
         transform: prs ? 'scale(0.90)' : 'scale(1)',
         filter: hov && !prs ? `drop-shadow(0 0 8px ${tone})` : 'none',
-        transition: 'all 120ms ease',
-      }}
+        transition: 'all 120ms ease' }}
     >
       <LayerGlyph path={icon} />
     </button>
@@ -102,8 +96,7 @@ export const CalibrationHeaderActions = ({
   onSave,
   onDelete,
   onReset,
-  onToggleInfo,
-}: {
+  onToggleInfo }: {
   profileVisible: boolean;
   infoEnabled: boolean;
   onSave: () => void;
@@ -145,8 +138,7 @@ export const CalibrationHeaderActions = ({
           overflow: 'hidden',
           pointerEvents: actionsVisible ? 'auto' : 'none',
           transition: 'opacity 160ms ease, transform 160ms ease, filter 160ms ease, clip-path 160ms ease',
-          willChange: 'opacity, transform, filter, clip-path',
-        }}
+          willChange: 'opacity, transform, filter, clip-path' }}
       >
         {actionsMounted ? (
           <>
@@ -181,8 +173,7 @@ export const CalibrationAreaBlock = ({
   translationActive,
   hasCalibrationRegion,
   qualityScore,
-  qualityText,
-}: {
+  qualityText }: {
   translationActive: boolean;
   hasCalibrationRegion: boolean;
   qualityScore: number | null;
@@ -243,16 +234,14 @@ export const CalibrationAreaBlock = ({
         boxShadow: hovered
           ? 'inset 0 0 0 1px rgba(125,211,252,0.28), inset 0 1px 0 rgba(255,255,255,0.05), 0 0 18px rgba(125,211,252,0.06)'
           : 'inset 0 1px 0 rgba(255,255,255,0.03)',
-        transition: 'box-shadow 180ms ease',
-      }}
+        transition: 'box-shadow 180ms ease' }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, height: 24, minHeight: 24 }}>
         <div
           style={{
             ...labelStyle,
             opacity: contentVisible ? 1 : 0,
-            transition: 'opacity 160ms ease',
-          }}
+            transition: 'opacity 160ms ease' }}
         >
           {headerLabel}
         </div>
@@ -261,8 +250,7 @@ export const CalibrationAreaBlock = ({
             color: 'rgba(172,214,255,0.82)',
             opacity: contentVisible ? 1 : 0,
             filter: hovered ? 'drop-shadow(0 0 6px rgba(125,211,252,0.42))' : 'none',
-            transition: 'opacity 160ms ease, filter 180ms ease',
-          }}
+            transition: 'opacity 160ms ease, filter 180ms ease' }}
         >
           <LayerGlyph path={headerIcon} />
         </div>
@@ -279,8 +267,7 @@ export const CalibrationAreaBlock = ({
             display: 'grid',
             alignContent: 'center',
             gap: displayMode === 'status' ? 14 : 12,
-            width: '100%',
-          }}
+            width: '100%' }}
         >
           {displayMode === 'status' ? (
             <>
@@ -351,8 +338,7 @@ export const CalibrationAreaBlock = ({
                       WebkitLineClamp: 4,
                       WebkitBoxOrient: 'vertical',
                       overflow: 'hidden',
-                      maxHeight: '6.1em',
-                    }}
+                      maxHeight: '6.1em' }}
                   >
                     {resolvedQualityText}
                   </div>
@@ -427,8 +413,7 @@ export const CalibrationInfoDock = ({ info, visible }: { info: CalibrationInfoCo
           ? 'inset(0% 0% 0% 0% round 16px)'
           : 'inset(8% 6% 8% 6% round 16px)',
         transition: 'opacity 160ms ease, transform 160ms ease, filter 160ms ease, clip-path 160ms ease, height 180ms ease',
-        willChange: 'opacity, transform, filter, clip-path, height',
-      }}
+        willChange: 'opacity, transform, filter, clip-path, height' }}
     >
       <div
         ref={contentRef}
@@ -436,8 +421,7 @@ export const CalibrationInfoDock = ({ info, visible }: { info: CalibrationInfoCo
           opacity: contentVisible ? 1 : 0,
           transform: contentVisible ? 'translateY(0)' : 'translateY(4px)',
           filter: contentVisible ? 'blur(0px)' : 'blur(2px)',
-          transition: 'opacity 130ms ease, transform 130ms ease, filter 130ms ease',
-        }}
+          transition: 'opacity 130ms ease, transform 130ms ease, filter 130ms ease' }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
           <div style={{ fontSize: 12.5, color: '#e2eefb', fontWeight: 750, letterSpacing: '-0.01em' }}>{displayInfo.title}</div>

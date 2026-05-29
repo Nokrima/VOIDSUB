@@ -1,19 +1,14 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import {ValueRail} from '../../../components/ValueRail';
-import type { CalibrationRuntimeValues } from '../../../config/calibrationPresets';
-import type { HoverState, CalibrationPreviewResult, CalibrationControlKey, CalibrationControlConfig, ConceptCalibrationSnapshot, CalibrationValues, ConceptCalibrationDraftProfile, CalibrationInfoKey, CalibrationInfoContent, ImprovementMode, CalibrationAreaMode } from '../CalibrationTypes';
-import {labelStyle, shellStyle, calibrationGroupTitleStyle, calibrationHintTextStyle} from '../CalibrationConfig';
-import {clampNumber, normalizeCalibrationValue, formatCalibrationValue} from '../CalibrationUtils';
-import {LayerGlyph} from './BaseBlocks';
-import {CalibrationAreaBlock} from './CalibrationLayout';
-
+import React, { useEffect, useState } from 'react';
+import { CalibrationControlKey, CalibrationControlConfig, CalibrationInfoKey, ImprovementMode } from '../CalibrationTypes';
+import { labelStyle, shellStyle, calibrationGroupTitleStyle, calibrationHintTextStyle } from '../CalibrationConfig';
+import { clampNumber, normalizeCalibrationValue, formatCalibrationValue } from '../CalibrationUtils';
+import { LayerGlyph } from './BaseBlocks';
 export const CalibrationSliderControl = ({
   item,
   value,
   onChange,
   onInfoFocus,
-  disabled = false,
-}: {
+  disabled = false }: {
   item: CalibrationControlConfig;
   value: number;
   onChange: (key: CalibrationControlKey, value: number) => void;
@@ -46,8 +41,7 @@ export const CalibrationSliderControl = ({
         gap: 8,
         opacity: disabled ? 0.42 : 1,
         filter: disabled ? 'saturate(0.62)' : 'saturate(1)',
-        transition: 'opacity 180ms ease, filter 180ms ease',
-      }}
+        transition: 'opacity 180ms ease, filter 180ms ease' }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
         <div style={{ fontSize: 12.5, fontWeight: 600, color: '#e2eefb', letterSpacing: '-0.01em' }}>{item.label}</div>
@@ -99,8 +93,7 @@ export const CalibrationSliderControl = ({
           background: 'linear-gradient(180deg, rgba(255,255,255,0.095), rgba(255,255,255,0.055))',
           boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.34), inset 0 0 0 1px rgba(255,255,255,0.045)',
           overflow: 'visible',
-          pointerEvents: disabled ? 'none' : 'auto',
-        }}
+          pointerEvents: disabled ? 'none' : 'auto' }}
       >
         <div
           style={{
@@ -112,8 +105,7 @@ export const CalibrationSliderControl = ({
             borderRadius: 999,
             background: disabled ? 'rgba(148,163,184,0.22)' : `linear-gradient(90deg, ${item.accentStart}, ${item.accentEnd})`,
             boxShadow: disabled ? 'none' : `0 0 18px ${item.glow}`,
-            transition: 'width 120ms ease',
-          }}
+            transition: 'width 120ms ease' }}
         />
         <div
           style={{
@@ -126,8 +118,7 @@ export const CalibrationSliderControl = ({
             transform: 'translate(-50%, -50%)',
             background: disabled ? 'linear-gradient(180deg, #b7c1ce, #748194)' : 'linear-gradient(180deg, #f8fbff, #b9cce3)',
             boxShadow: disabled ? '0 4px 10px rgba(0,0,0,0.22), 0 0 0 3px rgba(15,23,42,0.82)' : `0 5px 14px rgba(0,0,0,0.32), 0 0 0 3px rgba(15,23,42,0.82), 0 0 18px ${item.glow}`,
-            transition: 'left 120ms ease',
-          }}
+            transition: 'left 120ms ease' }}
         />
       </div>
     </div>
@@ -140,8 +131,7 @@ export const CalibrationGroupSection = ({
   description,
   children,
   infoKey,
-  onInfoFocus,
-}: {
+  onInfoFocus }: {
   title: string;
   description: string;
   children: React.ReactNode;
@@ -167,8 +157,7 @@ export const ImprovementToggleBlock = ({
   onToggleFilters,
   rawFlowEnabled,
   onToggleRawFlow,
-  disabled = false,
-}: {
+  disabled = false }: {
   filtersEnabled: boolean;
   onToggleFilters: () => void;
   rawFlowEnabled: boolean;
@@ -226,8 +215,7 @@ export const ImprovementToggleBlock = ({
           : 'inset 0 1px 0 rgba(255,255,255,0.03)',
         transition: 'box-shadow 180ms ease, opacity 280ms ease, background 280ms ease',
         opacity: !disabled ? 1 : 0.48,
-        background: !disabled ? shellStyle.background : 'rgba(5, 9, 14, 0.22)',
-      }}
+        background: !disabled ? shellStyle.background : 'rgba(5, 9, 14, 0.22)' }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, height: 24, minHeight: 24 }}>
         <div style={{ ...labelStyle, opacity: contentVisible ? 1 : 0, transition: 'opacity 160ms ease' }}>
@@ -238,8 +226,7 @@ export const ImprovementToggleBlock = ({
             color: 'rgba(172,214,255,0.82)',
             opacity: contentVisible ? 1 : 0,
             filter: hovered ? 'drop-shadow(0 0 6px rgba(125,211,252,0.42))' : 'none',
-            transition: 'opacity 160ms ease, filter 180ms ease',
-          }}
+            transition: 'opacity 160ms ease, filter 180ms ease' }}
         >
           <LayerGlyph path={headerIcon} />
         </div>
@@ -256,8 +243,7 @@ export const ImprovementToggleBlock = ({
             display: 'grid',
             alignContent: 'center',
             gap: 14,
-            width: '100%',
-          }}
+            width: '100%' }}
         >
           <div style={{ display: 'grid', gap: 6 }}>
             <span style={{ fontSize: 13, color: '#9fb7cf', fontWeight: 500, lineHeight: 1.45, letterSpacing: '-0.01em' }}>
@@ -276,8 +262,7 @@ export const ImprovementToggleBlock = ({
               gridTemplateColumns: '36px 1fr 36px',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 8,
-            }}
+              gap: 8 }}
           >
             <button
               type="button"
@@ -294,8 +279,7 @@ export const ImprovementToggleBlock = ({
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                transition: 'color 180ms ease',
-              }}
+                transition: 'color 180ms ease' }}
             >
               <LayerGlyph path={offIcon} />
             </button>
@@ -314,8 +298,7 @@ export const ImprovementToggleBlock = ({
                 borderRadius: 999,
                 background: 'linear-gradient(180deg,rgba(7,11,17,0.88),rgba(4,8,13,0.94))',
                 boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03),0 0 0 1px rgba(255,255,255,0.02)',
-                overflow: 'hidden',
-              }}
+                overflow: 'hidden' }}
             >
               <div
                 style={{
@@ -326,8 +309,7 @@ export const ImprovementToggleBlock = ({
                   width: 'calc(50% - 2px)',
                   borderRadius: 999,
                   background: 'linear-gradient(180deg, rgba(125,211,252,0.28), rgba(125,211,252,0.14))',
-                  transition: 'left 220ms ease',
-                }}
+                  transition: 'left 220ms ease' }}
               />
             </button>
             <button
@@ -345,8 +327,7 @@ export const ImprovementToggleBlock = ({
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                transition: 'color 180ms ease',
-              }}
+                transition: 'color 180ms ease' }}
             >
               <LayerGlyph path={onIcon} />
             </button>
@@ -357,5 +338,5 @@ export const ImprovementToggleBlock = ({
   );
 };
 
-// ─── CalibrationAreaBlock ────────────────────────────────────────────────────
+// ─── ────────────────────────────────────────────────────
 

@@ -1,4 +1,3 @@
-import type { CalibrationRuntimeValues } from '../../config/calibrationPresets';
 
 export type HoverState = 'up' | 'down' | null;
 

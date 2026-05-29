@@ -1,8 +1,5 @@
-import React, { useEffect, useState, useRef, useLayoutEffect } from 'react';
-import type { HardwareResult, AppSettingsPayload, TranslationStatePayload, OcrFrameStatPayload, OfflineModelDetails, OfflineStatusPayload, OfflineModelAction, EngineHardwareInfo, HealthCheckItem, EngineModelItem, PerfEstimateItem, OfflineLangModelItem, MotorDurumuProps, EngineInfoKey } from '../EnginesTypes';
-import {G, engineInfoContent} from '../EnginesConfig';
-import {MotorDurumu} from './MotorDurumu';
-
+import { useEffect, useState, useRef, useLayoutEffect } from 'react';
+import { G, engineInfoContent } from '../EnginesConfig';
 export const InfoButton = ({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) => (
   <button
     type="button"
@@ -64,15 +61,13 @@ export const EngineInfoDock = ({ info, visible }: { info?: typeof engineInfoCont
         opacity: visible ? 1 : 0, transform: visible ? 'translateY(0) scale(1)' : 'translateY(6px) scale(0.985)',
         filter: visible ? 'blur(0px) saturate(1)' : 'blur(3px) saturate(0.92)',
         clipPath: visible ? 'inset(0% 0% 0% 0% round 16px)' : 'inset(8% 6% 8% 6% round 16px)',
-        transition: 'opacity 160ms ease, transform 160ms ease, filter 160ms ease, clip-path 160ms ease, height 180ms ease',
-      }}
+        transition: 'opacity 160ms ease, transform 160ms ease, filter 160ms ease, clip-path 160ms ease, height 180ms ease' }}
     >
       <div
         ref={contentRef}
         style={{
           opacity: contentVisible ? 1 : 0, transform: contentVisible ? 'translateY(0)' : 'translateY(4px)',
-          filter: contentVisible ? 'blur(0px)' : 'blur(2px)', transition: 'opacity 130ms ease, transform 130ms ease, filter 130ms ease',
-        }}
+          filter: contentVisible ? 'blur(0px)' : 'blur(2px)', transition: 'opacity 130ms ease, transform 130ms ease, filter 130ms ease' }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
           <div style={{ fontSize: 12.5, color: '#e2eefb', fontWeight: 750, letterSpacing: '-0.01em' }}>{displayInfo.title}</div>

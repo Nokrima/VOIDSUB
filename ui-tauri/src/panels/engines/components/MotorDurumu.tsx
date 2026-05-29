@@ -1,9 +1,9 @@
-import React, { useEffect, useState, useRef, useLayoutEffect } from 'react';
-import {wsClient} from '../../../bridge/websocket';
-import type { HardwareResult, AppSettingsPayload, TranslationStatePayload, OcrFrameStatPayload, OfflineModelDetails, OfflineStatusPayload, OfflineModelAction, EngineHardwareInfo, HealthCheckItem, EngineModelItem, PerfEstimateItem, OfflineLangModelItem, MotorDurumuProps, EngineInfoKey } from '../EnginesTypes';
-import {colors, TS, G, engineInfoContent} from '../EnginesConfig';
-import {ICheck, IWarn, IFail} from './StatusIcons';
-import {InfoButton, EngineInfoDock} from './EngineInfoDock';
+import React, { useEffect, useState } from 'react';
+import { wsClient } from '../../../bridge/websocket';
+import { MotorDurumuProps, EngineInfoKey } from '../EnginesTypes';
+import { colors, TS, G, engineInfoContent } from '../EnginesConfig';
+import { ICheck, IWarn, IFail } from './StatusIcons';
+import { InfoButton, EngineInfoDock } from './EngineInfoDock';
 
 export const MotorDurumu: React.FC<MotorDurumuProps> = ({ height = '100%', hardwareInfo, healthChecks, models, perfEstimate, onEngineSelect, selectedEngineId, isAvailable, offlineLangModels, offlineBusy, modelActions, completedModelId, onLangDownload, onLangCancelDownload, onLangRequestRemove, onEasyocrDownload, onEasyocrCancel, onEasyocrRemove, onRefreshHardware, isScanning, easyocrAction, easyocrCompleted, cudaAction, cudaCompleted, onCudaDownload, onCudaCancel, onCudaRemove }) => {
   const currentEngineId = selectedEngineId;

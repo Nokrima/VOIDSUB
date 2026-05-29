@@ -1,8 +1,7 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import {ValueRail} from '../../../components/ValueRail';
-import type { CalibrationRuntimeValues } from '../../../config/calibrationPresets';
-import type { HoverState, CalibrationPreviewResult, CalibrationControlKey, CalibrationControlConfig, ConceptCalibrationSnapshot, CalibrationValues, ConceptCalibrationDraftProfile, CalibrationInfoKey, CalibrationInfoContent, ImprovementMode, CalibrationAreaMode } from '../CalibrationTypes';
-import {labelStyle, titleStyle, shellStyle} from '../CalibrationConfig';
+import React, { useEffect, useRef, useState } from 'react';
+import { ValueRail } from '../../../components/ValueRail';
+import { HoverState } from '../CalibrationTypes';
+import { labelStyle, titleStyle, shellStyle } from '../CalibrationConfig';
 
 export const LayerGlyph = ({ path, size = 18 }: { path: string, size?: number }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" style={{ width: size, height: size }}>

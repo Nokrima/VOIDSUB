@@ -1,5 +1,5 @@
-import type { CalibrationRuntimeValues } from '../../config/calibrationPresets';
-import type { HoverState, CalibrationPreviewResult, CalibrationControlKey, CalibrationControlConfig, ConceptCalibrationSnapshot, CalibrationValues, ConceptCalibrationDraftProfile, CalibrationInfoKey, CalibrationInfoContent, ImprovementMode, CalibrationAreaMode } from './CalibrationTypes';
+
+import { CalibrationControlKey, CalibrationControlConfig, CalibrationValues, CalibrationInfoKey, CalibrationInfoContent } from './CalibrationTypes';
 
 export const labelStyle: React.CSSProperties = {
   fontSize: 11,

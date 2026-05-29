@@ -1,6 +1,3 @@
-import {EngineInfoDock} from './components/EngineInfoDock';
-import {MotorDurumu} from './components/MotorDurumu';
-
 export interface HardwareResult {
   recommended_engine: string;
   available_engines: string[];
@@ -101,7 +98,7 @@ export interface OfflineLangModelItem {
   status: 'active' | 'installed' | 'available';
 }
 
-// --- MotorDurumu Component ---
+// --- Component ---
 
 export interface MotorDurumuProps {
   height?: number | string;
