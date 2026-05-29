@@ -87,7 +87,9 @@ class OCRDiagnostics:
             pass
         cv2.imwrite(str(target / "frame.png"), frame)
         cv2.imwrite(str(target / "processed.png"), processed)
-        with open(target / "payload.json", "w", encoding="utf-8") as handle:
+        payload_path = target / "payload.json"
+        tmp_path = payload_path.with_suffix(".json.tmp")
+        with open(tmp_path, "w", encoding="utf-8") as handle:
             json.dump(
                 {
                     "phase": phase,
@@ -101,3 +103,4 @@ class OCRDiagnostics:
                 ensure_ascii=False,
                 indent=2,
             )
+        os.replace(tmp_path, payload_path)
