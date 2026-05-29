@@ -120,9 +120,9 @@ class WindowsOCREngine(OCREngine):
             f"[{PREFIX_OCR}-043] Windows OCR start requested: source_language={self.source_language}, language_tag={self.language_tag}"
         )
         self.start_error = None
-        self.task_queue = mp.Queue()
-        self.result_queue = mp.Queue()
-        self.error_queue = mp.Queue()
+        self.task_queue = mp.Queue(maxsize=30)
+        self.result_queue = mp.Queue(maxsize=30)
+        self.error_queue = mp.Queue(maxsize=30)
         self.ready_event = mp.Event()
 
         self.process = mp.Process(

@@ -25,7 +25,7 @@ class EasyOCREngine(OCREngine):
         self.logger = get_logger()
         self.reader = None
         self.worker_proc: subprocess.Popen | None = None
-        self._stdout_q = queue.Queue()
+        self._stdout_q = queue.Queue(maxsize=30)
         self.source_language = "auto"
         self.lang_list = ["en", "ru"]
         self.use_gpu = False

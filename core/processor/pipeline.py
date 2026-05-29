@@ -243,6 +243,7 @@ class TranslationPipeline:
                     frame_id, frame, resolved_region, capture_probe = snapshot
                     frame_started_monotonic = float((capture_probe or {}).get("captured_monotonic", time.monotonic()))
                     if frame_id <= self._processed_frame_id:
+                        del frame
                         await asyncio.sleep(min(self.loop_interval, 0.012))
                         continue
                     self._processed_frame_id = frame_id
@@ -286,6 +287,7 @@ class TranslationPipeline:
                                         f"last_text={self.last_text!r}"
                                     ),
                                 )
+                                del frame
                                 await asyncio.sleep(min(self.loop_interval, 0.01))
                                 continue
                             if self.slot_manager.get_sample_count() >= min_slot_samples:
@@ -294,6 +296,7 @@ class TranslationPipeline:
                                 stabilized_text = None
                             if stabilized_text:
                                 self._emit_translation(stabilized_text, frame_started_monotonic=frame_started_monotonic, ocr_duration_ms=0.0)
+                            del frame
                             await asyncio.sleep(min(self.loop_interval, 0.01))
                             continue
                     self._last_frame_hash = frame_hash
@@ -331,6 +334,7 @@ class TranslationPipeline:
                             },
                         )
                         self._emit_frame_stat(None, "no_text")
+                        del frame
                         await asyncio.sleep(min(self.loop_interval, 0.01))
                         continue
 
@@ -375,9 +379,13 @@ class TranslationPipeline:
                         and self._is_subtitle_active()
                         and quality_score < max(self.quality_threshold + 6, 50)
                     ):
+                        del frame
+                        del ocr_payload
                         await asyncio.sleep(0)
                         continue
                     if not self.raw_translation_flow_enabled and detected_text == self.last_text:
+                        del frame
+                        del ocr_payload
                         await asyncio.sleep(0)
                         continue
                     if not self.raw_translation_flow_enabled and len(detected_text.strip()) < self._effective_min_text_chars():
@@ -390,6 +398,8 @@ class TranslationPipeline:
                             ),
                         )
                         self._emit_frame_stat(ocr_payload, "rejected", "min_text_chars")
+                        del frame
+                        del ocr_payload
                         await asyncio.sleep(0)
                         continue
                     junk_rejected = False
@@ -449,6 +459,8 @@ class TranslationPipeline:
                             },
                         )
                         self._emit_frame_stat(ocr_payload, "rejected", "junk")
+                        del frame
+                        del ocr_payload
                         await asyncio.sleep(0)
                         continue
                     quality_threshold = self.quality_threshold
@@ -491,6 +503,8 @@ class TranslationPipeline:
                         )
                         log_event(PREFIX_SYS, "033", "[Görüntü İşleme] -> ATLANDI | Düşük kalite OCR çıktısı", throttle_key="quality_skip", throttle_seconds=2.0)
                         self._emit_frame_stat(ocr_payload, "rejected", "quality")
+                        del frame
+                        del ocr_payload
                         await asyncio.sleep(0)
                         continue
                     self.last_detected_text = detected_text
@@ -506,6 +520,8 @@ class TranslationPipeline:
                             ),
                         )
                         self._emit_translation(detected_text, frame_started_monotonic=frame_started_monotonic, ocr_duration_ms=ocr_duration_ms)
+                        del frame
+                        del ocr_payload
                         await asyncio.sleep(0)
                         continue
 
@@ -540,6 +556,8 @@ class TranslationPipeline:
                     )
                     if push_result == "rejected":
                         self._emit_frame_stat(ocr_payload, "rejected", "slot_rejected")
+                        del frame
+                        del ocr_payload
                         await asyncio.sleep(0)
                         continue
                     if self.slot_manager.get_sample_count() < min_slot_samples:
@@ -552,6 +570,8 @@ class TranslationPipeline:
                             ),
                         )
                         self._emit_frame_stat(ocr_payload, "rejected", "slot_wait")
+                        del frame
+                        del ocr_payload
                         await asyncio.sleep(0)
                         continue
 
@@ -577,6 +597,8 @@ class TranslationPipeline:
                                 "reason": "stabilizer",
                             },
                         )
+                        del frame
+                        del ocr_payload
                         await asyncio.sleep(0)
                         continue
 
@@ -611,6 +633,8 @@ class TranslationPipeline:
                         ),
                     )
                     self._emit_translation(stabilized_text, frame_started_monotonic=frame_started_monotonic, ocr_duration_ms=ocr_duration_ms)
+                    del frame
+                    del ocr_payload
                     await asyncio.sleep(0)
                 except asyncio.CancelledError:
                     raise
@@ -1197,7 +1221,7 @@ class TranslationPipeline:
             return None
         return (
             self._latest_frame_id,
-            self._latest_frame.copy(),
+            self._latest_frame,  # Remove .copy() to save memory
             dict(self._latest_resolved_region) if isinstance(self._latest_resolved_region, dict) else None,
             dict(self._latest_capture_probe) if isinstance(self._latest_capture_probe, dict) else None,
         )

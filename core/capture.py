@@ -353,6 +353,8 @@ class ScreenCapturer:
                         self._set_capture_state("fresh", 0.0)
                     finally:
                         bitmap.close()
+                        del bitmap
+                        del frame
         except Exception as exc:
             self._runtime_error = str(exc)
             log_error(PREFIX_SYS, "013", str(exc), "WGC ile goruntu alinamadi.")
