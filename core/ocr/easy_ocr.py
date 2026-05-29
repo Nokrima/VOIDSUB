@@ -7,6 +7,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import queue
 import subprocess
 import sys
 import threading
@@ -24,6 +25,7 @@ class EasyOCREngine(OCREngine):
         self.logger = get_logger()
         self.reader = None
         self.worker_proc: subprocess.Popen | None = None
+        self._stdout_q = queue.Queue()
         self.source_language = "auto"
         self.lang_list = ["en", "ru"]
         self.use_gpu = False
@@ -74,6 +76,21 @@ class EasyOCREngine(OCREngine):
                 creationflags=cflags
             )
             
+            # Stderr'i okuyup loglamak ve buffer'i temiz tutmak (Deadlock engelleme)
+            def stderr_reader(proc):
+                for line in iter(proc.stderr.readline, ''):
+                    if line:
+                        self.logger.warning(f"[{PREFIX_OCR}-WRK-ERR] {line.strip()}")
+                proc.stderr.close()
+
+            # Stdout'u kuyruga almak (Timeout desteklemek icin)
+            def stdout_reader(proc, q):
+                for line in iter(proc.stdout.readline, ''):
+                    q.put(line)
+
+            threading.Thread(target=stderr_reader, args=(self.worker_proc,), daemon=True).start()
+            threading.Thread(target=stdout_reader, args=(self.worker_proc, self._stdout_q), daemon=True).start()
+
             # GPU kontrolünü worker'dan almak zordur, şimdilik varsayılan true/false atayabiliriz
             # (Worker kodu gpu=torch.cuda.is_available() yapıyor)
             self.use_gpu = True 
@@ -122,7 +139,13 @@ class EasyOCREngine(OCREngine):
             self.worker_proc.stdin.write(payload)
             self.worker_proc.stdin.flush()
             
-            response_line = self.worker_proc.stdout.readline()
+            try:
+                response_line = self._stdout_q.get(timeout=15.0)
+            except queue.Empty:
+                self.logger.error(f"[{PREFIX_OCR}-034] EasyOCR Worker yanit vermedi (Timeout). Yeniden baslatiliyor...")
+                self.stop()
+                return []
+                
             if not response_line:
                 return []
                 
@@ -153,6 +176,13 @@ class EasyOCREngine(OCREngine):
             except Exception:
                 pass
             self.worker_proc = None
+            
+        # Kuyrugu temizle
+        while not self._stdout_q.empty():
+            try:
+                self._stdout_q.get_nowait()
+            except queue.Empty:
+                break
             
         self.reader = None
         if self.use_gpu and not self.is_compiled:
