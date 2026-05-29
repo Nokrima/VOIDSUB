@@ -11,8 +11,8 @@ let reconnectTimeout: ReturnType<typeof setTimeout>;
 const MAX_PENDING = 64;
 const pendingMessages: string[] = [];
 
-type EventPayload = Record<string, any>;
-type EventHandler = (data: any) => void;
+type EventPayload = Record<string, unknown>;
+export type EventHandler<T = any> = (data: T) => void;
 
 const listeners: Record<string, Set<EventHandler>> = {};
 const eventHistory: Record<string, EventPayload[]> = {};
@@ -89,7 +89,14 @@ export const connect = async () => {
       const data = JSON.parse(event.data);
       const eventName = data.event;
       const payload = data.data ?? {};
-      if (!eventName) {
+
+      if (!eventName || typeof eventName !== 'string') {
+        return;
+      }
+
+      // Basic runtime guard
+      if (typeof payload !== 'object' || payload === null) {
+        console.warn(`[WS] Geçersiz payload formatı (${eventName}). Nesne bekleniyordu.`);
         return;
       }
 
@@ -146,15 +153,15 @@ export const send = (event: string, data?: Record<string, unknown>) => {
   console.warn('Bağlantı hazır değil. Paket gönderilemedi:', event);
 };
 
-export const onEvent = (event: string, handler: EventHandler) => {
+export const onEvent = <T = any>(event: string, handler: EventHandler<T>) => {
   if (!listeners[event]) {
     listeners[event] = new Set();
   }
 
-  listeners[event].add(handler);
+  listeners[event].add(handler as EventHandler);
 
   return () => {
-    listeners[event].delete(handler);
+    listeners[event].delete(handler as EventHandler);
     if (listeners[event].size === 0) {
       delete listeners[event];
     }
