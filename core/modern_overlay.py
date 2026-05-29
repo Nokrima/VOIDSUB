@@ -137,21 +137,25 @@ class OverlayWidget(QWidget):
         if event.button() == Qt.LeftButton: # type: ignore
             self._drag_ignored = False
             self.controller._drag_active = True
-            self.controller.signals.drag_started.emit(event.globalPosition().x(), event.globalPosition().y())
+            if self.controller.signals:
+                self.controller.signals.drag_started.emit(event.globalPosition().x(), event.globalPosition().y())
         elif event.button() == Qt.RightButton: # type: ignore
             self._drag_ignored = True
             self.controller._drag_active = False
-            self.controller.signals.drag_reset.emit()
+            if self.controller.signals:
+                self.controller.signals.drag_reset.emit()
 
     def mouseMoveEvent(self, event):
         if event.buttons() & Qt.LeftButton and not getattr(self, "_drag_ignored", False): # type: ignore
-            self.controller.signals.drag_moved.emit(event.globalPosition().x(), event.globalPosition().y())
+            if self.controller.signals:
+                self.controller.signals.drag_moved.emit(event.globalPosition().x(), event.globalPosition().y())
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.LeftButton: # type: ignore
             self._drag_ignored = False
             self.controller._drag_active = False
-            self.controller.signals.drag_released.emit()
+            if self.controller.signals:
+                self.controller.signals.drag_released.emit()
 
     def enterEvent(self, event):
         self.controller.hover_active = True
@@ -172,7 +176,8 @@ class OverlayWidget(QWidget):
             import ctypes.wintypes
             msg = ctypes.wintypes.MSG.from_address(message.__int__())
             if msg.message == 0x007E:  # WM_DISPLAYCHANGE
-                self.controller.signals.display_changed.emit()
+                if self.controller.signals:
+                    self.controller.signals.display_changed.emit()
         except Exception:
             pass
         return super().nativeEvent(eventType, message)
@@ -232,9 +237,9 @@ class ModernOverlay:
     def _bootstrap(self) -> None:
         try:
             if not QApplication.instance():
-                self.app = QApplication([])
+                self.app = cast("QApplication | None", QApplication([]))
             else:
-                self.app = QApplication.instance()
+                self.app = cast("QApplication | None", QApplication.instance())
                 
             self.signals = OverlaySignals()
             self.window = OverlayWidget(self)
@@ -785,7 +790,8 @@ class ModernOverlay:
         if self._capture_suppressed == 1:
             self._capture_restore_visible = True
             self.visible = False
-            self.window.hide()
+            if self.window:
+                self.window.hide()
 
     def _do_finish_capture(self, was_hidden: bool):
         if self._capture_suppressed <= 0: return
@@ -793,7 +799,8 @@ class ModernOverlay:
         if self._capture_suppressed > 0: return
         if self._capture_restore_visible and not self._hidden_by_user and self.lines:
             self.visible = True
-            self.window.show()
+            if self.window:
+                self.window.show()
             self._render()
         self._capture_restore_visible = False
 

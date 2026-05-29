@@ -12,6 +12,7 @@ import subprocess
 import sys
 import threading
 from pathlib import Path
+from typing import Any
 import cv2
 import numpy as np
 
@@ -59,6 +60,10 @@ class EasyOCREngine(OCREngine):
 
     def _start_worker_mode(self) -> bool:
         try:
+            if not self.plugin_python:
+                self.start_error = "plugin_python None."
+                return False
+                
             worker_script = self.plugin_python.parent / "easyocr-worker.py"
             if not worker_script.exists():
                 self.start_error = "easyocr-worker.py bulunamadı!"

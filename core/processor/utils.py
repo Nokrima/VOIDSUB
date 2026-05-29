@@ -58,10 +58,34 @@ class IPipelineState(Protocol):
     translation_engine: str
     offline_model_key: str
     tgt_language: str
-    src_language: str
+    active_engine: str
     performance_tier: str
     ocr_scene_mode: str
-    
+    _latest_capture_probe: dict | None
+    _latest_resolved_region: dict | None
+    _processed_frame_id: int
+    _last_frame_hash: bytes
+    last_text: str
+    last_detected_text: str
+    last_detected_quality: int
+    _pending_translations: deque[tuple[str, int, float, float, float, str]]
+    _reused_frame_count: int
+    _last_perf_stats: dict[str, float]
+
+    def _get_engine_instance(self, engine_id: str) -> Any: ...
+    def _capture_delay(self) -> float: ...
+    def _runtime_engine_id(self) -> str: ...
+    def _should_skip_translation(self, text: str) -> bool: ...
+    def _take_latest_frame(self) -> tuple[int, Any, dict, dict]: ...
+    def _read_fast_then_refine(self, frame_id: int, frame: Any, region: dict, probe: dict) -> dict: ...
+    def _get_cached_translation(self, text: str) -> str | None: ...
+    def _cache_key_for_source(self, text: str) -> str: ...
+    def _log_debug(self, prefix: str, code: str, message: str, correlation_id: str = "") -> None: ...
+    def _log_trl(self, code: str, message: str, correlation_id: str = "") -> None: ...
+    def _log_ui(self, code: str, message: str, correlation_id: str = "") -> None: ...
+    def _log_ocr(self, code: str, message: str, correlation_id: str = "") -> None: ...
+    def _log_perf(self, code: str, message: str, correlation_id: str = "") -> None: ...
+    def _translate_pending_loop(self) -> None: ...
     translation_queue: "TranslationQueueService"
     overlay_publisher: "OverlayPublisherService"
     
@@ -69,7 +93,6 @@ class IPipelineState(Protocol):
     source_state: Any
     
     _translation_request_id: int
-    _pending_translations: deque
     _active_translation_task: asyncio.Task | None
     _active_translation_source: str
     _last_translated_text: str
@@ -78,8 +101,6 @@ class IPipelineState(Protocol):
     _last_emitted_source_time: float
     
     _last_stat_emit_time: float
-    _reused_frame_count: int
-    _last_perf_stats: dict
     last_text: str
     _last_emit_time: float
     _last_raw_source_text: str

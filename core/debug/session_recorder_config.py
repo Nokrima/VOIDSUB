@@ -39,6 +39,7 @@ class ConfigPatcher:
             self.original_methods["should_skip"] = pipeline._should_skip_refine
 
             def patched_should_skip(frame_id, payload):
+                scene_fit = 0.45
                 if payload:
                     scene_fit = payload.get("scene_fit", 0.45)
                     diff = float(overrides["scene_fit_threshold"]) - 0.42

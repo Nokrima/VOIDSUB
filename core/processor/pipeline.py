@@ -98,7 +98,7 @@ class TranslationPipeline:
 
         self._translation_request_id = 0
         self._active_translation_task: asyncio.Task | None = None
-        self._pending_translations: deque[tuple[str, int, float, float, float]] = deque(maxlen=3)
+        self._pending_translations: deque[tuple[str, int, float, float, float, str]] = deque(maxlen=3)
         self._active_translation_source = ""
         self._ocr_candidate_history: deque[dict] = deque(maxlen=10)
         self._last_merge_confidence = 0.0
@@ -1041,7 +1041,7 @@ class TranslationPipeline:
         return build_detected_text(ocr_results, self.ocr_scene_mode, self.target_region)
 
 
-    def _evaluate_tip2_best_variant_gate(self, analysis: dict[str, object]) -> dict[str, object]:
+    def _evaluate_tip2_best_variant_gate(self, analysis: dict[str, Any]) -> dict[str, Any]:
         health = int(analysis.get("health_score", 0))
         suspicious = int(analysis.get("suspicious_tokens", 0))
         broken = int(analysis.get("broken_token_count", 0))
@@ -1158,8 +1158,8 @@ class TranslationPipeline:
         similarity = SequenceMatcher(a=last_normalized, b=current_normalized).ratio()
         if similarity < threshold:
             return False
-        current_analysis = JunkFilter.analyze_text(stabilized_text)
-        last_analysis = JunkFilter.analyze_text(self._last_emitted_source_text)
+        current_analysis: dict[str, Any] = JunkFilter.analyze_text(stabilized_text)
+        last_analysis: dict[str, Any] = JunkFilter.analyze_text(self._last_emitted_source_text)
         current_health = int(current_analysis["health_score"])
         last_health = int(last_analysis["health_score"])
         current_recognized = int(current_analysis["recognized_count"])

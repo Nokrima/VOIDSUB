@@ -35,7 +35,7 @@ async def test_e2e_pipeline_loop(caplog):
     class FakeOCR:
         def is_ready(self): return True
         def process(self, *args, **kwargs): return ("Detected Hello", 90)
-    pipeline.ocr_engine = FakeOCR()
+    setattr(pipeline, "ocr_engine", FakeOCR())
     pipeline._activate_engine = MagicMock(return_value=True)
     pipeline._get_engine_instance = MagicMock(return_value=pipeline.ocr_engine)
     import numpy as np
@@ -55,7 +55,7 @@ async def test_e2e_pipeline_loop(caplog):
         "signal": 1.0
     })
     def fake_translate(text): return ("Merhaba çeviri", "google")
-    pipeline.translation_queue._translate_text = fake_translate
+    setattr(pipeline.translation_queue, "_translate_text", fake_translate)
     pipeline.offline_translator = MagicMock()
     pipeline.ocr_filters_enabled = False
     pipeline.diagnostics = MagicMock()
@@ -78,10 +78,13 @@ async def test_e2e_pipeline_loop(caplog):
     await task
 
     print("BRIDGE CALLS:", bridge_mock.send.mock_calls)
-    print("IS READY:", pipeline.ocr_engine.is_ready())
+    if hasattr(pipeline, "ocr_engine") and pipeline.ocr_engine is not None:
+        print("IS READY:", pipeline.ocr_engine.is_ready())
+    else:
+        print("IS READY: False")
     print("Take latest frame called?", pipeline._take_latest_frame.called)
     assert len(calls) > 0, "No translation was emitted over bridge"
-    payload = calls[0].args[1]
+    payload = calls[0].args[1] if hasattr(calls[0], "args") else calls[0][1]
     assert payload["original_text"] == "Detected Hello"
     assert payload["translated_text"] == "Merhaba çeviri"
     assert payload["translation_source"] == "google"
