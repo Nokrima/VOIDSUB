@@ -48,7 +48,10 @@ def _quick_normalize(text: str) -> str:
 def _strip_speaker(text: str) -> str:
     return re.sub(r"^[A-ZÇĞİÖŞÜa-zçğıöşü\.\•\s]*:\s*", "", str(text or "").strip())
 
-class TranslationPipeline:
+from core.processor.translation_queue import TranslationQueueMixin
+from core.processor.overlay_publisher import OverlayPublisherMixin
+
+class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
     def __init__(self, bridge, capturer):
         self.logger = get_logger()
         self.bridge = bridge
@@ -132,32 +135,9 @@ class TranslationPipeline:
             )
         self.logger.debug(f"[{prefix}-{code}] {message}")
 
-    def _log_ocr(self, code: str, message: str) -> None:
-        self._log_debug("OCR", code, message)
 
-    def _log_trl(self, code: str, message: str) -> None:
-        self._log_debug("TRL", code, message)
 
-    def _log_ui(self, code: str, message: str) -> None:
-        self._log_debug("SYS", code, message)
 
-    def _log_perf(self, frame_to_overlay_ms: float, ocr_ms: float, translation_ms: float) -> None:
-        overhead_ms = max(frame_to_overlay_ms - ocr_ms - translation_ms, 0.0)
-        self._last_perf_stats = {
-            "frame_to_overlay_ms": float(frame_to_overlay_ms),
-            "ocr_ms": float(ocr_ms),
-            "translation_ms": float(translation_ms),
-            "overhead_ms": float(overhead_ms),
-        }
-        self._log_debug(
-            "PERF",
-            "001",
-            (
-                f"frame_to_overlay={frame_to_overlay_ms:.1f}ms, "
-                f"ocr={ocr_ms:.1f}ms, translation={translation_ms:.1f}ms, "
-                f"overhead={overhead_ms:.1f}ms"
-            ),
-        )
 
     async def start_loop(self):
         if self.is_running:
@@ -717,155 +697,6 @@ class TranslationPipeline:
                 self.logger.error(f"[{PREFIX_SYS}-047] [Ekran Yakalama Döngüsü] -> ÜRETİCİ AKSADI | Hata: {exc}")
             await asyncio.sleep(self._capture_delay())
 
-    async def _translate_pending_loop(self) -> None:
-        while self._pending_translations:
-            # Drain the queue to eliminate latency from intermediate OCR updates.
-            # If there are multiple queued translations, only the most recent one matters.
-            while len(self._pending_translations) > 1:
-                skipped = self._pending_translations.popleft()
-                self._log_trl("015", f"Queue drain: skipped request_id={skipped[1]}")
-                
-            text, request_id, queued_at_monotonic, frame_started_monotonic, ocr_duration_ms = self._pending_translations.popleft()
-            loop = asyncio.get_running_loop()
-            try:
-                self._active_translation_source = text
-                queue_wait_ms = (time.monotonic() - queued_at_monotonic) * 1000
-                self.logger.info(f"[OCR-035] translate_in: {_clip_log_text(text)}")
-                self._log_trl(
-                    "001",
-                    (
-                        f"Translation requested: request_id={request_id}, text={text!r}, "
-                        f"queue_wait_ms={queue_wait_ms:.1f}"
-                    ),
-                )
-                translation_started = time.perf_counter()
-                if self.raw_translation_flow_enabled:
-                    effective_src = self._resolve_translation_source_language(text, log_decision=True)
-                    google_task = loop.run_in_executor(None, self._translate_with_engine, "google", text, effective_src)
-                    offline_task = loop.run_in_executor(None, self._translate_with_engine, "offline", text, effective_src)
-                    google_result, offline_result = await asyncio.gather(google_task, offline_task, return_exceptions=True)
-                    if isinstance(google_result, Exception):
-                        self.logger.error(f"[{PREFIX_SYS}-046] [Google Çeviri] -> GÖREV HATASI (HAM MOD) | Detay: {google_result}")
-                        google_result = (text, "error")
-                    if isinstance(offline_result, Exception):
-                        self.logger.error(f"[{PREFIX_SYS}-046] [Offline Çeviri] -> GÖREV HATASI (HAM MOD) | Detay: {offline_result}")
-                        offline_result = (text, "offline_error")
-                    self._log_trl(
-                        "013",
-                        (
-                            f"Raw flow dual translation: google_source={google_result[1]!r}, "
-                            f"offline_source={offline_result[1]!r}, google_text={google_result[0]!r}, "
-                            f"offline_text={offline_result[0]!r}"
-                        ),
-                    )
-                    translated_text, source = self._select_translation_result(
-                        google_result=google_result,
-                        offline_result=offline_result,
-                    )
-                else:
-                    translated_text, source = await loop.run_in_executor(None, self._translate_text, text)
-                translation_duration_ms = (time.perf_counter() - translation_started) * 1000
-                self.logger.info(f"[OCR-036] translate_out ({source}): {_clip_log_text(translated_text)}")
-                self._log_trl(
-                    "002",
-                    (
-                        f"Translation result: request_id={request_id}, source={source}, "
-                        f"duration_ms={translation_duration_ms:.1f}, text={translated_text!r}"
-                    ),
-                )
-            except Exception as exc:
-                self.logger.error(f"[{PREFIX_SYS}-046] [Asenkron Çeviri Görevi] -> GÖREV HATASI | Detay: {exc}")
-                self._active_translation_source = ""
-                continue
-            if not self.raw_translation_flow_enabled and request_id != self._translation_request_id:
-                if not self._should_keep_stale_translation(text):
-                    log_event(PREFIX_SYS, "034", "[Çeviri Senkronizasyonu] -> DÜŞÜRÜLDÜ (DROP) | Geç kalan çeviri", throttle_key="stale_drop", throttle_seconds=1.0)
-                    self._active_translation_source = ""
-                    continue
-            if source == "error" or not translated_text or not self.is_running:
-                self._log_trl(
-                    "003",
-                    (
-                        f"Output filter: decision=BLOCKED, request_id={request_id}, source={source}, "
-                        f"running={self.is_running}, translated_text={translated_text!r}, reason=empty_or_error"
-                    ),
-                )
-                if source == "error" and self.is_running:
-                    from core.errors import emit_bridge_event
-                    self.is_running = False
-                    emit_bridge_event("translation_state", {
-                        "running": False,
-                        "reason": "engine_unavailable",
-                        "message": "İnternet bağlantısı koptu veya çeviri motoru yanıt vermiyor."
-                    })
-                self._active_translation_source = ""
-                continue
-            if self._should_skip_translated_emit(translated_text, source):
-                cache_key = self._cache_key_for_source(text, source)
-                if cache_key and not self.raw_translation_flow_enabled:
-                    self.tr_cache.mark_bad(cache_key)
-                log_event(
-                    PREFIX_SYS,
-                    "035",
-                    "Ayni ceviri tekrar bastirildi.",
-                    throttle_key="translated_repeat_drop",
-                    throttle_seconds=0.7,
-                    level="debug",
-                )
-                self._log_trl(
-                    "004",
-                    (
-                        f"Output filter: decision=BLOCKED, request_id={request_id}, source={source}, "
-                        f"reason=same_last, cache_key={cache_key!r}, translated_text={translated_text!r}"
-                    ),
-                )
-                self._active_translation_source = ""
-                continue
-            self._log_trl(
-                "005",
-                (
-                    f"Output filter: decision=PASSED, request_id={request_id}, source={source}, "
-                    f"translated_text={translated_text!r}"
-                ),
-            )
-            if self.raw_translation_flow_enabled:
-                self._log_trl(
-                    "012",
-                    (
-                        f"Raw flow output bypass: request_id={request_id}, source={source}, "
-                        "translated_repeat_filter=guarded, overlay_chunking=single"
-                    ),
-                )
-            self._last_translated_text = self._normalize_translated_text(translated_text)
-            self._last_translated_emit_time = time.monotonic()
-            self._last_emitted_source_text = text
-            self._last_emitted_source_time = self._last_translated_emit_time
-            frame_to_overlay_ms = (time.monotonic() - frame_started_monotonic) * 1000
-            self._log_ui(
-                "001",
-                (
-                    f"Overlay update: source={source}, original_text={text!r}, "
-                    f"translated_text={translated_text!r}, display_mode=single, chunk_count=1"
-                ),
-            )
-            self._log_ui(
-                "002",
-                f"Overlay chunk: index=1/1, text={translated_text!r}, display_duration_ms={frame_to_overlay_ms:.1f}",
-            )
-            self._log_perf(frame_to_overlay_ms, ocr_duration_ms, translation_duration_ms)
-            self.bridge.send(
-                "new_translation",
-                {
-                    "id": str(uuid.uuid4()),
-                    "original_text": text,
-                    "translated_text": translated_text,
-                    "translation_source": source,
-                    "timestamp": time.time(),
-                },
-            )
-            self._active_translation_source = ""
-        self._active_translation_task = None
-        self._active_translation_source = ""
 
     def stop(self):
         self.is_running = False
@@ -1128,93 +959,8 @@ class TranslationPipeline:
             },
         )
 
-    def _translate_with_engine(self, engine_kind: str, detected_text: str, effective_src: str) -> tuple[str, str]:
-        if engine_kind == "offline":
-            return self.offline_translator.translate(detected_text, effective_src, self.tgt_language)
-        return self.translator.translate(detected_text, src=effective_src, tgt=self.tgt_language)
 
-    def _select_translation_result(
-        self,
-        *,
-        google_result: tuple[str, str] | None,
-        offline_result: tuple[str, str] | None,
-    ) -> tuple[str, str]:
-        preferred_order = ["google", "offline"] if self.translation_engine != "offline" else ["offline", "google"]
-        candidates = {
-            "google": google_result,
-            "offline": offline_result,
-        }
-        accepted_sources = {
-            "google": {"google", "cache"},
-            "offline": {"offline"},
-        }
-        soft_sources = {"offline_unavailable", "offline_unsupported", "offline_error", "error", "none"}
 
-        for engine_kind in preferred_order:
-            result = candidates.get(engine_kind)
-            if result and result[1] in accepted_sources[engine_kind] and result[0]:
-                return result
-
-        for engine_kind in preferred_order:
-            result = candidates.get(engine_kind)
-            if result and result[1] not in soft_sources and result[0]:
-                return result
-
-        for engine_kind in preferred_order:
-            result = candidates.get(engine_kind)
-            if result and result[0]:
-                return result
-
-        return "", "error"
-
-    def _translate_text(self, detected_text: str) -> tuple[str, str]:
-        effective_src = self._resolve_translation_source_language(detected_text, log_decision=True)
-        if self.translation_engine == "offline":
-            offline_engine = "offline-nllb" if self.offline_model_key == "nllb" else "offline-opus"
-            self._log_trl(
-                "006",
-                (
-                    f"Engine selected: engine={offline_engine}, reason=translation_engine_offline, "
-                    f"src={effective_src}, tgt={self.tgt_language}, model_key={self.offline_model_key}"
-                ),
-            )
-            return self.offline_translator.translate(detected_text, effective_src, self.tgt_language)
-
-        self._log_trl(
-            "007",
-            (
-                f"Engine selected: engine=google, reason=translation_engine_{self.translation_engine}, "
-                f"src={effective_src}, tgt={self.tgt_language}"
-            ),
-        )
-        translated_text, source = self.translator.translate(detected_text, src=effective_src, tgt=self.tgt_language)
-        if source == "error":
-            if self.offline_translator.is_available():
-                fallback_text, fallback_source = self.offline_translator.translate(detected_text, effective_src, self.tgt_language)
-                if fallback_source == "offline":
-                    fallback_engine = "offline-nllb" if self.offline_model_key == "nllb" else "offline-opus"
-                    self._log_trl(
-                        "008",
-                        (
-                            f"Engine fallback: from=google, to={fallback_engine}, reason=google_error, "
-                            f"src={effective_src}, tgt={self.tgt_language}"
-                        ),
-                    )
-                    from core.errors import emit_bridge_event
-                    emit_bridge_event("translation_engine_fallback", {"from": "google", "to": "offline", "reason": "google_error"})
-                    emit_bridge_event("log_entry", {
-                        "timestamp": "", "level": "WARNING", "prefix": "TRL", "code": "TRL-003",
-                        "message": "İnternet bağlantısı kurulamıyor. Çevrimdışı moda geçiliyor."
-                    })
-                    return fallback_text, fallback_source
-            else:
-                from core.errors import emit_bridge_event
-                emit_bridge_event("translation_state", {
-                    "running": False,
-                    "reason": "engine_unavailable",
-                    "message": "İnternet bağlantısı kurulamıyor ve Çevrimdışı motor kurulu değil."
-                })
-        return translated_text, source
 
     def _take_latest_frame(self) -> tuple[int, np.ndarray, dict | None, dict | None] | None:
         if self._latest_frame is None or self._latest_frame_id <= 0:
@@ -1435,195 +1181,6 @@ class TranslationPipeline:
     def _build_detected_text(self, ocr_results: list[tuple]) -> str:
         return build_detected_text(ocr_results, self.ocr_scene_mode, self.target_region)
 
-    def _emit_translation(self, stabilized_text: str, *, frame_started_monotonic: float | None = None, ocr_duration_ms: float = 0.0) -> None:
-        if not stabilized_text:
-            return
-        if self.raw_translation_flow_enabled:
-            if self._should_skip_raw_source_repeat(stabilized_text):
-                self._log_trl(
-                    "014",
-                    (
-                        f"Raw flow enqueue blocked: reason=same_source_repeat, "
-                        f"source_text={stabilized_text!r}"
-                    ),
-                )
-                return
-            self._log_trl(
-                "011",
-                (
-                    f"Raw flow enqueue: source_text={stabilized_text!r}, "
-                    "cache=off, stabilizer=off, source_state=off, repeat_family=off"
-                ),
-            )
-            self.last_text = stabilized_text
-            self._last_emit_time = time.monotonic()
-            self._translation_request_id += 1
-            queued_at_monotonic = time.monotonic()
-            self._pending_translations.append(
-                (
-                    stabilized_text,
-                    self._translation_request_id,
-                    queued_at_monotonic,
-                    frame_started_monotonic or queued_at_monotonic,
-                    ocr_duration_ms,
-                )
-            )
-            self._last_raw_source_text = self._normalize_translated_text(stabilized_text)
-            self._last_raw_source_time = queued_at_monotonic
-            if self._active_translation_task is None or self._active_translation_task.done():
-                self._active_translation_task = asyncio.create_task(self._translate_pending_loop())
-            return
-        state_analysis = JunkFilter.analyze_text(stabilized_text)
-        state_decision = self.source_state.consider(stabilized_text, state_analysis, now=time.monotonic())
-        selected_text = state_decision.selected_text or stabilized_text
-        selected_analysis = JunkFilter.analyze_text(selected_text)
-        self._log_ocr(
-            "027",
-            (
-                f"Source state: action={'EMIT' if state_decision.should_emit else 'SKIP'}, "
-                f"state={state_decision.state}, reason={state_decision.reason}, "
-                f"similarity={state_decision.similarity:.2f}, family_changed={state_decision.family_changed}, "
-                f"health={state_analysis['health_score']}, verdict={state_analysis['health_verdict']}, "
-                f"broken={state_analysis['broken_token_count']}, connected_noise={state_analysis['connected_noise_runs']}, "
-                f"tip2={state_analysis['tip2_suspect']}, memory_hit={state_decision.memory_hit}, "
-                f"memory_age_ms={state_decision.memory_age_ms:.1f}, memory_reason={state_decision.memory_reason!r}, "
-                f"text={stabilized_text!r}, selected={selected_text!r}"
-            ),
-        )
-        if state_decision.memory_hit:
-            self._log_ocr(
-                "030",
-                (
-                    f"Session memory: action=HIT, reason={state_decision.memory_reason}, "
-                    f"age_ms={state_decision.memory_age_ms:.1f}, text={stabilized_text!r}"
-                ),
-            )
-        tip2_gate = self._evaluate_tip2_best_variant_gate(selected_analysis)
-        if bool(selected_analysis.get("tip2_suspect")) or state_decision.reason == "tip2_confirmed_best":
-            self._log_ocr(
-                "029",
-                (
-                    f"Tip2 best-variant gate: action={'WOULD_EMIT' if tip2_gate['would_emit'] else 'WOULD_SKIP'}, "
-                    f"reason={tip2_gate['reason']}, health={selected_analysis['health_score']}, "
-                    f"verdict={selected_analysis['health_verdict']}, suspicious={selected_analysis['suspicious_tokens']}, "
-                    f"broken={selected_analysis['broken_token_count']}, connected_noise={selected_analysis['connected_noise_runs']}, "
-                    f"recognized_ratio={selected_analysis['recognized_ratio']:.2f}, unknown_long={selected_analysis['unknown_long_alpha_count']}, "
-                    f"speaker_prefix_suspicious={selected_analysis['speaker_prefix_suspicious']}, "
-                    f"joined={selected_analysis['joined_word_hits']}, merged={selected_analysis['merged_token_hits']}, "
-                    f"minor_merge={selected_analysis['minor_merge_hits']}, tail_broken={selected_analysis['tail_broken_tokens']}, "
-                    f"text={selected_text!r}"
-                ),
-            )
-        if state_decision.should_emit and state_decision.reason == "tip2_confirmed_best" and not bool(tip2_gate["would_emit"]):
-            self._log_ocr(
-                "031",
-                (
-                    f"Tip2 emit blocked: reason={tip2_gate['reason']}, "
-                    f"health={selected_analysis['health_score']}, suspicious={selected_analysis['suspicious_tokens']}, "
-                    f"broken={selected_analysis['broken_token_count']}, connected_noise={selected_analysis['connected_noise_runs']}, "
-                    f"recognized_ratio={selected_analysis['recognized_ratio']:.2f}, unknown_long={selected_analysis['unknown_long_alpha_count']}, "
-                    f"minor_merge={selected_analysis['minor_merge_hits']}, "
-                    f"text={selected_text!r}"
-                ),
-            )
-            return
-        if not state_decision.should_emit:
-            return
-        if selected_text != stabilized_text:
-            self._log_ocr(
-                "028",
-                (
-                    f"Tip2 emit selection: original={stabilized_text!r}, selected={selected_text!r}, "
-                    f"reason={state_decision.reason}, state={state_decision.state}"
-                ),
-            )
-        stabilized_text = selected_text
-        if stabilized_text == self.last_text:
-            return
-        if self._should_skip_regressive_emit(stabilized_text):
-            return
-        current_normalized = re.sub(r"\s+", " ", _strip_speaker(stabilized_text).lower()).strip()
-        last_normalized = re.sub(r"\s+", " ", _strip_speaker(str(self.last_text or "")).lower()).strip()
-        if current_normalized and current_normalized == last_normalized:
-            return
-        if self._should_skip_family_repeat(stabilized_text):
-            return
-        self.last_text = stabilized_text
-        self._last_emit_time = time.monotonic()
-        cached_translation = self._get_cached_translation(stabilized_text)
-        cache_key = self._cache_key_for_source(stabilized_text, "cache")
-        if cached_translation:
-            self._log_trl(
-                "009",
-                f"Cache hit: cache_key={cache_key!r}, source_text={stabilized_text!r}, translated_text={cached_translation!r}",
-            )
-            if self._active_translation_task is not None and not self._active_translation_task.done():
-                log_event(
-                    PREFIX_SYS,
-                    "037",
-                    "Aktif ceviri gorevi varken cache cikisi ertelendi.",
-                    throttle_key="cache_emit_deferred",
-                    throttle_seconds=0.5,
-                    level="debug",
-                )
-                return
-            self.logger.info(f"[OCR-037] cache_out: {_clip_log_text(cached_translation)}")
-            frame_to_overlay_ms = ((time.monotonic() - frame_started_monotonic) * 1000) if frame_started_monotonic else 0.0
-            self._log_trl(
-                "005",
-                f"Output filter: decision=PASSED, request_id=cache, source=cache, translated_text={cached_translation!r}",
-            )
-            self._log_ui(
-                "001",
-                (
-                    f"Overlay update: source={self.translation_engine}-cache, original_text={stabilized_text!r}, "
-                    f"translated_text={cached_translation!r}, display_mode=single, chunk_count=1"
-                ),
-            )
-            self._log_ui(
-                "002",
-                f"Overlay chunk: index=1/1, text={cached_translation!r}, display_duration_ms={frame_to_overlay_ms:.1f}",
-            )
-            self._log_perf(frame_to_overlay_ms, ocr_duration_ms, 0.0)
-            self.bridge.send(
-                "new_translation",
-                {
-                    "id": str(uuid.uuid4()),
-                    "original_text": stabilized_text,
-                    "translated_text": cached_translation,
-                    "translation_source": f"{self.translation_engine}-cache",
-                    "timestamp": time.time(),
-                },
-            )
-            return
-        self._log_trl(
-            "010",
-            f"Cache miss: cache_key={cache_key!r}, source_text={stabilized_text!r}",
-        )
-        self._translation_request_id += 1
-        slot_norm = self.slot_manager.get_normalized_slot() or _quick_normalize(stabilized_text)
-        for pending_text, _, _, _, _ in self._pending_translations:
-            pend_norm = _quick_normalize(pending_text)
-            if slot_norm and pend_norm and SequenceMatcher(None, slot_norm, pend_norm).ratio() >= 0.85:
-                return
-        if self._pending_translations:
-            pending_normalized = re.sub(r"\s+", " ", self._pending_translations[-1][0].strip().lower())
-            if pending_normalized == current_normalized:
-                return
-        if self._pending_translations and self._pending_translations[-1][0] == stabilized_text:
-            return
-        queued_at_monotonic = time.monotonic()
-        self._pending_translations.append(
-            (
-                stabilized_text,
-                self._translation_request_id,
-                queued_at_monotonic,
-                frame_started_monotonic or queued_at_monotonic,
-                ocr_duration_ms,
-            )
-        )
-        if self._active_translation_task is None or self._active_translation_task.done():
-            self._active_translation_task = asyncio.create_task(self._translate_pending_loop())
 
     def _evaluate_tip2_best_variant_gate(self, analysis: dict[str, object]) -> dict[str, object]:
         health = int(analysis.get("health_score", 0))
@@ -1942,19 +1499,6 @@ class TranslationPipeline:
         tier = get_performance_tier_profile(self._runtime_engine_id(), self.performance_tier, self.translation_engine)
         return tier.get(key, default)
 
-    def _log_translation_policy(self, tier: dict) -> None:
-        repeat_window = int(tier.get("translated_repeat_window_ms", 0))
-        log_event(
-            PREFIX_CFG,
-            "014",
-            (
-                f"Servis davranis politikasi aktif: {self.translation_engine}/"
-                f"{self.performance_tier} | hedef={tier.get('target_ms')}ms | "
-                f"hizli_metin={tier.get('fast_text_len')} | tekrar_penceresi={repeat_window}ms"
-            ),
-            throttle_key="translation_policy_cfg",
-            throttle_seconds=0.2,
-        )
 
     def _normalize_translated_text(self, text: str) -> str:
         return re.sub(r"\s+", " ", str(text or "").strip()).lower()
@@ -2014,48 +1558,10 @@ class TranslationPipeline:
                 throttle_seconds=1.0,
             )
 
-    def _get_cached_translation(self, text: str) -> str | None:
-        effective_src = self._resolve_translation_source_language(text)
-        google_key = f"google:{effective_src}:{self.tgt_language}:{text}"
-        if self.translation_engine == "google":
-            return self.tr_cache.get(google_key, exact_only=True)
-        if self.translation_engine == "offline":
-            return None
-        return self.tr_cache.get(google_key, exact_only=True)
 
-    def _cache_key_for_source(self, text: str, source: str) -> str:
-        prefix = "offline" if "offline" in str(source or "").lower() else "google"
-        return f"{prefix}:{self._resolve_translation_source_language(text)}:{self.tgt_language}:{text}"
 
-    def _resolve_translation_source_language(self, text: str, *, log_decision: bool = False) -> str:
-        if self.src_language != "auto":
-            return self.src_language
-        detected = self._detect_text_language(text)
-        if log_decision:
-            log_event(
-                PREFIX_SYS,
-                "036",
-                f"Otomatik kaynak algisi: {detected.upper()} | OCR tepkisi: {self._describe_source_reaction()}",
-                throttle_key=f"source_detect_{detected}",
-                throttle_seconds=0.8,
-            )
-        return detected
 
-    def _detect_text_language(self, text: str) -> str:
-        compact = str(text or "").strip()
-        cyrillic_count = len(re.findall(r"[\u0400-\u04FF]", compact))
-        latin_count = len(re.findall(r"[A-Za-z]", compact))
-        if cyrillic_count >= 2 and cyrillic_count >= max(2, latin_count):
-            return "ru"
-        return "en"
 
-    def _describe_source_reaction(self) -> str:
-        runtime_engine = self._runtime_engine_id()
-        if runtime_engine == "easy":
-            return "easy=en+ru karma OCR"
-        if runtime_engine == "winonly":
-            return "winonly tek dil secimiyle sinirli"
-        return runtime_engine
 
     def _reset_runtime_state(self, clear_stabilizer: bool) -> None:
         self.last_text = ""
@@ -2088,28 +1594,6 @@ class TranslationPipeline:
         """
         return self.target_region
 
-    def _emit_frame_stat(self, payload: dict | None, result: str, reason: str = "") -> None:
-        """Throttled (max 1/sn) OCR cerceve tanilama eventi. UI'da gercek zamanli izleme saglar."""
-        now = time.monotonic()
-        if now - self._last_stat_emit_time < 0.85:
-            return
-        self._last_stat_emit_time = now
-        self.bridge.send(
-            "ocr_frame_stat",
-            {
-                "engine": self._runtime_engine_id(),
-                "scene_selected": self.ocr_scene_mode,
-                "detected_scene": payload.get("detected_scene_mode", "?") if payload else "?",
-                "quality": int(payload.get("quality", 0)) if payload else 0,
-                "result": result,          # accepted | rejected | no_text
-                "reason": reason,          # quality | junk | "" (bos = kabul edildi)
-                "signal": round(float(payload.get("signal", 0.0)), 1) if payload else 0.0,
-                "variant": payload.get("variant", "-") if payload else "-",
-                "capture_delay_ms": round(self._capture_delay() * 1000, 1),
-                "queue_depth": len(self._pending_translations),
-                "reused_frame_count": int(self._reused_frame_count),
-            },
-        )
 
     def _normalize_ocr_text(self, text: str) -> str:
         cleaned = unicodedata.normalize("NFKC", text).strip()
