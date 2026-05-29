@@ -672,15 +672,18 @@ pub fn run() {
                 .text("quit_app", "Çıkış")
                 .build()?;
 
-            let tray_icon = TrayIconBuilder::with_id("main-tray")
+            let mut tray_builder = TrayIconBuilder::with_id("main-tray")
                 .menu(&tray_menu)
                 .show_menu_on_left_click(false)
-                .tooltip("VOIDSUB")
-                .icon(
-                    app.default_window_icon()
-                        .cloned()
-                        .expect("tray icon bulunamadi"),
-                )
+                .tooltip("VOIDSUB");
+            
+            if let Some(icon) = app.default_window_icon().cloned() {
+                tray_builder = tray_builder.icon(icon);
+            } else {
+                log::error!("tray icon bulunamadi");
+            }
+
+            let tray_icon = tray_builder
                 .on_tray_icon_event(|tray, event| {
                     if let TrayIconEvent::Click {
                         button: MouseButton::Left,
@@ -711,20 +714,25 @@ pub fn run() {
                 suspended_shortcuts: Arc::new(Mutex::new(None)),
             });
 
-            let window = app.get_webview_window("main").expect("main window missing");
+            if let Some(window) = app.get_webview_window("main") {
+                #[cfg(debug_assertions)]
+                window.open_devtools();
 
-            #[cfg(debug_assertions)]
-            window.open_devtools();
+                #[cfg(target_os = "macos")]
+                if let Err(e) = apply_vibrancy(&window, NSVisualEffectMaterial::HudWindow, None, None) {
+                    log::error!("macOS vibrancy uygulanamadı: {}", e);
+                }
 
-            #[cfg(target_os = "macos")]
-            apply_vibrancy(&window, NSVisualEffectMaterial::HudWindow, None, None)
-                .expect("macOS vibrancy uygulanamadı");
-
-            #[cfg(target_os = "windows")]
-            {
-                let _ = window.set_shadow(true);
-                apply_rounded_corners(&window);
-                apply_mica(&window, Some(true)).expect("Windows mica uygulanamadı");
+                #[cfg(target_os = "windows")]
+                {
+                    let _ = window.set_shadow(true);
+                    apply_rounded_corners(&window);
+                    if let Err(e) = apply_mica(&window, Some(true)) {
+                        log::error!("Windows mica uygulanamadı: {}", e);
+                    }
+                }
+            } else {
+                log::error!("main window missing during setup");
             }
 
             // Oyun tam ekranındayken de calisan global kısayolları kaydet.
