@@ -60,11 +60,12 @@ def cleanup_startup_artifacts() -> None:
                             if path_out:
                                 try:
                                     proc_path = Path(path_out.strip()).resolve()
+                                    _python_embedded = (BASE_DIR / "python_embedded").resolve()
                                     is_our_process = (
                                         proc_path.is_relative_to(BASE_DIR.resolve()) or
                                         proc_path.is_relative_to(USER_DATA_DIR.resolve()) or
                                         proc_path.is_relative_to(DOCS_DIR.resolve()) or
-                                        "python_embedded" in proc_path.parts
+                                        proc_path.is_relative_to(_python_embedded)
                                     )
                                 except Exception:
                                     pass
