@@ -39,7 +39,7 @@ import {
   CalibrationSliderControl,
   CalibrationGroupSection,
   calibrationSettingsGridStyle,
-} from './calibration/CalibrationHelpers';
+} from './calibration';
 
 export const CalibrationView: React.FC<{
   currentPerformanceId?: string;

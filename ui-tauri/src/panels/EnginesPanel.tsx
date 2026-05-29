@@ -25,7 +25,7 @@ import {
   PerfEstimateItem,
   OfflineLangModelItem,
   EngineHardwareInfo,
-} from './engines/EnginesHelpers';
+} from './engines';
 
 export const EnginesPanel: React.FC = () => {
   const { notify } = useAppContext();
