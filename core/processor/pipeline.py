@@ -305,7 +305,7 @@ class TranslationPipeline:
                                 "reason": "no_text",
                             },
                         )
-                        self._emit_frame_stat(None, "no_text")
+                        self.overlay_publisher._emit_frame_stat(None, "no_text")
                         del frame
                         await asyncio.sleep(min(self.loop_interval, 0.01))
                         continue
@@ -369,7 +369,7 @@ class TranslationPipeline:
                                 f"text={detected_text!r}"
                             ),
                         )
-                        self._emit_frame_stat(ocr_payload, "rejected", "min_text_chars")
+                        self.overlay_publisher._emit_frame_stat(ocr_payload, "rejected", "min_text_chars")
                         del frame
                         del ocr_payload
                         await asyncio.sleep(0)
@@ -430,7 +430,7 @@ class TranslationPipeline:
                                 "reason": "junk",
                             },
                         )
-                        self._emit_frame_stat(ocr_payload, "rejected", "junk")
+                        self.overlay_publisher._emit_frame_stat(ocr_payload, "rejected", "junk")
                         del frame
                         del ocr_payload
                         await asyncio.sleep(0)
@@ -474,7 +474,7 @@ class TranslationPipeline:
                             },
                         )
                         log_event(PREFIX_SYS, "033", "[Görüntü İşleme] -> ATLANDI | Düşük kalite OCR çıktısı", throttle_key="quality_skip", throttle_seconds=2.0)
-                        self._emit_frame_stat(ocr_payload, "rejected", "quality")
+                        self.overlay_publisher._emit_frame_stat(ocr_payload, "rejected", "quality")
                         del frame
                         del ocr_payload
                         await asyncio.sleep(0)
@@ -483,7 +483,7 @@ class TranslationPipeline:
                     self.last_detected_quality = quality_score
 
                     if self.raw_translation_flow_enabled:
-                        self._emit_frame_stat(ocr_payload, "accepted")
+                        self.overlay_publisher._emit_frame_stat(ocr_payload, "accepted")
                         self.overlay_publisher._log_ocr(
                             "024",
                             (
@@ -527,7 +527,7 @@ class TranslationPipeline:
                         ),
                     )
                     if push_result == "rejected":
-                        self._emit_frame_stat(ocr_payload, "rejected", "slot_rejected")
+                        self.overlay_publisher._emit_frame_stat(ocr_payload, "rejected", "slot_rejected")
                         del frame
                         del ocr_payload
                         await asyncio.sleep(0)
@@ -541,7 +541,7 @@ class TranslationPipeline:
                                 f"reason=slot_wait"
                             ),
                         )
-                        self._emit_frame_stat(ocr_payload, "rejected", "slot_wait")
+                        self.overlay_publisher._emit_frame_stat(ocr_payload, "rejected", "slot_wait")
                         del frame
                         del ocr_payload
                         await asyncio.sleep(0)
@@ -596,7 +596,7 @@ class TranslationPipeline:
                             "frame_id": frame_id,
                         },
                     )
-                    self._emit_frame_stat(ocr_payload, "accepted")
+                    self.overlay_publisher._emit_frame_stat(ocr_payload, "accepted")
                     self.overlay_publisher._log_ocr(
                         "024",
                         (
@@ -1496,7 +1496,7 @@ class TranslationPipeline:
         return re.sub(r"\s+", " ", str(text or "").strip()).lower()
 
     def _should_skip_translated_emit(self, translated_text: str, source: str = "") -> bool:
-        normalized = self.overlay_publisher._normalize_translated_text(translated_text)
+        normalized = self._normalize_translated_text(translated_text)
         if not normalized or not self._last_translated_text:
             return False
         repeat_window_ms = int(self._profile_value("translated_repeat_window_ms", 220))
@@ -1512,17 +1512,17 @@ class TranslationPipeline:
         return False
 
     def _should_skip_raw_source_repeat(self, text: str) -> bool:
-        normalized = self.overlay_publisher._normalize_translated_text(text)
+        normalized = self._normalize_translated_text(text)
         if not normalized:
             return False
         now = time.monotonic()
         if self._last_raw_source_text == normalized and (now - self._last_raw_source_time) * 1000 < 900:
             return True
         if self._pending_translations:
-            pending_normalized = self.overlay_publisher._normalize_translated_text(self._pending_translations[-1][0])
+            pending_normalized = self._normalize_translated_text(self._pending_translations[-1][0])
             if pending_normalized == normalized:
                 return True
-        if self._active_translation_source and self.overlay_publisher._normalize_translated_text(self._active_translation_source) == normalized:
+        if self._active_translation_source and self._normalize_translated_text(self._active_translation_source) == normalized:
             return True
         return False
     def _effective_min_text_chars(self) -> int:

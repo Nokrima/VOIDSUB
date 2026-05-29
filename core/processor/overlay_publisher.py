@@ -184,11 +184,12 @@ class OverlayPublisherService:
         )
         self.p._translation_request_id += 1
         slot_norm = self.p.slot_manager.get_normalized_slot() or _quick_normalize(stabilized_text)
-        for pending_text, _, _, _, _ in self.p._pending_translations:
+        for pending_text, _, _, _, _, _ in self.p._pending_translations:
             pend_norm = _quick_normalize(pending_text)
             if slot_norm and pend_norm and SequenceMatcher(None, slot_norm, pend_norm).ratio() >= 0.85:
                 return
         if self.p._pending_translations:
+            current_normalized = re.sub(r"\s+", " ", stabilized_text.strip().lower())
             pending_normalized = re.sub(r"\s+", " ", self.p._pending_translations[-1][0].strip().lower())
             if pending_normalized == current_normalized:
                 return
