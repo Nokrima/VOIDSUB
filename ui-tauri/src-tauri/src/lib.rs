@@ -48,6 +48,26 @@ struct TrayState {
 struct BackendState {
     port: Mutex<Option<String>>,
     error: Mutex<Option<String>>,
+    #[cfg(target_os = "windows")]
+    job_handle: Mutex<Option<isize>>,
+}
+
+impl Drop for BackendState {
+    fn drop(&mut self) {
+        #[cfg(target_os = "windows")]
+        {
+            if let Ok(guard) = self.job_handle.lock() {
+                if let Some(handle) = *guard {
+                    extern "system" {
+                        fn CloseHandle(hObject: *mut std::ffi::c_void) -> i32;
+                    }
+                    unsafe {
+                        CloseHandle(handle as *mut std::ffi::c_void);
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -279,16 +299,24 @@ unsafe fn unregister_all_hotkeys() {
 unsafe fn register_shortcuts(shortcuts: &ShortcutsMap) {
     let null_hwnd = std::ptr::null_mut();
     if let Some((mods, vk)) = parse_shortcut_string(&shortcuts.start_stop) {
-        RegisterHotKey(null_hwnd, 1, mods, vk);
+        if RegisterHotKey(null_hwnd, 1, mods, vk) == 0 {
+            log::error!("Failed to register start_stop hotkey: {}", shortcuts.start_stop);
+        }
     }
     if let Some((mods, vk)) = parse_shortcut_string(&shortcuts.select_region) {
-        RegisterHotKey(null_hwnd, 2, mods, vk);
+        if RegisterHotKey(null_hwnd, 2, mods, vk) == 0 {
+            log::error!("Failed to register select_region hotkey: {}", shortcuts.select_region);
+        }
     }
     if let Some((mods, vk)) = parse_shortcut_string(&shortcuts.hide_overlay) {
-        RegisterHotKey(null_hwnd, 3, mods, vk);
+        if RegisterHotKey(null_hwnd, 3, mods, vk) == 0 {
+            log::error!("Failed to register hide_overlay hotkey: {}", shortcuts.hide_overlay);
+        }
     }
     if let Some((mods, vk)) = parse_shortcut_string(&shortcuts.temporary_region) {
-        RegisterHotKey(null_hwnd, 4, mods, vk);
+        if RegisterHotKey(null_hwnd, 4, mods, vk) == 0 {
+            log::error!("Failed to register temporary_region hotkey: {}", shortcuts.temporary_region);
+        }
     }
 }
 
@@ -475,6 +503,8 @@ pub fn run() {
         .manage(BackendState {
             port: Mutex::new(None),
             error: Mutex::new(None),
+            #[cfg(target_os = "windows")]
+            job_handle: Mutex::new(None),
         })
         .setup(|app| {
             let app_handle = app.handle().clone();
@@ -579,6 +609,8 @@ pub fn run() {
                                     std::mem::size_of_val(&info) as u32,
                                 );
                                 AssignProcessToJobObject(job, child.as_raw_handle() as HANDLE);
+                                let state: tauri::State<'_, BackendState> = app_handle.state();
+                                *state.job_handle.lock().unwrap() = Some(job as isize);
                             }
                         }
                     }
@@ -686,6 +718,22 @@ pub fn run() {
 
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("Tauri çalıştırılırken bir hata oluştu");
+        .build(tauri::generate_context!())
+        .expect("Tauri çalıştırılırken bir hata oluştu")
+        .run(|app_handle, event| {
+            if let tauri::RunEvent::Exit = event {
+                #[cfg(target_os = "windows")]
+                {
+                    use tauri::Manager;
+                    const WM_QUIT: u32 = 0x0012;
+                    let state = app_handle.state::<HotkeyState>();
+                    let tid = *state.thread_id.lock().unwrap();
+                    if tid != 0 {
+                        unsafe {
+                            PostThreadMessageW(tid, WM_QUIT, 0, 0);
+                        }
+                    }
+                }
+            }
+        });
 }
