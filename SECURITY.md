@@ -27,3 +27,28 @@
 `script-src 'unsafe-inline'` **has been removed**. The application uses a bundled Vite output (`script-src 'self'`) with no inline scripts.
 
 `unsafe-eval` **has been removed** from both `script-src` and `default-src`.
+
+---
+
+## Audit Gate Verification
+
+**Date:** 2026-05-29
+
+The following security gates have been successfully verified locally to ensure the integrity of the `v2.0.0` release:
+
+### 1. `npm audit` (Frontend Dependencies)
+- **Target:** `ui-tauri`
+- **Result:** `found 0 vulnerabilities`
+- **Status:** PASS
+
+### 2. `cargo check --locked` (Tauri Backend Core)
+- **Target:** `ui-tauri/src-tauri`
+- **Result:** `Finished dev profile [unoptimized + debuginfo] target(s) in 0.38s` (Successful compilation using locked dependency tree).
+- **Status:** PASS
+
+### 3. `pip-audit` (Python Backend Environment)
+- **Target:** Python environment
+- **Result:** 
+  - `deep-translator 1.11.4` flagged with `PYSEC-2022-252` (Accepted, see above).
+  - `pip 24.0` flagged with CVEs (CVE-2025-8869, CVE-2026-1703, CVE-2026-3219, CVE-2026-6357). 
+- **Status:** PASS (Note: The `pip` warnings apply to the development environment package manager and do not impact the distributed application since `pip` is not a runtime dependency of VoidSub).
