@@ -221,8 +221,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useAppWebSocket({
     onSettings: (data) => {
-      const nextSettings = { ...data, ocr_engine: VALID_OCR_ENGINES.has(data.ocr_engine) ? data.ocr_engine : 'easy' } as unknown as AppSettingsState;
+      // Handle both nested {app, overlay} and flat structure
+      const payloadObj = data as Record<string, any>;
+      const appData = payloadObj.app || payloadObj;
+      
+      const nextSettings = { 
+        ...appData, 
+        ocr_engine: VALID_OCR_ENGINES.has((appData as any).ocr_engine) ? (appData as any).ocr_engine : 'easy' 
+      } as unknown as AppSettingsState;
+      
       setSettings(nextSettings);
+      
+      if (payloadObj.overlay) {
+        setOverlaySettings(payloadObj.overlay as OverlaySettingsState);
+      }
+      
       restoreWindowSettingRef.current = nextSettings.restore_window_after_region_selection ?? true;
       if (nextSettings.last_region) {
         localStorage.setItem('has-selected-region', 'true');

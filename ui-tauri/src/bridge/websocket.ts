@@ -199,7 +199,7 @@ const validatePayload = (eventName: string, payload: Record<string, unknown>): b
     case 'hardware_result':
       return 'cpu' in payload && 'gpu' in payload && 'ram_gb' in payload && Array.isArray(payload.available_engines);
     case 'app_settings_loaded':
-      return 'performance_tier' in payload;
+      return 'performance_tier' in payload || 'app' in payload;
     case 'translation_state':
       return 'running' in payload;
     case 'calibration_region_selected':
