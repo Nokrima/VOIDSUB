@@ -27,13 +27,44 @@ export interface OcrFrameStat {
   variant: string;
 }
 
+export interface TranslationState {
+  running: boolean;
+  loading?: boolean;
+  engine?: string;
+  reason?: string;
+  message?: string;
+}
+
+export interface RegionState {
+  region: {
+    top: number;
+    left: number;
+    width: number;
+    height: number;
+  } | null;
+}
+
+export interface AppSettings {
+  ocr_engine: string;
+  translation_engine: string;
+  ocr_scene_mode: string;
+  [key: string]: any;
+}
+
+export interface HardwareResult {
+  cpu_model?: string;
+  ram_gb?: number;
+  gpu_available?: boolean;
+  [key: string]: any;
+}
+
 export interface AppWebSocketBindings {
-  onSettings: (data: any) => void;
-  onHardware: (data: any) => void;
-  onOverlaySettings: (data: any) => void;
+  onSettings: (data: AppSettings) => void;
+  onHardware: (data: HardwareResult) => void;
+  onOverlaySettings: (data: OverlaySettingsState) => void;
   onOfflineStatus: (data: any) => void;
   onTranslation: (data: TranslationPreview) => void;
-  onTranslationState: (data: any) => void;
+  onTranslationState: (data: TranslationState) => void;
   onEngineDenied: (data: any) => void;
   onSettingsSaveFailed: (data: any) => void;
   onEngineRepair: (data: any) => void;
@@ -42,7 +73,7 @@ export interface AppWebSocketBindings {
   onTranslationFallback: (data: any) => void;
   onOcrRuntimeFallback: (data: any) => void;
   onFrameStat: (data: OcrFrameStat) => void;
-  onRegionSelected: (data: any) => void;
+  onRegionSelected: (data: RegionState) => void;
   onRegionCancelled: (data: any) => void;
   onRegionFailed: (data: any) => void;
   onAsyncError: (data: any) => void;

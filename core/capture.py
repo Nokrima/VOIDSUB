@@ -258,6 +258,17 @@ class ScreenCapturer:
 
     def resolve_region(self, region: dict) -> dict:
         next_region = dict(region) if isinstance(region, dict) else region
+        bounds = self._virtual_bounds()
+        v_left = bounds["left"]
+        v_top = bounds["top"]
+        v_right = v_left + bounds["width"]
+        v_bottom = v_top + bounds["height"]
+        
+        next_region["left"] = max(v_left, min(int(next_region.get("left", 0)), v_right - 10))
+        next_region["top"] = max(v_top, min(int(next_region.get("top", 0)), v_bottom - 10))
+        next_region["width"] = max(10, min(int(next_region.get("width", 0)), v_right - next_region["left"]))
+        next_region["height"] = max(10, min(int(next_region.get("height", 0)), v_bottom - next_region["top"]))
+
         self._last_resolved_region = dict(next_region) if isinstance(next_region, dict) else None
         return next_region
 

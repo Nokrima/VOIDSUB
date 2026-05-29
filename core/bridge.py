@@ -201,13 +201,35 @@ class BridgeServer:
         if not isinstance(region, dict):
             return None
         try:
+            import ctypes
+            user32 = ctypes.windll.user32
+            v_left = int(user32.GetSystemMetrics(76)) # SM_XVIRTUALSCREEN
+            v_top = int(user32.GetSystemMetrics(77)) # SM_YVIRTUALSCREEN
+            v_width = int(user32.GetSystemMetrics(78)) # SM_CXVIRTUALSCREEN
+            v_height = int(user32.GetSystemMetrics(79)) # SM_CYVIRTUALSCREEN
+            v_right = v_left + v_width
+            v_bottom = v_top + v_height
+
+            left = int(region.get("left", 0))
+            top = int(region.get("top", 0))
+            width = int(region.get("width", 0))
+            height = int(region.get("height", 0))
+
+            if width <= 0 or height <= 0:
+                return None
+
+            left = max(v_left, min(left, v_right - 10))
+            top = max(v_top, min(top, v_bottom - 10))
+            width = max(10, min(width, v_right - left))
+            height = max(10, min(height, v_bottom - top))
+
             normalized = {
-                "top": int(region.get("top", 0)),
-                "left": int(region.get("left", 0)),
-                "width": int(region.get("width", 0)),
-                "height": int(region.get("height", 0)),
+                "top": top,
+                "left": left,
+                "width": width,
+                "height": height,
             }
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, Exception):
             return None
         if normalized["width"] <= 0 or normalized["height"] <= 0:
             return None
