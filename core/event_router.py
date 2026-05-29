@@ -1,7 +1,12 @@
 import asyncio
 import json
 from copy import deepcopy
-from typing import Any
+from typing import Any, Callable
+
+VALID_PROFILE_MODES = ["anime", "visual_novel", "game", "manga", "mixed"]
+VALID_SOURCE_LANGUAGES = ["auto", "ja", "en", "ko", "zh", "ru"]
+VALID_TARGET_LANGUAGES = ["tr", "en"]
+VALID_OFFLINE_MODEL_KEYS = ["opus_mt_en_tr", "sugoi_v4", "sugoi_v4_ja_en"]
 
 from core.errors import (
     PREFIX_CFG,
@@ -23,7 +28,7 @@ class EventRouter:
         self._register_routes()
         self._register_validators()
 
-    def route(self, event_name: str, handler: callable):
+    def route(self, event_name: str, handler: Callable):
         self.routes[event_name] = handler
 
     def _register_validators(self):
@@ -144,7 +149,7 @@ class EventRouter:
             try:
                 if not validator(payload):
                     from core.errors import log_error
-                    log_error(PREFIX_SYS, "050", f"Event validation failed: {event}")
+                    log_error(PREFIX_SYS, "050", f"Event validation failed: {event}", f"Etkinlik doğrulanamadı: {event}")
                     return
             except Exception as e:
                 from core.errors import log_error
@@ -284,7 +289,6 @@ class EventRouter:
                 self.bridge.send("settings_save_failed", {"scope": "app", "message": "Motor tercihi kaydedilemedi."})
 
     def handle_change_ocr_scene_mode(self, payload: dict):
-        from core.bridge import VALID_PROFILE_MODES
         scene_mode = payload.get("mode")
         if scene_mode in VALID_PROFILE_MODES:
             if hasattr(self.bridge.worker, "update_config"):
@@ -296,7 +300,6 @@ class EventRouter:
                 self.bridge.send("settings_save_failed", {"scope": "app", "message": "OCR sahne modu kaydedilemedi."})
 
     def handle_save_settings(self, payload: dict):
-        from core.bridge import VALID_SOURCE_LANGUAGES, VALID_TARGET_LANGUAGES, VALID_OFFLINE_MODEL_KEYS
         previous = deepcopy(self.bridge.settings["app"])
         next_payload = self.bridge._merge_dict(self.bridge.settings["app"], payload)
         next_payload.pop("app_version", None)

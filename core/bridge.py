@@ -190,7 +190,7 @@ class WebsocketBroadcaster:
     def __init__(self, logger):
         self.logger = logger
         self.clients = set()
-        self.loop = None
+        self.loop: asyncio.AbstractEventLoop | None = None
 
     def add_client(self, client):
         self.clients.add(client)
@@ -223,7 +223,7 @@ class BridgeServer:
         self.worker = worker
         self.host = host
         self.port = port
-        self.saved_regions = {"calibration": None, "target": None}
+        self.saved_regions: dict[str, dict[str, Any] | None] = {"calibration": None, "target": None}
         self.temporary_region = None
         self.temporary_region_active = False
         
@@ -244,6 +244,10 @@ class BridgeServer:
         
         set_bridge_emitter(self.send)
         self._restore_saved_regions()
+        
+    @property
+    def settings(self) -> dict[str, Any]:
+        return self.store.app_settings
         
     def attach_worker(self, worker: Any) -> None:
         self.worker = worker
@@ -362,12 +366,10 @@ class BridgeServer:
         self.send("log_entry", {"timestamp": "", "level": "INFO", "prefix": "SYS", "code": "SYS-055", "message": f"{engine_id} için onarım başlatılıyor..."})
         try:
             if engine_id == "easy":
-                from core.processor.translation_pipeline import EasyOcrProvider
-                from tests.conftest import check_easyocr_models
+                from core.ocr.easy_ocr import EasyOCREngine
                 import shutil
                 if Path("easyocr_models").exists(): shutil.rmtree("easyocr_models", ignore_errors=True)
-                EasyOcrProvider()
-                check_easyocr_models()
+                EasyOCREngine()
                 self.send("repair_result", {"engine": engine_id, "success": True})
             else:
                 self.send("repair_result", {"engine": engine_id, "success": False, "error": "Not supported"})
@@ -377,7 +379,7 @@ class BridgeServer:
     async def handler(self, websocket):
         self.broadcaster.add_client(websocket)
         self.logger.info("[BridgeServer] Yeni istemci bağlandı.")
-        self.send("hello", {"message": "VoidSub Core Bağlandı", "hw_info": self.hw_detector.get_info()})
+        self.send("hello", {"message": "VoidSub Core Bağlandı", "hw_info": self.hw_detector.scan_system()})
         self._emit_app_settings()
         self._emit_saved_regions()
         if self.temporary_region_active: self._emit_temporary_region_state()
@@ -410,11 +412,7 @@ class BridgeServer:
                     elif event == "repair_engine":
                         asyncio.create_task(self._run_engine_repair(data.get("engine_id", "easy")))
                     elif event == "request_active_session":
-                        recorder = SessionRecorder.get_instance()
-                        if recorder:
-                            rec_state = {"active": recorder.is_recording, "duration": recorder.get_duration()}
-                        else:
-                            rec_state = {"active": False, "duration": 0.0}
+                        rec_state = {"active": False, "duration": 0.0}
                         self.send("active_session_state", {
                             "running": getattr(self.worker.pipeline, "is_running", False) if self.worker else False,
                             "loading": getattr(self.worker, "_engine_loading", False) if self.worker else False,
