@@ -194,9 +194,49 @@ const validatePayload = (eventName: string, payload: Record<string, unknown>): b
     case 'translation_state':
       return 'running' in payload;
     case 'calibration_region_selected':
+    case 'region_selected':
+    case 'temporary_region_selected':
       return 'x1' in payload && 'y1' in payload && 'x2' in payload && 'y2' in payload;
+    case 'new_translation':
+      return 'translated_text' in payload;
+    case 'ocr_frame_stat':
+      return 'fps' in payload;
+    case 'engine_change_denied':
+    case 'settings_save_failed':
+    case 'offline_model_error':
+    case 'async_error':
+    case 'region_selection_failed':
+    case 'calibration_region_failed':
+    case 'temporary_region_failed':
+    case 'easyocr_plugin_error':
+    case 'cuda_error':
+      return 'error' in payload;
+    case 'translation_engine_fallback':
+    case 'ocr_engine_runtime_fallback':
+      return 'engine' in payload && 'reason' in payload;
+    case 'log_entry':
+      return 'message' in payload || 'level' in payload;
+    case 'overlay_settings_loaded':
+    case 'offline_model_status':
+    case 'engine_repair_result':
+    case 'offline_model_complete':
+    case 'offline_model_progress':
+    case 'offline_model_cancelled':
+    case 'easyocr_plugin_progress':
+    case 'easyocr_plugin_complete':
+    case 'easyocr_plugin_cancelled':
+    case 'cuda_progress':
+    case 'cuda_complete':
+    case 'cuda_cancelled':
+    case 'region_selection_cancelled':
+    case 'calibration_region_cancelled':
+    case 'temporary_region_state':
+    case 'temporary_region_cancelled':
+    case 'shortcut_feedback':
+    case 'calibration_preview_result':
+      return true;
     default:
-      return true; // We accept other events for now
+      return false; // Outbound-only or unknown events are rejected
   }
 };
 
