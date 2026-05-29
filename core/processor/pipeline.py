@@ -34,10 +34,10 @@ logger = get_logger()
 
 from core.processor.utils import _clip_log_text, _quick_normalize, _strip_speaker
 
-from core.processor.translation_queue import TranslationQueueMixin
-from core.processor.overlay_publisher import OverlayPublisherMixin
+from core.processor.translation_queue import TranslationQueueService
+from core.processor.overlay_publisher import OverlayPublisherService
 
-class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
+class TranslationPipeline:
     def __init__(self, bridge, capturer):
         self.logger = get_logger()
         self.bridge = bridge
@@ -53,6 +53,8 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
         self.diagnostics = OCRDiagnostics()
         self.stabilizer = TextStabilizer()
         self.slot_manager = SlotManager()
+        self.translation_queue = TranslationQueueService(self)
+        self.overlay_publisher = OverlayPublisherService(self)
 
         self.is_running = False
         self.active_engine = "easy"
@@ -226,7 +228,7 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
                     frame_hash = self._frame_hash(frame)
                     if frame_hash == self._last_frame_hash and self.last_detected_text:
                         if self.raw_translation_flow_enabled:
-                            self._log_ocr(
+                            self.overlay_publisher._log_ocr(
                                 "032",
                                 (
                                     f"Raw flow frame reuse allowed: frame_id={frame_id}, reason=hash_match, "
@@ -235,7 +237,7 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
                             )
                         else:
                             self._reused_frame_count += 1
-                            self._log_ocr(
+                            self.overlay_publisher._log_ocr(
                                 "002",
                                 (
                                     f"Frame reused: frame_id={frame_id}, reason=hash_match, "
@@ -249,7 +251,7 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
                                 self.last_detected_quality,
                             )
                             if self._should_skip_reused_frame_reprocess(min_slot_samples):
-                                self._log_ocr(
+                                self.overlay_publisher._log_ocr(
                                     "026",
                                     (
                                         f"Static frame skipped: frame_id={frame_id}, repeat_count={self._reused_frame_count}, "
@@ -265,7 +267,7 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
                             else:
                                 stabilized_text = None
                             if stabilized_text:
-                                self._emit_translation(stabilized_text, frame_started_monotonic=frame_started_monotonic, ocr_duration_ms=0.0)
+                                self.overlay_publisher._emit_translation(stabilized_text, frame_started_monotonic=frame_started_monotonic, ocr_duration_ms=0.0)
                             del frame
                             await asyncio.sleep(min(self.loop_interval, 0.01))
                             continue
@@ -283,7 +285,7 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
                         ocr_payload = None
                     ocr_duration_ms = (time.perf_counter() - ocr_started) * 1000
                     if not ocr_payload:
-                        self._log_ocr(
+                        self.overlay_publisher._log_ocr(
                             "015",
                             f"No OCR payload: frame_id={frame_id}, ocr_ms={ocr_duration_ms:.1f}, resolved_region={resolved_region}",
                         )
@@ -312,19 +314,19 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
                     clean_report = clean_ocr_source_detailed(raw_detected_text) if not self.raw_translation_flow_enabled else None
                     detected_text = raw_detected_text if self.raw_translation_flow_enabled else str(clean_report["text"])
                     if self.raw_translation_flow_enabled:
-                        self._log_ocr(
+                        self.overlay_publisher._log_ocr(
                             "033",
                             (
                                 f"Raw flow cleanup bypass: frame_id={frame_id}, "
                                 f"raw_text={raw_detected_text!r}, cleaned_candidate=None"
                             ),
                         )
-                        self._log_ocr(
+                        self.overlay_publisher._log_ocr(
                             "013",
                             f"Source cleanup: frame_id={frame_id}, changed=False, steps=['skipped_raw_mode'], before={raw_detected_text!r}, after={detected_text!r}",
                         )
                     else:
-                        self._log_ocr(
+                        self.overlay_publisher._log_ocr(
                             "013",
                             (
                                 f"Source cleanup: frame_id={frame_id}, changed={clean_report['changed']}, "
@@ -333,7 +335,7 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
                             ),
                         )
                     quality_score = int(ocr_payload["quality"])
-                    self._log_ocr(
+                    self.overlay_publisher._log_ocr(
                         "016",
                         (
                             f"Final OCR text: frame_id={frame_id}, variant={ocr_payload['variant']}, "
@@ -359,7 +361,7 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
                         await asyncio.sleep(0)
                         continue
                     if not self.raw_translation_flow_enabled and len(detected_text.strip()) < self._effective_min_text_chars():
-                        self._log_ocr(
+                        self.overlay_publisher._log_ocr(
                             "017",
                             (
                                 f"Min text chars gate: decision=REJECTED, frame_id={frame_id}, "
@@ -374,18 +376,18 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
                         continue
                     junk_rejected = False
                     if self.raw_translation_flow_enabled:
-                        self._log_ocr(
+                        self.overlay_publisher._log_ocr(
                             "018",
                             f"Junk filter: decision=BYPASSED, frame_id={frame_id}, text={detected_text!r}",
                         )
-                        self._log_ocr(
+                        self.overlay_publisher._log_ocr(
                             "014",
                             f"Tip2 analysis: frame_id={frame_id}, decision=BYPASSED",
                         )
                     else:
                         junk_rejected = JunkFilter.is_junk(detected_text)
                         text_health = JunkFilter.analyze_text(detected_text)
-                        self._log_ocr(
+                        self.overlay_publisher._log_ocr(
                             "018",
                             (
                                 f"Junk filter: decision={'REJECTED' if junk_rejected else 'ACCEPTED'}, "
@@ -399,7 +401,7 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
                                 f"tip2={text_health['tip2_suspect']}"
                             ),
                         )
-                        self._log_ocr(
+                        self.overlay_publisher._log_ocr(
                             "014",
                             (
                                 f"Tip2 analysis: frame_id={frame_id}, candidate={text_health['tip2_suspect']}, "
@@ -440,14 +442,14 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
                         quality_threshold, quality_reason = self._quality_gate_context(detected_text, quality_score)
                         quality_rejected = self._should_drop_for_quality(detected_text, quality_score)
                     if self.raw_translation_flow_enabled:
-                        self._log_ocr(
+                        self.overlay_publisher._log_ocr(
                             "034",
                             (
                                 f"Raw flow gates bypassed: frame_id={frame_id}, "
                                 f"min_chars=off, junk=off, quality=off, score={quality_score}, threshold={quality_threshold}"
                             ),
                         )
-                    self._log_ocr(
+                    self.overlay_publisher._log_ocr(
                         "019",
                     (
                         f"Quality gate: decision={'REJECTED' if quality_rejected else 'ACCEPTED'}, "
@@ -482,14 +484,14 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
 
                     if self.raw_translation_flow_enabled:
                         self._emit_frame_stat(ocr_payload, "accepted")
-                        self._log_ocr(
+                        self.overlay_publisher._log_ocr(
                             "024",
                             (
                                 f"Raw flow queued for translation: frame_id={frame_id}, text={detected_text!r}, "
                                 f"ocr_ms={ocr_duration_ms:.1f}"
                             ),
                         )
-                        self._emit_translation(detected_text, frame_started_monotonic=frame_started_monotonic, ocr_duration_ms=ocr_duration_ms)
+                        self.overlay_publisher._emit_translation(detected_text, frame_started_monotonic=frame_started_monotonic, ocr_duration_ms=ocr_duration_ms)
                         del frame
                         del ocr_payload
                         await asyncio.sleep(0)
@@ -501,7 +503,7 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
                         self._instability_count = getattr(self, "_instability_count", 0) + 1
                         if self._instability_count > 5:
                             from core.errors import emit_bridge_event
-                            self._log_ocr("060", "Ekran içeriği çok hızlı değişiyor (Flickering tespit edildi).")
+                            self.overlay_publisher._log_ocr("060", "Ekran içeriği çok hızlı değişiyor (Flickering tespit edildi).")
                             emit_bridge_event("log_entry", {
                                 "timestamp": "", "level": "INFO", "prefix": "OCR", "code": "OCR-060",
                                 "message": "Ekran içeriği çok hızlı değişiyor. Çeviri gecikmeli görünebilir."
@@ -514,7 +516,7 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
                     sample_count = self.slot_manager.get_sample_count()
                     slot_debug = self.slot_manager.get_slot_debug()
                     min_slot_samples = self._required_slot_samples(detected_text, quality_score)
-                    self._log_ocr(
+                    self.overlay_publisher._log_ocr(
                         "020",
                         (
                             f"Stabilizer push: decision={push_result.upper()}, frame_id={frame_id}, "
@@ -531,7 +533,7 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
                         await asyncio.sleep(0)
                         continue
                     if self.slot_manager.get_sample_count() < min_slot_samples:
-                        self._log_ocr(
+                        self.overlay_publisher._log_ocr(
                             "021",
                             (
                                 f"Stabilizer decision: ACCEPTED=NO, frame_id={frame_id}, "
@@ -547,7 +549,7 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
 
                     stabilized_text = self.slot_manager.get_slot()
                     if stabilized_text is None:
-                        self._log_ocr(
+                        self.overlay_publisher._log_ocr(
                             "022",
                             f"Stabilizer decision: ACCEPTED=NO, frame_id={frame_id}, reason=stabilizer_none, text={detected_text!r}",
                         )
@@ -572,7 +574,7 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
                         await asyncio.sleep(0)
                         continue
 
-                    self._log_ocr(
+                    self.overlay_publisher._log_ocr(
                         "023",
                         (
                             f"Stabilizer decision: ACCEPTED=YES, frame_id={frame_id}, "
@@ -595,14 +597,14 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
                         },
                     )
                     self._emit_frame_stat(ocr_payload, "accepted")
-                    self._log_ocr(
+                    self.overlay_publisher._log_ocr(
                         "024",
                         (
                             f"Final text queued for translation: frame_id={frame_id}, text={stabilized_text!r}, "
                             f"ocr_ms={ocr_duration_ms:.1f}"
                         ),
                     )
-                    self._emit_translation(stabilized_text, frame_started_monotonic=frame_started_monotonic, ocr_duration_ms=ocr_duration_ms)
+                    self.overlay_publisher._emit_translation(stabilized_text, frame_started_monotonic=frame_started_monotonic, ocr_duration_ms=ocr_duration_ms)
                     del frame
                     del ocr_payload
                     await asyncio.sleep(0)
@@ -659,7 +661,7 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
                         "resolved_region": dict(resolved_region) if isinstance(resolved_region, dict) else None,
                         "shape": tuple(frame.shape),
                     }
-                    self._log_ocr(
+                    self.overlay_publisher._log_ocr(
                         "001",
                         (
                             f"Frame captured: frame_id={self._latest_frame_id}, "
@@ -763,7 +765,7 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
             tier = get_performance_tier_profile(self.active_engine, self.performance_tier, self.translation_engine)
             self.loop_interval = max(0.04, float(tier["target_ms"]) / 1000)
             self.source_state.configure(hold_window_ms=int(tier.get("source_family_hold_ms", 1600)))
-            self._log_translation_policy(tier)
+            self.overlay_publisher._log_translation_policy(tier)
         if offline_model_key is not None and hasattr(self.offline_translator, "set_model_key"):
             normalized_model_key = str(offline_model_key or "opus_mt_en_tr").strip().lower()
             if normalized_model_key != self.offline_model_key:
@@ -792,7 +794,7 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
             self.loop_interval = max(0.04, float(tier["target_ms"]) / 1000)
             self.source_state.configure(hold_window_ms=int(tier.get("source_family_hold_ms", 1600)))
             log_event(PREFIX_CFG, "013", f"[Performans Profili] -> UYGULANDI | Seviye: {performance_tier} | Motor: {self.active_engine} | Hedef(ms): {tier['target_ms']}", throttle_key="performance_tier_cfg", throttle_seconds=0.2)
-            self._log_translation_policy(tier)
+            self.overlay_publisher._log_translation_policy(tier)
         if ocr_filters_enabled is not None:
             self.ocr_filters_enabled = bool(ocr_filters_enabled)
             self._translation_request_id += 1
@@ -968,7 +970,7 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
             return None
 
         detected_scene_mode, scene_scores, variants = self.image_processor.process_variants(frame, self.ocr_scene_mode, self.ocr_filters_enabled)
-        self._log_ocr(
+        self.overlay_publisher._log_ocr(
             "004",
             (
                 f"Candidate prep: frame_id={frame_id}, engine={self.active_engine}, "
@@ -997,7 +999,7 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
             payload = self._read_variant(frame, frame_id, variants[index], detected_scene_mode, scene_scores)
             if payload and self._is_better_payload(payload, best_payload):
                 best_payload = payload
-                self._log_ocr(
+                self.overlay_publisher._log_ocr(
                     "005",
                     (
                         f"Candidate update: frame_id={frame_id}, phase=fast, selected_variant={payload['variant']}, "
@@ -1005,7 +1007,7 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
                     ),
                 )
             if payload and self._is_fast_accept(payload):
-                self._log_ocr(
+                self.overlay_publisher._log_ocr(
                     "006",
                     (
                         f"Candidate selected: frame_id={frame_id}, phase=fast_accept, variant={payload['variant']}, "
@@ -1017,7 +1019,7 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
 
         if self._should_skip_refine(frame_id, best_payload):
             if best_payload is not None:
-                self._log_ocr(
+                self.overlay_publisher._log_ocr(
                     "007",
                     (
                         f"Candidate selected: frame_id={frame_id}, phase=skip_refine, variant={best_payload['variant']}, "
@@ -1034,7 +1036,7 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
             payload = self._read_variant(frame, frame_id, variants[index], detected_scene_mode, scene_scores)
             if payload and self._is_better_payload(payload, best_payload):
                 best_payload = payload
-                self._log_ocr(
+                self.overlay_publisher._log_ocr(
                     "008",
                     (
                         f"Candidate update: frame_id={frame_id}, phase=refine, selected_variant={payload['variant']}, "
@@ -1042,7 +1044,7 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
                     ),
                 )
             if payload and self._is_fast_accept(payload):
-                self._log_ocr(
+                self.overlay_publisher._log_ocr(
                     "009",
                     (
                         f"Candidate selected: frame_id={frame_id}, phase=refine_fast_accept, variant={payload['variant']}, "
@@ -1052,7 +1054,7 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
                 )
                 return payload
         if best_payload is not None:
-            self._log_ocr(
+            self.overlay_publisher._log_ocr(
                 "010",
                 (
                     f"Candidate selected: frame_id={frame_id}, phase=final, variant={best_payload['variant']}, "
@@ -1076,14 +1078,14 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
             ocr_frame = np.stack([processed_frame] * 3, axis=-1)
         ocr_results = self.ocr_engine.read(cast(np.ndarray, ocr_frame))
         if not ocr_results:
-            self._log_ocr(
+            self.overlay_publisher._log_ocr(
                 "011",
                 f"OCR result: frame_id={frame_id}, variant={variant_label}, engine={self.active_engine}, result_count=0",
             )
             return None
         raw_texts = [str(item[1]) for item in ocr_results if len(item) >= 2]
         avg_confidence = self._result_signal(ocr_results)
-        self._log_ocr(
+        self.overlay_publisher._log_ocr(
             "011",
             (
                 f"OCR result: frame_id={frame_id}, variant={variant_label}, engine={self.active_engine}, "
@@ -1092,12 +1094,12 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
         )
         detected_text = self._build_detected_text(ocr_results)
         if not detected_text:
-            self._log_ocr(
+            self.overlay_publisher._log_ocr(
                 "012",
                 f"Text assembly result: frame_id={frame_id}, variant={variant_label}, text=''",
             )
             return None
-        self._log_ocr(
+        self.overlay_publisher._log_ocr(
             "012",
             f"Text assembly result: frame_id={frame_id}, variant={variant_label}, text={detected_text!r}",
         )
@@ -1304,7 +1306,7 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
             and current_recognized <= last_recognized
             and (current_mojibake > last_mojibake or current_suspicious > last_suspicious)
         ):
-            self._log_ocr(
+            self.overlay_publisher._log_ocr(
                 "025",
                 (
                     f"Family repeat blocked: reason=dirtier_variant, similarity={similarity:.2f}, "
@@ -1494,7 +1496,7 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
         return re.sub(r"\s+", " ", str(text or "").strip()).lower()
 
     def _should_skip_translated_emit(self, translated_text: str, source: str = "") -> bool:
-        normalized = self._normalize_translated_text(translated_text)
+        normalized = self.overlay_publisher._normalize_translated_text(translated_text)
         if not normalized or not self._last_translated_text:
             return False
         repeat_window_ms = int(self._profile_value("translated_repeat_window_ms", 220))
@@ -1510,17 +1512,17 @@ class TranslationPipeline(TranslationQueueMixin, OverlayPublisherMixin):
         return False
 
     def _should_skip_raw_source_repeat(self, text: str) -> bool:
-        normalized = self._normalize_translated_text(text)
+        normalized = self.overlay_publisher._normalize_translated_text(text)
         if not normalized:
             return False
         now = time.monotonic()
         if self._last_raw_source_text == normalized and (now - self._last_raw_source_time) * 1000 < 900:
             return True
         if self._pending_translations:
-            pending_normalized = self._normalize_translated_text(self._pending_translations[-1][0])
+            pending_normalized = self.overlay_publisher._normalize_translated_text(self._pending_translations[-1][0])
             if pending_normalized == normalized:
                 return True
-        if self._active_translation_source and self._normalize_translated_text(self._active_translation_source) == normalized:
+        if self._active_translation_source and self.overlay_publisher._normalize_translated_text(self._active_translation_source) == normalized:
             return True
         return False
     def _effective_min_text_chars(self) -> int:

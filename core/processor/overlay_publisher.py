@@ -11,12 +11,15 @@ from core.processor.utils import _clip_log_text, _quick_normalize, _strip_speake
 if TYPE_CHECKING:
     from core.processor.utils import IPipelineState
 
-class OverlayPublisherMixin:
-    def _emit_translation(self: "IPipelineState", stabilized_text: str, *, frame_started_monotonic: float | None = None, ocr_duration_ms: float = 0.0, correlation_id: str = "") -> None:
+class OverlayPublisherService:
+    def __init__(self, pipeline: "IPipelineState"):
+        self.p = pipeline
+
+    def _emit_translation(self, stabilized_text: str, *, frame_started_monotonic: float | None = None, ocr_duration_ms: float = 0.0, correlation_id: str = "") -> None:
         if not stabilized_text:
             return
-        if self.raw_translation_flow_enabled:
-            if self._should_skip_raw_source_repeat(stabilized_text):
+        if self.p.raw_translation_flow_enabled:
+            if self.p._should_skip_raw_source_repeat(stabilized_text):
                 self._log_trl(
                     "014",
                     (
@@ -32,27 +35,27 @@ class OverlayPublisherMixin:
                     "cache=off, stabilizer=off, source_state=off, repeat_family=off"
                 ),
             )
-            self.last_text = stabilized_text
-            self._last_emit_time = time.monotonic()
-            self._translation_request_id += 1
+            self.p.last_text = stabilized_text
+            self.p._last_emit_time = time.monotonic()
+            self.p._translation_request_id += 1
             queued_at_monotonic = time.monotonic()
-            self._pending_translations.append(
+            self.p._pending_translations.append(
                 (
                     stabilized_text,
-                    self._translation_request_id,
+                    self.p._translation_request_id,
                     queued_at_monotonic,
                     frame_started_monotonic or queued_at_monotonic,
                     ocr_duration_ms,
                     correlation_id or getattr(self, "current_correlation_id", ""),
                 )
             )
-            self._last_raw_source_text = self._normalize_translated_text(stabilized_text)
-            self._last_raw_source_time = queued_at_monotonic
-            if self._active_translation_task is None or self._active_translation_task.done():
-                self._active_translation_task = asyncio.create_task(self._translate_pending_loop())
+            self.p._last_raw_source_text = self.p._normalize_translated_text(stabilized_text)
+            self.p._last_raw_source_time = queued_at_monotonic
+            if self.p._active_translation_task is None or self.p._active_translation_task.done():
+                self.p._active_translation_task = asyncio.create_task(self.p.translation_queue._translate_pending_loop())
             return
         state_analysis = JunkFilter.analyze_text(stabilized_text)
-        state_decision = self.source_state.consider(stabilized_text, state_analysis, now=time.monotonic())
+        state_decision = self.p.source_state.consider(stabilized_text, state_analysis, now=time.monotonic())
         selected_text = state_decision.selected_text or stabilized_text
         selected_analysis = JunkFilter.analyze_text(selected_text)
         self._log_ocr(
@@ -76,7 +79,7 @@ class OverlayPublisherMixin:
                     f"age_ms={state_decision.memory_age_ms:.1f}, text={_clip_log_text(stabilized_text)}"
                 ),
             )
-        tip2_gate = self._evaluate_tip2_best_variant_gate(selected_analysis)
+        tip2_gate = self.p._evaluate_tip2_best_variant_gate(selected_analysis)
         if bool(selected_analysis.get("tip2_suspect")) or state_decision.reason == "tip2_confirmed_best":
             self._log_ocr(
                 "029",
@@ -116,26 +119,26 @@ class OverlayPublisherMixin:
                 ),
             )
         stabilized_text = selected_text
-        if stabilized_text == self.last_text:
+        if stabilized_text == self.p.last_text:
             return
-        if self._should_skip_regressive_emit(stabilized_text):
+        if self.p._should_skip_regressive_emit(stabilized_text):
             return
         current_normalized = re.sub(r"\s+", " ", _strip_speaker(stabilized_text).lower()).strip()
-        last_normalized = re.sub(r"\s+", " ", _strip_speaker(str(self.last_text or "")).lower()).strip()
+        last_normalized = re.sub(r"\s+", " ", _strip_speaker(str(self.p.last_text or "")).lower()).strip()
         if current_normalized and current_normalized == last_normalized:
             return
-        if self._should_skip_family_repeat(stabilized_text):
+        if self.p._should_skip_family_repeat(stabilized_text):
             return
-        self.last_text = stabilized_text
-        self._last_emit_time = time.monotonic()
-        cached_translation = self._get_cached_translation(stabilized_text)
-        cache_key = self._cache_key_for_source(stabilized_text, "cache")
+        self.p.last_text = stabilized_text
+        self.p._last_emit_time = time.monotonic()
+        cached_translation = self.p.translation_queue._get_cached_translation(stabilized_text)
+        cache_key = self.p.translation_queue._cache_key_for_source(stabilized_text, "cache")
         if cached_translation:
             self._log_trl(
                 "009",
                 f"Cache hit: cache_key={_clip_log_text(cache_key)}, source_text={_clip_log_text(stabilized_text)}, translated_text={_clip_log_text(cached_translation)}",
             )
-            if self._active_translation_task is not None and not self._active_translation_task.done():
+            if self.p._active_translation_task is not None and not self.p._active_translation_task.done():
                 log_event(
                     PREFIX_SYS,
                     "037",
@@ -145,7 +148,7 @@ class OverlayPublisherMixin:
                     level="debug",
                 )
                 return
-            self.logger.info(f"[OCR-037] cache_out: {_clip_log_text(cached_translation)}")
+            self.p.logger.info(f"[OCR-037] cache_out: {_clip_log_text(cached_translation)}")
             frame_to_overlay_ms = ((time.monotonic() - frame_started_monotonic) * 1000) if frame_started_monotonic else 0.0
             self._log_trl(
                 "005",
@@ -154,7 +157,7 @@ class OverlayPublisherMixin:
             self._log_ui(
                 "001",
                 (
-                    f"Overlay update: source={self.translation_engine}-cache, original_text={_clip_log_text(stabilized_text)}, "
+                    f"Overlay update: source={self.p.translation_engine}-cache, original_text={_clip_log_text(stabilized_text)}, "
                     f"translated_text={_clip_log_text(cached_translation)}, display_mode=single, chunk_count=1"
                 ),
             )
@@ -163,13 +166,13 @@ class OverlayPublisherMixin:
                 f"Overlay chunk: index=1/1, text={_clip_log_text(cached_translation)}, display_duration_ms={frame_to_overlay_ms:.1f}",
             )
             self._log_perf(frame_to_overlay_ms, ocr_duration_ms, 0.0)
-            self.bridge.send(
+            self.p.bridge.send(
                 "new_translation",
                 {
                     "id": str(uuid.uuid4()),
                     "original_text": stabilized_text,
                     "translated_text": cached_translation,
-                    "translation_source": f"{self.translation_engine}-cache",
+                    "translation_source": f"{self.p.translation_engine}-cache",
                     "timestamp": time.time(),
                     "correlation_id": correlation_id or getattr(self, "current_correlation_id", ""),
                 },
@@ -179,73 +182,73 @@ class OverlayPublisherMixin:
             "010",
             f"Cache miss: cache_key={_clip_log_text(cache_key)}, source_text={_clip_log_text(stabilized_text)}",
         )
-        self._translation_request_id += 1
-        slot_norm = self.slot_manager.get_normalized_slot() or _quick_normalize(stabilized_text)
-        for pending_text, _, _, _, _ in self._pending_translations:
+        self.p._translation_request_id += 1
+        slot_norm = self.p.slot_manager.get_normalized_slot() or _quick_normalize(stabilized_text)
+        for pending_text, _, _, _, _ in self.p._pending_translations:
             pend_norm = _quick_normalize(pending_text)
             if slot_norm and pend_norm and SequenceMatcher(None, slot_norm, pend_norm).ratio() >= 0.85:
                 return
-        if self._pending_translations:
-            pending_normalized = re.sub(r"\s+", " ", self._pending_translations[-1][0].strip().lower())
+        if self.p._pending_translations:
+            pending_normalized = re.sub(r"\s+", " ", self.p._pending_translations[-1][0].strip().lower())
             if pending_normalized == current_normalized:
                 return
-        if self._pending_translations and self._pending_translations[-1][0] == stabilized_text:
+        if self.p._pending_translations and self.p._pending_translations[-1][0] == stabilized_text:
             return
         queued_at_monotonic = time.monotonic()
-        self._pending_translations.append(
+        self.p._pending_translations.append(
             (
                 stabilized_text,
-                self._translation_request_id,
+                self.p._translation_request_id,
                 queued_at_monotonic,
                 frame_started_monotonic or queued_at_monotonic,
                 ocr_duration_ms,
                 correlation_id or getattr(self, "current_correlation_id", ""),
             )
         )
-        if self._active_translation_task is None or self._active_translation_task.done():
-            self._active_translation_task = asyncio.create_task(self._translate_pending_loop())
+        if self.p._active_translation_task is None or self.p._active_translation_task.done():
+            self.p._active_translation_task = asyncio.create_task(self.p.translation_queue._translate_pending_loop())
 
-    def _emit_frame_stat(self: "IPipelineState", payload: dict | None, result: str, reason: str = "") -> None:
+    def _emit_frame_stat(self, payload: dict | None, result: str, reason: str = "") -> None:
         """Throttled (max 1/sn) OCR cerceve tanilama eventi. UI'da gercek zamanli izleme saglar."""
         now = time.monotonic()
-        if now - self._last_stat_emit_time < 0.85:
+        if now - self.p._last_stat_emit_time < 0.85:
             return
-        self._last_stat_emit_time = now
-        self.bridge.send(
+        self.p._last_stat_emit_time = now
+        self.p.bridge.send(
             "ocr_frame_stat",
             {
-                "engine": self._runtime_engine_id(),
-                "scene_selected": self.ocr_scene_mode,
+                "engine": self.p._runtime_engine_id(),
+                "scene_selected": self.p.ocr_scene_mode,
                 "detected_scene": payload.get("detected_scene_mode", "?") if payload else "?",
                 "quality": int(payload.get("quality", 0)) if payload else 0,
                 "result": result,          # accepted | rejected | no_text
                 "reason": reason,          # quality | junk | "" (bos = kabul edildi)
                 "signal": round(float(payload.get("signal", 0.0)), 1) if payload else 0.0,
                 "variant": payload.get("variant", "-") if payload else "-",
-                "capture_delay_ms": round(self._capture_delay() * 1000, 1),
-                "queue_depth": len(self._pending_translations),
-                "reused_frame_count": int(self._reused_frame_count),
+                "capture_delay_ms": round(self.p._capture_delay() * 1000, 1),
+                "queue_depth": len(self.p._pending_translations),
+                "reused_frame_count": int(self.p._reused_frame_count),
             },
         )
 
-    def _log_ui(self: "IPipelineState", code: str, message: str, correlation_id: str = "") -> None:
-        self._log_debug("SYS", code, message, correlation_id=correlation_id)
+    def _log_ui(self, code: str, message: str, correlation_id: str = "") -> None:
+        self.p._log_debug("SYS", code, message, correlation_id=correlation_id)
 
-    def _log_trl(self: "IPipelineState", code: str, message: str, correlation_id: str = "") -> None:
-        self._log_debug("TRL", code, message, correlation_id=correlation_id)
+    def _log_trl(self, code: str, message: str, correlation_id: str = "") -> None:
+        self.p._log_debug("TRL", code, message, correlation_id=correlation_id)
 
-    def _log_ocr(self: "IPipelineState", code: str, message: str, correlation_id: str = "") -> None:
-        self._log_debug("OCR", code, message, correlation_id=correlation_id)
+    def _log_ocr(self, code: str, message: str, correlation_id: str = "") -> None:
+        self.p._log_debug("OCR", code, message, correlation_id=correlation_id)
 
-    def _log_perf(self: "IPipelineState", frame_to_overlay_ms: float, ocr_ms: float, translation_ms: float, correlation_id: str = "") -> None:
+    def _log_perf(self, frame_to_overlay_ms: float, ocr_ms: float, translation_ms: float, correlation_id: str = "") -> None:
         overhead_ms = max(frame_to_overlay_ms - ocr_ms - translation_ms, 0.0)
-        self._last_perf_stats = {
+        self.p._last_perf_stats = {
             "frame_to_overlay_ms": float(frame_to_overlay_ms),
             "ocr_ms": float(ocr_ms),
             "translation_ms": float(translation_ms),
             "overhead_ms": float(overhead_ms),
         }
-        self._log_debug(
+        self.p._log_debug(
             "PERF",
             "001",
             (
@@ -256,14 +259,14 @@ class OverlayPublisherMixin:
             correlation_id=correlation_id,
         )
 
-    def _log_translation_policy(self: "IPipelineState", tier: dict) -> None:
+    def _log_translation_policy(self, tier: dict) -> None:
         repeat_window = int(tier.get("translated_repeat_window_ms", 0))
         log_event(
             PREFIX_CFG,
             "014",
             (
-                f"Servis davranis politikasi aktif: {self.translation_engine}/"
-                f"{self.performance_tier} | hedef={tier.get('target_ms')}ms | "
+                f"Servis davranis politikasi aktif: {self.p.translation_engine}/"
+                f"{self.p.performance_tier} | hedef={tier.get('target_ms')}ms | "
                 f"hizli_metin={tier.get('fast_text_len')} | tekrar_penceresi={repeat_window}ms"
             ),
             throttle_key="translation_policy_cfg",

@@ -17,21 +17,22 @@ async def test_pipeline_mixin_smoke():
     )
     
     # Mock translation engine methods to prevent real network calls
-    pipeline._translate_with_engine = MagicMock(return_value=("Merhaba dünya", "google"))
-    pipeline._select_translation_result = MagicMock(return_value=("Merhaba dünya", "google"))
-    pipeline._translate_text = MagicMock(return_value=("Merhaba dünya", "google"))
+    pipeline.translation_queue._translate_with_engine = MagicMock(return_value=("Merhaba dünya", "google"))
+    pipeline.translation_queue._select_translation_result = MagicMock(return_value=("Merhaba dünya", "google"))
+    pipeline.translation_queue._translate_text = MagicMock(return_value=("Merhaba dünya", "google"))
     pipeline._should_skip_translated_emit = MagicMock(return_value=False)
     
     pipeline.is_running = True
     
     # Run the loop (it will break when queue is empty because of `while self._pending_translations:`)
-    await pipeline._translate_pending_loop()
+    await pipeline.translation_queue._translate_pending_loop()
     
     # The queue should be empty now
     assert len(pipeline._pending_translations) == 0
     
     # It should have emitted a new translation
     from unittest.mock import ANY
+    print("MOCK CALLS:", bridge_mock.send.mock_calls)
     bridge_mock.send.assert_any_call("new_translation", ANY)
     
     # Verify the payload structure
