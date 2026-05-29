@@ -12,7 +12,7 @@ const MAX_PENDING = 64;
 const pendingMessages: string[] = [];
 
 type EventPayload = Record<string, any>;
-type EventHandler = (data: EventPayload) => void;
+type EventHandler = (data: any) => void;
 
 const listeners: Record<string, Set<EventHandler>> = {};
 const eventHistory: Record<string, EventPayload[]> = {};

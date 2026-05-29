@@ -58,25 +58,52 @@ export interface HardwareResult {
   [key: string]: any;
 }
 
+export interface OfflineStatusResult {
+  installed: boolean;
+  model?: string;
+  downloading?: boolean;
+  progress?: number;
+  [key: string]: unknown;
+}
+
+export interface ErrorPayload {
+  message?: string;
+  reason?: string;
+  scope?: string;
+  [key: string]: unknown;
+}
+
+export interface EngineRepairResult {
+  success: boolean;
+  engine: string;
+  message?: string;
+}
+
+export interface FallbackPayload {
+  from: string;
+  to: string;
+  reason?: string;
+}
+
 export interface AppWebSocketBindings {
   onSettings: (data: AppSettings) => void;
   onHardware: (data: HardwareResult) => void;
   onOverlaySettings: (data: OverlaySettingsState) => void;
-  onOfflineStatus: (data: any) => void;
+  onOfflineStatus: (data: OfflineStatusResult) => void;
   onTranslation: (data: TranslationPreview) => void;
   onTranslationState: (data: TranslationState) => void;
-  onEngineDenied: (data: any) => void;
-  onSettingsSaveFailed: (data: any) => void;
-  onEngineRepair: (data: any) => void;
-  onOfflineError: (data: any) => void;
+  onEngineDenied: (data: ErrorPayload) => void;
+  onSettingsSaveFailed: (data: ErrorPayload) => void;
+  onEngineRepair: (data: EngineRepairResult) => void;
+  onOfflineError: (data: ErrorPayload) => void;
   onOfflineComplete: () => void;
-  onTranslationFallback: (data: any) => void;
-  onOcrRuntimeFallback: (data: any) => void;
+  onTranslationFallback: (data: FallbackPayload) => void;
+  onOcrRuntimeFallback: (data: FallbackPayload) => void;
   onFrameStat: (data: OcrFrameStat) => void;
   onRegionSelected: (data: RegionState) => void;
-  onRegionCancelled: (data: any) => void;
-  onRegionFailed: (data: any) => void;
-  onAsyncError: (data: any) => void;
+  onRegionCancelled: () => void;
+  onRegionFailed: (data: ErrorPayload) => void;
+  onAsyncError: (data: ErrorPayload) => void;
 }
 
 export const translationReasonMessage = (reason: unknown) => {

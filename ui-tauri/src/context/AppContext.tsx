@@ -221,7 +221,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useAppWebSocket({
     onSettings: (data) => {
-      const nextSettings = { ...data, ocr_engine: VALID_OCR_ENGINES.has(data.ocr_engine) ? data.ocr_engine : 'easy' };
+      const nextSettings = { ...data, ocr_engine: VALID_OCR_ENGINES.has(data.ocr_engine) ? data.ocr_engine : 'easy' } as unknown as AppSettingsState;
       setSettings(nextSettings);
       restoreWindowSettingRef.current = nextSettings.restore_window_after_region_selection ?? true;
       if (nextSettings.last_region) {
@@ -289,9 +289,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     onOfflineComplete: () => enqueueNotice('success', 'Offline modeller kullanıma hazır.'),
     onTranslationFallback: (data) => enqueueNotice('warning', `${String(data.from ?? 'bilinmeyen')} yerine ${String(data.to ?? 'yedek motor')} kullanılıyor.`),
     onOcrRuntimeFallback: (data) => {
-      const selected = String(data.selected ?? 'Seçili motor');
-      const runtime = String(data.runtime ?? 'yedek motor');
-      const sceneMode = String(data.scene_mode ?? '');
+      const selected = String(data.from ?? 'Seçili motor');
+      const runtime = String(data.to ?? 'yedek motor');
+      const sceneMode = String(data.reason ?? '');
       const sceneLabel = sceneMode === 'floating' ? 'saha metni' : 'bu sahne';
       enqueueNotice('info', `${selected} ${sceneLabel} için uygun değil. ${runtime} kullanılıyor.`, `ocr_runtime_fallback:${selected}:${runtime}:${sceneMode}`);
     },
@@ -310,9 +310,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       enqueueNotice('success', 'Tarama alanı güncellendi.');
     },
-    onRegionCancelled: (data) => {
+    onRegionCancelled: () => {
       restoreAfterRegionSelection().catch(() => undefined);
-      enqueueNotice('info', String(data.message ?? 'Tarama alanı seçimi iptal edildi.'));
+      enqueueNotice('info', 'Tarama alanı seçimi iptal edildi.');
     },
     onRegionFailed: (data) => {
       restoreAfterRegionSelection().catch(() => undefined);
