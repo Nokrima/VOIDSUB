@@ -38,10 +38,14 @@ def redact_sensitive_fields(payload: dict | str) -> dict | str:
         return redacted_payload
     return payload
 
-from typing import Protocol, Any
+from typing import Protocol, Any, TYPE_CHECKING
 from collections import deque
 import logging
 import asyncio
+
+if TYPE_CHECKING:
+    from core.processor.translation_queue import TranslationQueueService
+    from core.processor.overlay_publisher import OverlayPublisherService
 
 class IPipelineState(Protocol):
     logger: logging.Logger
@@ -57,6 +61,9 @@ class IPipelineState(Protocol):
     src_language: str
     performance_tier: str
     ocr_scene_mode: str
+    
+    translation_queue: "TranslationQueueService"
+    overlay_publisher: "OverlayPublisherService"
     
     slot_manager: Any
     source_state: Any

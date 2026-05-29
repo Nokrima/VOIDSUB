@@ -40,19 +40,31 @@ class TranslationQueueService:
                     effective_src = self._resolve_translation_source_language(text, log_decision=True)
                     google_task = loop.run_in_executor(None, self._translate_with_engine, "google", text, effective_src)
                     offline_task = loop.run_in_executor(None, self._translate_with_engine, "offline", text, effective_src)
-                    google_result, offline_result = await asyncio.gather(google_task, offline_task, return_exceptions=True)
-                    if isinstance(google_result, Exception):
-                        self.p.logger.error(f"[{PREFIX_SYS}-046] [Google Çeviri] -> GÖREV HATASI (HAM MOD) | Detay: {google_result}")
-                        google_result = (text, "error")
-                    if isinstance(offline_result, Exception):
-                        self.p.logger.error(f"[{PREFIX_SYS}-046] [Offline Çeviri] -> GÖREV HATASI (HAM MOD) | Detay: {offline_result}")
-                        offline_result = (text, "offline_error")
+                    google_res_raw, offline_res_raw = await asyncio.gather(google_task, offline_task, return_exceptions=True)
+                    
+                    google_result: tuple[str, str] | None = None
+                    if isinstance(google_res_raw, BaseException):
+                        self.p.logger.error(f"[{PREFIX_SYS}-046] [Google Çeviri] -> GÖREV HATASI (HAM MOD) | Detay: {google_res_raw}")
+                    else:
+                        google_result = google_res_raw
+
+                    offline_result: tuple[str, str] | None = None
+                    if isinstance(offline_res_raw, BaseException):
+                        self.p.logger.error(f"[{PREFIX_SYS}-046] [Offline Çeviri] -> GÖREV HATASI (HAM MOD) | Detay: {offline_res_raw}")
+                    else:
+                        offline_result = offline_res_raw
+
+                    g_src = google_result[1] if google_result else "error"
+                    o_src = offline_result[1] if offline_result else "offline_error"
+                    g_txt = google_result[0] if google_result else text
+                    o_txt = offline_result[0] if offline_result else text
+
                     self.p.overlay_publisher._log_trl(
                         "013",
                         (
-                            f"Raw flow dual translation: google_source={google_result[1]!r}, "
-                            f"offline_source={offline_result[1]!r}, google_text={_clip_log_text(google_result[0])}, "
-                            f"offline_text={_clip_log_text(offline_result[0])}"
+                            f"Raw flow dual translation: google_source={g_src!r}, "
+                            f"offline_source={o_src!r}, google_text={_clip_log_text(g_txt)}, "
+                            f"offline_text={_clip_log_text(o_txt)}"
                         ),
                         correlation_id=correlation_id,
                     )
