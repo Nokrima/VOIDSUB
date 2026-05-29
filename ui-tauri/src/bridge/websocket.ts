@@ -117,7 +117,37 @@ export interface WebSocketEventMap {
 
 export type EventHandler<T = unknown> = (data: T) => void;
 
-const listeners: Record<string, Set<EventHandler<unknown>>> = {};
+class TypedEventRegistry {
+  private listeners: { [K in keyof WebSocketEventMap]?: Set<EventHandler<WebSocketEventMap[K]>> } = {};
+
+  public add<K extends keyof WebSocketEventMap>(event: K, handler: EventHandler<WebSocketEventMap[K]>) {
+    if (!this.listeners[event]) {
+      // @ts-expect-error - TS cannot verify generic mapped type assignment
+      this.listeners[event] = new Set();
+    }
+    // Using a non-null assertion or safe access to avoid generic casting of the handler itself
+    this.listeners[event]!.add(handler);
+
+    return () => {
+      const set = this.listeners[event];
+      if (set) {
+        set.delete(handler);
+        if (set.size === 0) {
+          delete this.listeners[event];
+        }
+      }
+    };
+  }
+
+  public dispatch<K extends keyof WebSocketEventMap>(event: K, payload: WebSocketEventMap[K]) {
+    const set = this.listeners[event];
+    if (set) {
+      set.forEach((handler) => handler(payload));
+    }
+  }
+}
+
+const registry = new TypedEventRegistry();
 const eventHistory: Record<string, unknown[]> = {};
 
 const pushEventHistory = <K extends keyof WebSocketEventMap>(event: K, payload: WebSocketEventMap[K]) => {
@@ -128,10 +158,7 @@ const pushEventHistory = <K extends keyof WebSocketEventMap>(event: K, payload: 
 
 export const injectEvent = <K extends keyof WebSocketEventMap>(event: K, payload: WebSocketEventMap[K]) => {
   pushEventHistory(event, payload);
-  const eventListeners = listeners[event];
-  if (eventListeners) {
-    eventListeners.forEach((handler) => handler(payload));
-  }
+  registry.dispatch(event, payload);
 };
 
 export const getEventHistory = <K extends keyof WebSocketEventMap>(event: K): WebSocketEventMap[K][] => {
@@ -155,6 +182,21 @@ const flushPendingMessages = () => {
     if (message) {
       socket.send(message);
     }
+  }
+};
+
+const validatePayload = (eventName: string, payload: Record<string, unknown>): boolean => {
+  switch (eventName) {
+    case 'hardware_result':
+      return 'cpu' in payload && 'gpu' in payload && 'ram_gb' in payload && Array.isArray(payload.available_engines);
+    case 'app_settings_loaded':
+      return 'performance_tier' in payload;
+    case 'translation_state':
+      return 'running' in payload;
+    case 'calibration_region_selected':
+      return 'x1' in payload && 'y1' in payload && 'x2' in payload && 'y2' in payload;
+    default:
+      return true; // We accept other events for now
   }
 };
 
@@ -204,14 +246,16 @@ export const connect = async () => {
         return;
       }
 
-      pushEventHistory(
-        eventName as keyof WebSocketEventMap,
-        payload as WebSocketEventMap[keyof WebSocketEventMap]
-      );
-      const eventListeners = listeners[eventName];
-      if (eventListeners) {
-        eventListeners.forEach((handler) => handler(payload));
+      if (!validatePayload(eventName, payload as Record<string, unknown>)) {
+        console.warn(`[WS] Runtime doğrulama hatası. Olay: ${eventName}, Payload:`, payload);
+        return;
       }
+
+      const validEvent = eventName as keyof WebSocketEventMap;
+      const validPayload = payload as WebSocketEventMap[keyof WebSocketEventMap];
+
+      pushEventHistory(validEvent, validPayload);
+      registry.dispatch(validEvent, validPayload);
     } catch (err) {
       console.error('Gelen paket bozuk:', err);
     }
@@ -262,19 +306,7 @@ export const send = <K extends keyof WebSocketEventMap>(event: K, data?: Record<
 };
 
 export const onEvent = <K extends keyof WebSocketEventMap>(event: K, handler: EventHandler<WebSocketEventMap[K]>) => {
-  if (!listeners[event]) {
-    listeners[event] = new Set();
-  }
-
-  const eventListeners = listeners[event];
-  eventListeners.add(handler as EventHandler<unknown>);
-
-  return () => {
-    eventListeners.delete(handler as EventHandler<unknown>);
-    if (eventListeners.size === 0) {
-      delete listeners[event];
-    }
-  };
+  return registry.add(event, handler);
 };
 
 export const useWebSocket = () => {

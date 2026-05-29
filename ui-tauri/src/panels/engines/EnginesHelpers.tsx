@@ -21,6 +21,14 @@ export interface OcrFrameStatPayload {
   result: 'accepted' | 'rejected' | 'no_text';
   reason: string;
 }
+export interface OfflineModelDetails {
+  state?: string;
+  percent?: number;
+  detail?: string;
+  bytes_label?: string;
+  [key: string]: unknown;
+}
+
 export interface OfflineStatusPayload {
   available: boolean;
   busy?: boolean;
@@ -34,7 +42,7 @@ export interface OfflineStatusPayload {
   percent?: number;
   detail?: string;
   bytes_label?: string;
-  model_details?: Record<string, any>;
+  model_details?: Record<string, OfflineModelDetails>;
 }
 
 export type OfflineModelAction = {
