@@ -27,7 +27,7 @@ class TranslationQueueMixin:
                 self._log_trl(
                     "001",
                     (
-                        f"Translation requested: request_id={request_id}, text={text!r}, "
+                        f"Translation requested: request_id={request_id}, text={_clip_log_text(text)}, "
                         f"queue_wait_ms={queue_wait_ms:.1f}"
                     ),
                 )
@@ -47,8 +47,8 @@ class TranslationQueueMixin:
                         "013",
                         (
                             f"Raw flow dual translation: google_source={google_result[1]!r}, "
-                            f"offline_source={offline_result[1]!r}, google_text={google_result[0]!r}, "
-                            f"offline_text={offline_result[0]!r}"
+                            f"offline_source={offline_result[1]!r}, google_text={_clip_log_text(google_result[0])}, "
+                            f"offline_text={_clip_log_text(offline_result[0])}"
                         ),
                     )
                     translated_text, source = self._select_translation_result(
@@ -63,7 +63,7 @@ class TranslationQueueMixin:
                     "002",
                     (
                         f"Translation result: request_id={request_id}, source={source}, "
-                        f"duration_ms={translation_duration_ms:.1f}, text={translated_text!r}"
+                        f"duration_ms={translation_duration_ms:.1f}, text={_clip_log_text(translated_text)}"
                     ),
                 )
             except Exception as exc:
@@ -80,7 +80,7 @@ class TranslationQueueMixin:
                     "003",
                     (
                         f"Output filter: decision=BLOCKED, request_id={request_id}, source={source}, "
-                        f"running={self.is_running}, translated_text={translated_text!r}, reason=empty_or_error"
+                        f"running={self.is_running}, translated_text={_clip_log_text(translated_text)}, reason=empty_or_error"
                     ),
                 )
                 if source == "error" and self.is_running:
@@ -109,7 +109,7 @@ class TranslationQueueMixin:
                     "004",
                     (
                         f"Output filter: decision=BLOCKED, request_id={request_id}, source={source}, "
-                        f"reason=same_last, cache_key={cache_key!r}, translated_text={translated_text!r}"
+                        f"reason=same_last, cache_key={_clip_log_text(cache_key)}, translated_text={_clip_log_text(translated_text)}"
                     ),
                 )
                 self._active_translation_source = ""
@@ -118,7 +118,7 @@ class TranslationQueueMixin:
                 "005",
                 (
                     f"Output filter: decision=PASSED, request_id={request_id}, source={source}, "
-                    f"translated_text={translated_text!r}"
+                    f"translated_text={_clip_log_text(translated_text)}"
                 ),
             )
             if self.raw_translation_flow_enabled:
@@ -137,13 +137,13 @@ class TranslationQueueMixin:
             self._log_ui(
                 "001",
                 (
-                    f"Overlay update: source={source}, original_text={text!r}, "
-                    f"translated_text={translated_text!r}, display_mode=single, chunk_count=1"
+                    f"Overlay update: source={source}, original_text={_clip_log_text(text)}, "
+                    f"translated_text={_clip_log_text(translated_text)}, display_mode=single, chunk_count=1"
                 ),
             )
             self._log_ui(
                 "002",
-                f"Overlay chunk: index=1/1, text={translated_text!r}, display_duration_ms={frame_to_overlay_ms:.1f}",
+                f"Overlay chunk: index=1/1, text={_clip_log_text(translated_text)}, display_duration_ms={frame_to_overlay_ms:.1f}",
             )
             self._log_perf(frame_to_overlay_ms, ocr_duration_ms, translation_duration_ms)
             self.bridge.send(

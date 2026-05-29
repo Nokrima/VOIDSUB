@@ -21,14 +21,14 @@ class OverlayPublisherMixin:
                     "014",
                     (
                         f"Raw flow enqueue blocked: reason=same_source_repeat, "
-                        f"source_text={stabilized_text!r}"
+                        f"source_text={_clip_log_text(stabilized_text)}"
                     ),
                 )
                 return
             self._log_trl(
                 "011",
                 (
-                    f"Raw flow enqueue: source_text={stabilized_text!r}, "
+                    f"Raw flow enqueue: source_text={_clip_log_text(stabilized_text)}, "
                     "cache=off, stabilizer=off, source_state=off, repeat_family=off"
                 ),
             )
@@ -64,7 +64,7 @@ class OverlayPublisherMixin:
                 f"broken={state_analysis['broken_token_count']}, connected_noise={state_analysis['connected_noise_runs']}, "
                 f"tip2={state_analysis['tip2_suspect']}, memory_hit={state_decision.memory_hit}, "
                 f"memory_age_ms={state_decision.memory_age_ms:.1f}, memory_reason={state_decision.memory_reason!r}, "
-                f"text={stabilized_text!r}, selected={selected_text!r}"
+                f"text={_clip_log_text(stabilized_text)}, selected={_clip_log_text(selected_text)}"
             ),
         )
         if state_decision.memory_hit:
@@ -72,7 +72,7 @@ class OverlayPublisherMixin:
                 "030",
                 (
                     f"Session memory: action=HIT, reason={state_decision.memory_reason}, "
-                    f"age_ms={state_decision.memory_age_ms:.1f}, text={stabilized_text!r}"
+                    f"age_ms={state_decision.memory_age_ms:.1f}, text={_clip_log_text(stabilized_text)}"
                 ),
             )
         tip2_gate = self._evaluate_tip2_best_variant_gate(selected_analysis)
@@ -88,7 +88,7 @@ class OverlayPublisherMixin:
                     f"speaker_prefix_suspicious={selected_analysis['speaker_prefix_suspicious']}, "
                     f"joined={selected_analysis['joined_word_hits']}, merged={selected_analysis['merged_token_hits']}, "
                     f"minor_merge={selected_analysis['minor_merge_hits']}, tail_broken={selected_analysis['tail_broken_tokens']}, "
-                    f"text={selected_text!r}"
+                    f"text={_clip_log_text(selected_text)}"
                 ),
             )
         if state_decision.should_emit and state_decision.reason == "tip2_confirmed_best" and not bool(tip2_gate["would_emit"]):
@@ -100,7 +100,7 @@ class OverlayPublisherMixin:
                     f"broken={selected_analysis['broken_token_count']}, connected_noise={selected_analysis['connected_noise_runs']}, "
                     f"recognized_ratio={selected_analysis['recognized_ratio']:.2f}, unknown_long={selected_analysis['unknown_long_alpha_count']}, "
                     f"minor_merge={selected_analysis['minor_merge_hits']}, "
-                    f"text={selected_text!r}"
+                    f"text={_clip_log_text(selected_text)}"
                 ),
             )
             return
@@ -110,7 +110,7 @@ class OverlayPublisherMixin:
             self._log_ocr(
                 "028",
                 (
-                    f"Tip2 emit selection: original={stabilized_text!r}, selected={selected_text!r}, "
+                    f"Tip2 emit selection: original={_clip_log_text(stabilized_text)}, selected={_clip_log_text(selected_text)}, "
                     f"reason={state_decision.reason}, state={state_decision.state}"
                 ),
             )
@@ -132,7 +132,7 @@ class OverlayPublisherMixin:
         if cached_translation:
             self._log_trl(
                 "009",
-                f"Cache hit: cache_key={cache_key!r}, source_text={stabilized_text!r}, translated_text={cached_translation!r}",
+                f"Cache hit: cache_key={_clip_log_text(cache_key)}, source_text={_clip_log_text(stabilized_text)}, translated_text={_clip_log_text(cached_translation)}",
             )
             if self._active_translation_task is not None and not self._active_translation_task.done():
                 log_event(
@@ -148,18 +148,18 @@ class OverlayPublisherMixin:
             frame_to_overlay_ms = ((time.monotonic() - frame_started_monotonic) * 1000) if frame_started_monotonic else 0.0
             self._log_trl(
                 "005",
-                f"Output filter: decision=PASSED, request_id=cache, source=cache, translated_text={cached_translation!r}",
+                f"Output filter: decision=PASSED, request_id=cache, source=cache, translated_text={_clip_log_text(cached_translation)}",
             )
             self._log_ui(
                 "001",
                 (
-                    f"Overlay update: source={self.translation_engine}-cache, original_text={stabilized_text!r}, "
-                    f"translated_text={cached_translation!r}, display_mode=single, chunk_count=1"
+                    f"Overlay update: source={self.translation_engine}-cache, original_text={_clip_log_text(stabilized_text)}, "
+                    f"translated_text={_clip_log_text(cached_translation)}, display_mode=single, chunk_count=1"
                 ),
             )
             self._log_ui(
                 "002",
-                f"Overlay chunk: index=1/1, text={cached_translation!r}, display_duration_ms={frame_to_overlay_ms:.1f}",
+                f"Overlay chunk: index=1/1, text={_clip_log_text(cached_translation)}, display_duration_ms={frame_to_overlay_ms:.1f}",
             )
             self._log_perf(frame_to_overlay_ms, ocr_duration_ms, 0.0)
             self.bridge.send(
@@ -175,7 +175,7 @@ class OverlayPublisherMixin:
             return
         self._log_trl(
             "010",
-            f"Cache miss: cache_key={cache_key!r}, source_text={stabilized_text!r}",
+            f"Cache miss: cache_key={_clip_log_text(cache_key)}, source_text={_clip_log_text(stabilized_text)}",
         )
         self._translation_request_id += 1
         slot_norm = self.slot_manager.get_normalized_slot() or _quick_normalize(stabilized_text)
