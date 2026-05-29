@@ -111,6 +111,25 @@ class OfflineModelManager:
         self._pause = threading.Event()
         self._thread: threading.Thread | None = None
         self._install_started_at = 0.0
+        self._cleanup_stale_tmp_dirs()
+
+    def _cleanup_stale_tmp_dirs(self) -> None:
+        """Yarım kalmış / bayatlamış (24 saatten eski) tmp klasörlerini temizler."""
+        if not self.models_dir.exists():
+            return
+        now = time.time()
+        try:
+            for d in self.models_dir.iterdir():
+                if d.is_dir() and d.name.endswith("-tmp"):
+                    try:
+                        age_hours = (now - d.stat().st_mtime) / 3600
+                        if age_hours > 24:
+                            shutil.rmtree(d, ignore_errors=True)
+                            log_event(PREFIX_TRL, "073", f"[Sistem Temizliği] -> SİLİNDİ | Bayat tmp klasörü: {d.name}", level="warning")
+                    except Exception:
+                        pass
+        except Exception:
+            pass
 
     def set_model_key(self, model_key: str) -> None:
         normalized = self._normalize_model_key(model_key)
