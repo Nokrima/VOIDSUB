@@ -112,17 +112,17 @@ async def main() -> None:
         ),
     )
 
-    bridge = BridgeServer(worker=None)
+    bridge = BridgeServer(worker=None, port=0)
     set_bridge_emitter(bridge.send)
     bridge_task = None
 
     try:
-        print(f"[AKTIF] WebSocket Santrali {bridge.host}:{bridge.port} uzerinde dinleniyor.")
+        print("[SISTEM] WebSocket Santrali baslatiliyor...")
         print("[SISTEM] UI baglantisi bekleniyor...\n")
         log_event(
             PREFIX_SYS,
             "072",
-            f"[Ag Iletisimi] -> SISTEM KOPRUSU BASLATILIYOR | Host: {bridge.host} | Port: {bridge.port}",
+            f"[Ag Iletisimi] -> SISTEM KOPRUSU BASLATILIYOR | Host: {bridge.host} | Port: Dinamik",
         )
         bridge_task = asyncio.create_task(bridge.start())
         await asyncio.sleep(0)

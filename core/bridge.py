@@ -429,6 +429,17 @@ class BridgeServer:
     async def start(self):
         self.broadcaster.loop = asyncio.get_running_loop()
         server = await websockets.serve(self.handler, self.host, self.port)
+        
+        # Eğer dinamik port atandıysa gerçek portu al
+        if server.sockets:
+            actual_port = server.sockets[0].getsockname()[1]
+            self.port = actual_port
+            
         self.logger.info(f"[BridgeServer] WebSocket basladi: ws://{self.host}:{self.port}")
+        
+        import sys
+        print(f"[[VOIDSUB_WS_PORT:{self.port}]]")
+        sys.stdout.flush()
+        
         await asyncio.Future()
 
