@@ -2,15 +2,7 @@ import asyncio
 import time
 import uuid
 from core.errors import PREFIX_SYS, log_event
-def _clip_log_text(text: str, limit: int = 160) -> str:
-    import sys
-    import logging
-    from core.errors import get_logger
-    logger = get_logger()
-    if getattr(sys, 'frozen', False) and logger.level > logging.DEBUG:
-        return "*** [REDACTED] ***"
-    normalized = " ".join((text or "").split())
-    return normalized if len(normalized) <= limit else f"{normalized[:limit]}..."
+from core.processor.utils import _clip_log_text
 
 class TranslationQueueMixin:
     async def _translate_pending_loop(self) -> None:

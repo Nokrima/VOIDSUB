@@ -1,6 +1,11 @@
+import asyncio
 import time
 import uuid
-from core.errors import PREFIX_SYS, log_event
+import re
+from difflib import SequenceMatcher
+from core.errors import PREFIX_SYS, PREFIX_CFG, log_event
+from core.processor.junk_filter import JunkFilter
+from core.processor.utils import _clip_log_text, _quick_normalize, _strip_speaker
 
 class OverlayPublisherMixin:
     def _emit_translation(self, stabilized_text: str, *, frame_started_monotonic: float | None = None, ocr_duration_ms: float = 0.0) -> None:

@@ -32,21 +32,7 @@ from core.translation.offline import OfflineTranslationEngine
 
 logger = get_logger()
 
-def _clip_log_text(text: str, limit: int = 160) -> str:
-    if logger.level > logging.DEBUG:
-        return "*** [REDACTED] ***"
-    normalized = " ".join((text or "").split())
-    return normalized if len(normalized) <= limit else f"{normalized[:limit]}..."
-
-
-def _quick_normalize(text: str) -> str:
-    cleaned = re.sub(r"\s+", " ", str(text or "").strip().lower())
-    cleaned = re.sub(r"[^\w\s]", "", cleaned, flags=re.UNICODE)
-    return cleaned.strip()
-
-
-def _strip_speaker(text: str) -> str:
-    return re.sub(r"^[A-ZÇĞİÖŞÜa-zçğıöşü\.\•\s]*:\s*", "", str(text or "").strip())
+from core.processor.utils import _clip_log_text, _quick_normalize, _strip_speaker
 
 from core.processor.translation_queue import TranslationQueueMixin
 from core.processor.overlay_publisher import OverlayPublisherMixin
