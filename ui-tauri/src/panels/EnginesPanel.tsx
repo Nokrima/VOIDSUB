@@ -20,6 +20,11 @@ import {
   buildOfflineActionMap,
   G,
   MotorDurumu,
+  HealthCheckItem,
+  EngineModelItem,
+  PerfEstimateItem,
+  OfflineLangModelItem,
+  EngineHardwareInfo,
 } from './engines/EnginesHelpers';
 
 export const EnginesPanel: React.FC = () => {
@@ -222,14 +227,14 @@ export const EnginesPanel: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [confirmRemoveLangId]);
 
-  const mockHardwareInfo = {
+  const mockHardwareInfo: EngineHardwareInfo = {
     cpu: hardware?.cpu.name || 'Bilinmiyor',
     gpu: hardware?.gpu.name || 'Bilinmiyor',
     ram: hardware?.ram_gb ? `${hardware.ram_gb} GB` : 'Bilinmiyor',
     activeEngine: selectedEngine
   };
 
-  type HealthCheckItem = { label: string; value: string; state: 'ok' | 'warn' | 'error' };
+
   const realHealthChecks: Record<string, HealthCheckItem[]> = {
     winonly: [
       { label: 'Windows API', value: hardware?.available_engines.includes('winonly') ? 'Hazır' : 'Eksik', state: hardware?.available_engines.includes('winonly') ? 'ok' : 'error' },
@@ -243,7 +248,7 @@ export const EnginesPanel: React.FC = () => {
     ],
   };
 
-  type EngineModelItem = { id: string; name: string; subtitle: string; status: 'active' | 'available' | 'installed' | string };
+
   const realEngineModelsData: Record<string, EngineModelItem[]> = {
     winonly: [
       { id: 'w1', name: 'Windows OCR', subtitle: hardware?.engine_details?.winonly?.reason || 'Sistem OCR bileşeni', status: hardware?.available_engines.includes('winonly') ? 'active' : 'available' },
@@ -255,7 +260,7 @@ export const EnginesPanel: React.FC = () => {
     ],
   };
 
-  const realOfflineLangModels: { id: string; name: string; desc: string; size: string; status: 'active' | 'installed' | 'available' }[] = [
+  const realOfflineLangModels: OfflineLangModelItem[] = [
     {
       id: 'opus_mt_en_tr',
       name: 'İngilizce → Türkçe',
@@ -328,13 +333,13 @@ export const EnginesPanel: React.FC = () => {
     injectInfoLog('UI-007', `Yerel model kaldırma başlatıldı: ${modelId}`);
   };
 
-  type PerfEstimate = { fps: string; latency: string; gpuUsage: string; fpsBar: number; latencyBar: number; gpuBar: number };
-  const mockPerfEstimate: Record<string, PerfEstimate> = {
+
+  const mockPerfEstimate: Record<string, PerfEstimateItem> = {
     winonly: { fps: '30+', latency: '< 45ms', gpuUsage: '~5%', fpsBar: 40, latencyBar: 60, gpuBar: 5 },
     easy: { fps: '60+', latency: '< 15ms', gpuUsage: '~25%', fpsBar: 95, latencyBar: 90, gpuBar: 25 },
   };
 
-  const realPerfEstimate: Record<string, PerfEstimate> = {
+  const realPerfEstimate: Record<string, PerfEstimateItem> = {
     winonly: frameStat?.engine === 'winonly'
       ? { fps: frameStat.result === 'accepted' ? 'Canlı' : 'Beklemede', latency: `Kalite ${frameStat.quality}`, gpuUsage: hardware?.winrt_available ? 'Düşük' : '--', fpsBar: frameStat.result === 'accepted' ? 72 : 28, latencyBar: Math.max(10, Math.min(100, frameStat.quality)), gpuBar: 8 }
       : mockPerfEstimate.winonly,

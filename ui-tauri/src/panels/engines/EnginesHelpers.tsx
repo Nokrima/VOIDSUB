@@ -153,18 +153,57 @@ export const ICheck = () => <svg viewBox="0 0 24 24" fill="none" stroke={colors.
 export const IWarn = () => <svg viewBox="0 0 24 24" fill="none" stroke={colors.warning} strokeWidth="2.5" style={{ width: 12, height: 12 }}><path d="M12 2L2 22h20L12 2zM12 16v-6M12 20h.01" /></svg>;
 export const IFail = () => <svg viewBox="0 0 24 24" fill="none" stroke={colors.error} strokeWidth="2.5" style={{ width: 12, height: 12 }}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>;
 
+export interface EngineHardwareInfo {
+  cpu: string;
+  gpu: string;
+  ram: string;
+  activeEngine: string;
+  cuda_available?: boolean;
+  engine_details?: Record<string, { reason?: string; [key: string]: unknown }>;
+}
+
+export interface HealthCheckItem {
+  label: string;
+  value: string;
+  state: 'ok' | 'warn' | 'error';
+}
+
+export interface EngineModelItem {
+  id: string;
+  name: string;
+  subtitle: string;
+  status: 'active' | 'available' | 'installed';
+}
+
+export interface PerfEstimateItem {
+  fps: string;
+  latency: string;
+  gpuUsage: string;
+  fpsBar: number;
+  latencyBar: number;
+  gpuBar: number;
+}
+
+export interface OfflineLangModelItem {
+  id: string;
+  name: string;
+  desc: string;
+  size: string;
+  status: 'active' | 'installed' | 'available';
+}
+
 // --- MotorDurumu Component ---
 export interface MotorDurumuProps {
   height?: number | string;
-  hardwareInfo: { cpu: string; gpu: string; ram: string; activeEngine: string; cuda_available?: boolean; engine_details?: any };
-  healthChecks: Record<string, { label: string; value: string; state: 'ok' | 'warn' | 'error' }[]>;
-  models: Record<string, { id: string; name: string; subtitle: string; status: string }[]>;
-  perfEstimate: Record<string, any>;
+  hardwareInfo: EngineHardwareInfo;
+  healthChecks: Record<string, HealthCheckItem[]>;
+  models: Record<string, EngineModelItem[]>;
+  perfEstimate: Record<string, PerfEstimateItem>;
   onEngineSelect: (engineId: string) => void;
   selectedEngineId: string;
   isAvailable: (engineId: string) => boolean;
-  modelActions: Record<string, { type: 'install' | 'remove'; progress: number; detail: string; stage: string; bytes_label: string }>;
-  offlineLangModels: { id: string; name: string; desc: string; size: string; status: string }[];
+  modelActions: Record<string, OfflineModelAction>;
+  offlineLangModels: OfflineLangModelItem[];
   offlineBusy: boolean;
   completedModelId?: string | null;
   onLangDownload: (modelId: string) => void;

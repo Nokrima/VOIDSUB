@@ -231,7 +231,7 @@ export const CalibrationView: React.FC<{
   }, [settings?.raw_translation_flow_enabled]);
 
   useEffect(() => {
-    const offRegion = onEvent('calibration_region_selected', (data: any) => {
+    const offRegion = onEvent('calibration_region_selected', (data) => {
       if (data && data.preview_image) {
         setPreviewRegion({ x1: data.x1, y1: data.y1, x2: data.x2, y2: data.y2, image: data.preview_image });
         setPreviewResult(null);

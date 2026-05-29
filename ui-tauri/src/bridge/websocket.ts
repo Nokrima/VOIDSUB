@@ -28,6 +28,16 @@ import type {
   RegionState
 } from './useWebSocket';
 
+
+
+export interface RegionSelectedPayload {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  preview_image?: string;
+}
+
 export interface WebSocketEventMap {
   'app_settings_loaded': AppSettings;
   'hardware_result': HardwareResult;
@@ -91,11 +101,11 @@ export interface WebSocketEventMap {
   'stop_translation': void;
   'set_runtime_region': Record<string, unknown>;
   'calibration_select_region': void;
-  'calibration_region_selected': Record<string, unknown>;
+  'calibration_region_selected': RegionSelectedPayload;
   'calibration_region_cancelled': void;
   'calibration_region_failed': ErrorPayload;
   'temporary_region_state': Record<string, unknown>;
-  'temporary_region_selected': Record<string, unknown>;
+  'temporary_region_selected': RegionSelectedPayload;
   'temporary_region_cancelled': void;
   'temporary_region_failed': ErrorPayload;
   'shortcut_feedback': Record<string, unknown>;
@@ -107,8 +117,7 @@ export interface WebSocketEventMap {
 
 export type EventHandler<T = unknown> = (data: T) => void;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const listeners: Record<string, Set<EventHandler<any>>> = {};
+const listeners: Record<string, Set<EventHandler<unknown>>> = {};
 const eventHistory: Record<string, unknown[]> = {};
 
 const pushEventHistory = <K extends keyof WebSocketEventMap>(event: K, payload: WebSocketEventMap[K]) => {
@@ -119,8 +128,9 @@ const pushEventHistory = <K extends keyof WebSocketEventMap>(event: K, payload: 
 
 export const injectEvent = <K extends keyof WebSocketEventMap>(event: K, payload: WebSocketEventMap[K]) => {
   pushEventHistory(event, payload);
-  if (listeners[event]) {
-    listeners[event].forEach((handler) => handler(payload));
+  const eventListeners = listeners[event];
+  if (eventListeners) {
+    eventListeners.forEach((handler) => handler(payload));
   }
 };
 
@@ -198,8 +208,9 @@ export const connect = async () => {
         eventName as keyof WebSocketEventMap,
         payload as WebSocketEventMap[keyof WebSocketEventMap]
       );
-      if (listeners[eventName]) {
-        listeners[eventName].forEach((handler) => handler(payload));
+      const eventListeners = listeners[eventName];
+      if (eventListeners) {
+        eventListeners.forEach((handler) => handler(payload));
       }
     } catch (err) {
       console.error('Gelen paket bozuk:', err);
@@ -255,13 +266,12 @@ export const onEvent = <K extends keyof WebSocketEventMap>(event: K, handler: Ev
     listeners[event] = new Set();
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  listeners[event].add(handler as EventHandler<any>);
+  const eventListeners = listeners[event];
+  eventListeners.add(handler as EventHandler<unknown>);
 
   return () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    listeners[event].delete(handler as EventHandler<any>);
-    if (listeners[event].size === 0) {
+    eventListeners.delete(handler as EventHandler<unknown>);
+    if (eventListeners.size === 0) {
       delete listeners[event];
     }
   };
