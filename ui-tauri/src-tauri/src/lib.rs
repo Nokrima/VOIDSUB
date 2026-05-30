@@ -293,7 +293,7 @@ fn wait_for_backend(state: tauri::State<'_, BackendState>) -> Result<String, Str
                 return Err(err.clone());
             }
         }
-        if start.elapsed().as_secs() > 15 {
+        if start.elapsed().as_secs() > 60 {
             return Err("Backend baglanti suresi asildi (Timeout). Python sureci baslatilamadi veya yanit vermedi.".to_string());
         }
         std::thread::sleep(std::time::Duration::from_millis(50));
