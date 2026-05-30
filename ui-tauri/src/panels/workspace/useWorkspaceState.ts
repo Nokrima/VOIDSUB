@@ -91,7 +91,16 @@ export function useWorkspaceState({
     ? "HUD ve sahne üstü yazılarda güçlü"
     : "Sabit diyalog ve alt bantta güçlü";
 
-  const availableServices = ["auto", "google", "offline"] as ServiceKey[];
+  // --- Derived: service ---
+  const isAnyOfflineModelReady =
+    offlineStatus?.models_ready &&
+    Object.values(offlineStatus.models_ready).some((ready) => ready);
+
+  const availableServices = (
+    isAnyOfflineModelReady
+      ? ["auto", "google", "offline"]
+      : ["auto", "google"]
+  ) as ServiceKey[];
   const requestedService: ServiceKey =
     settings?.translation_engine === "offline" ||
     settings?.translation_engine === "google"
@@ -100,9 +109,20 @@ export function useWorkspaceState({
   const safeService = availableServices.includes(requestedService)
     ? requestedService
     : "auto";
-  const offlineModelOrder: OfflineModelKey[] = ["opus_mt_en_tr", "nllb"];
-  const safeOfflineModel: OfflineModelKey =
-    settings?.offline_model_key === "nllb" ? "nllb" : "opus_mt_en_tr";
+  const allModels: OfflineModelKey[] = ["opus_mt_en_tr", "nllb"];
+  const offlineModelOrder: OfflineModelKey[] = allModels.filter(
+    (key) => offlineStatus?.models_ready?.[key]
+  );
+  // Fallback in case none are ready so array is not empty when rendering
+  if (offlineModelOrder.length === 0) {
+    offlineModelOrder.push("opus_mt_en_tr");
+  }
+
+  const safeOfflineModel: OfflineModelKey = offlineModelOrder.includes(
+    settings?.offline_model_key as OfflineModelKey
+  )
+    ? (settings?.offline_model_key as OfflineModelKey)
+    : offlineModelOrder[0];
   const serviceIndex = Math.max(
     0,
     availableServices.findIndex((item) => item === safeService),

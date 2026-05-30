@@ -656,6 +656,52 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [settings?.ocr_engine, hardware?.available_engines]);
 
+  // Çeviri Motoru ve Çevrimdışı Model kullanılabilirlik denetimi
+  useEffect(() => {
+    if (!settings || !offlineStatus || !offlineStatus.models_ready) return;
+
+    const readyModels = Object.keys(offlineStatus.models_ready).filter(
+      (k) => offlineStatus.models_ready[k]
+    );
+    const isAnyModelReady = readyModels.length > 0;
+    const isOfflineEngine = settings.translation_engine === "offline";
+
+    let updates: any = {};
+
+    // 1. Eğer offline seçili ama hiçbir model kurulu değilse -> auto
+    if (isOfflineEngine && !isAnyModelReady) {
+      updates.translation_engine = "auto";
+      enqueueNotice(
+        "warning",
+        "Çevrimdışı model bulunamadı. Çeviri motoru Auto olarak değiştirildi.",
+        "fallback_translation_engine"
+      );
+    }
+
+    // 2. Eğer offline seçili ve seçili olan model kurulu değilse -> kurulu olan başka bir modele geç
+    if (
+      isOfflineEngine &&
+      isAnyModelReady &&
+      !offlineStatus.models_ready[settings.offline_model_key]
+    ) {
+      updates.offline_model_key = readyModels[0];
+      enqueueNotice(
+        "warning",
+        "Seçili model bulunamadı. Kurulu olan başka bir çevrimdışı modele geçildi.",
+        "fallback_offline_model"
+      );
+    }
+
+    if (Object.keys(updates).length > 0) {
+      setSettings((prev: any) => ({ ...prev, ...updates }));
+      wsClient.send("save_settings", updates);
+    }
+  }, [
+    settings?.translation_engine,
+    settings?.offline_model_key,
+    offlineStatus?.models_ready,
+  ]);
+
   useEffect(() => {
     if (
       !settings ||
