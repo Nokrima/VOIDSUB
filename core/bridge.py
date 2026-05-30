@@ -137,8 +137,13 @@ class SettingsStore:
 class NativeRegionSelector:
     def __init__(self, bridge):
         self.bridge = bridge
+        self._is_running = False
 
     async def run(self, mode: str = "target") -> None:
+        if self._is_running:
+            return
+        self._is_running = True
+        try:
         self.bridge.send(
             "log_entry",
             {
@@ -222,6 +227,8 @@ class NativeRegionSelector:
             self.bridge.send(
                 "native_region_selection", {"status": "failed", "error": str(e)}
             )
+        finally:
+            self._is_running = False
 
     def _run_subprocess(self) -> subprocess.CompletedProcess:
         cmd = [sys.executable, "-m", "core.native_region_selector"]
