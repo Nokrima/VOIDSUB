@@ -91,12 +91,7 @@ export function useWorkspaceState({
     ? "HUD ve sahne üstü yazılarda güçlü"
     : "Sabit diyalog ve alt bantta güçlü";
 
-  // --- Derived: service ---
-  const availableServices = (
-    offlineStatus?.available
-      ? ["auto", "google", "offline"]
-      : ["auto", "google"]
-  ) as ServiceKey[];
+  const availableServices = ["auto", "google", "offline"] as ServiceKey[];
   const requestedService: ServiceKey =
     settings?.translation_engine === "offline" ||
     settings?.translation_engine === "google"
