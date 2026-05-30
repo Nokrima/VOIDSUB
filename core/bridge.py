@@ -6,6 +6,8 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 import websockets
+from websockets.exceptions import ConnectionClosed
+from websockets.server import serve
 
 from config.defaults import APP_VERSION, SETTINGS_FILE, WEBSOCKET_HOST, WEBSOCKET_PORT
 from core.errors import set_bridge_emitter
@@ -308,7 +310,7 @@ class WebsocketBroadcaster:
         for client in self.clients:
             try:
                 await client.send(message)
-            except websockets.exceptions.ConnectionClosed:
+            except ConnectionClosed:
                 dead_clients.add(client)
         self.clients -= dead_clients
 
@@ -806,14 +808,14 @@ class BridgeServer:
                         )
                 except json.JSONDecodeError:
                     self.logger.warning("[BridgeServer] Gecersiz JSON.")
-        except websockets.exceptions.ConnectionClosed:
+        except ConnectionClosed:
             self.logger.info("[BridgeServer] Istemci ayrildi.")
         finally:
             self.broadcaster.remove_client(websocket)
 
     async def start(self):
         self.broadcaster.loop = asyncio.get_running_loop()
-        server = await websockets.serve(self.handler, self.host, self.port)
+        server = await serve(self.handler, self.host, self.port)
 
         # Eğer dinamik port atandıysa gerçek portu al
         if server.sockets:
