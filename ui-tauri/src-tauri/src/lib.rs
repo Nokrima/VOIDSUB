@@ -236,7 +236,8 @@ fn parse_shortcut_string(s: &str) -> Option<(u32, u32)> {
         }
     }
 
-    let vk = match key_part.to_uppercase().as_str() {
+    let key_upper = key_part.to_uppercase();
+    let vk = match key_upper.as_str() {
         "F1" => Some(VK_F1 as u32),
         "F2" => Some(VK_F2 as u32),
         "F3" => Some(VK_F3 as u32),
@@ -271,7 +272,22 @@ fn parse_shortcut_string(s: &str) -> Option<(u32, u32)> {
         "NUMPAD9" => Some(VK_NUMPAD9 as u32),
         "PAUSE" => Some(VK_PAUSE as u32),
         "SCROLLLOCK" => Some(VK_SCROLL as u32),
-        _ => None,
+        "SPACE" => Some(0x20),
+        "ENTER" | "RETURN" => Some(0x0D),
+        "ESCAPE" | "ESC" => Some(0x1B),
+        "TAB" => Some(0x09),
+        _ => {
+            if key_upper.len() == 1 {
+                let c = key_upper.chars().next().unwrap();
+                if c.is_ascii_alphanumeric() {
+                    Some(c as u32)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        }
     };
 
     vk.map(|vk_code| (modifiers, vk_code))
@@ -314,26 +330,22 @@ unsafe fn unregister_all_hotkeys() {
 #[cfg(target_os = "windows")]
 unsafe fn register_shortcuts(shortcuts: &ShortcutsMap) {
     let null_hwnd = std::ptr::null_mut();
-    if let Some((mods, vk)) = parse_shortcut_string(&shortcuts.start_stop) {
-        if RegisterHotKey(null_hwnd, 1, mods, vk) == 0 {
-            log::error!("Failed to register start_stop hotkey: {}", shortcuts.start_stop);
+
+    let mut map_and_register = |key_str: &str, id: i32, name: &str| {
+        if let Some((mods, vk)) = parse_shortcut_string(key_str) {
+            if RegisterHotKey(null_hwnd, id, mods, vk) == 0 {
+                let err = std::io::Error::last_os_error();
+                log::error!("Failed to register {} hotkey ({}): {}", name, key_str, err);
+            }
+        } else {
+            log::warn!("Invalid shortcut format for {}: {}", name, key_str);
         }
-    }
-    if let Some((mods, vk)) = parse_shortcut_string(&shortcuts.select_region) {
-        if RegisterHotKey(null_hwnd, 2, mods, vk) == 0 {
-            log::error!("Failed to register select_region hotkey: {}", shortcuts.select_region);
-        }
-    }
-    if let Some((mods, vk)) = parse_shortcut_string(&shortcuts.hide_overlay) {
-        if RegisterHotKey(null_hwnd, 3, mods, vk) == 0 {
-            log::error!("Failed to register hide_overlay hotkey: {}", shortcuts.hide_overlay);
-        }
-    }
-    if let Some((mods, vk)) = parse_shortcut_string(&shortcuts.temporary_region) {
-        if RegisterHotKey(null_hwnd, 4, mods, vk) == 0 {
-            log::error!("Failed to register temporary_region hotkey: {}", shortcuts.temporary_region);
-        }
-    }
+    };
+
+    map_and_register(&shortcuts.start_stop, 1, "start_stop");
+    map_and_register(&shortcuts.select_region, 2, "select_region");
+    map_and_register(&shortcuts.hide_overlay, 3, "hide_overlay");
+    map_and_register(&shortcuts.temporary_region, 4, "temporary_region");
 }
 
 /// Hotkey'leri guncelle — thread-safe: hotkey thread'e WM_USER mesaji gonderir.
