@@ -310,9 +310,10 @@ export const connect = async () => {
       level: "error",
       prefix: "SYS",
       code: "000",
-      message: String(err),
+      message: String(err) + " Yeniden deneniyor...",
     });
-    return; // Backend başlamadıysa bağlanmaya çalışma
+    reconnectTimeout = setTimeout(connect, 5000);
+    return; // Backend başlamadıysa biraz bekle ve tekrar dene
   }
 
   socket = new WebSocket(WS_URL);
