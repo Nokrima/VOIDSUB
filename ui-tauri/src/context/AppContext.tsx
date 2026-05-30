@@ -659,20 +659,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (
       !settings ||
-      !offlineStatus ||
-      offlineStatus.available ||
-      settings.translation_engine !== "offline"
-    ) {
-      return;
-    }
-    const nextSettings = { ...settings, translation_engine: "auto" as const };
-    setSettings(nextSettings);
-    wsClient.send("save_settings", nextSettings);
-  }, [offlineStatus, settings]);
-
-  useEffect(() => {
-    if (
-      !settings ||
       !settings.onboarding_completed ||
       (FORCE_ONBOARDING_TEST && !forceOnboardingBypassed) ||
       startupIntroShownRef.current
