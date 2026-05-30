@@ -26,7 +26,6 @@ class TranslationQueueService:
             try:
                 self.p._active_translation_source = text
                 queue_wait_ms = (time.monotonic() - queued_at_monotonic) * 1000
-                self.p.logger.info(f"[OCR-035] translate_in: {_clip_log_text(text)}")
                 self.p.overlay_publisher._log_trl(
                     "001",
                     (
@@ -73,9 +72,15 @@ class TranslationQueueService:
                         offline_result=offline_result,
                     )
                 else:
-                    translated_text, source = await loop.run_in_executor(None, self._translate_text, text)
+                    cached_text = self._get_cached_translation(text)
+                    if cached_text:
+                        translated_text, source = cached_text, "cache"
+                    else:
+                        translated_text, source = await loop.run_in_executor(None, self._translate_text, text)
+                        if translated_text and source != "error" and source != "none":
+                            cache_key = self._cache_key_for_source(text, source)
+                            self.p.tr_cache.put(cache_key, translated_text, 1.0, source)
                 translation_duration_ms = (time.perf_counter() - translation_started) * 1000
-                self.p.logger.info(f"[OCR-036] translate_out ({source}): {_clip_log_text(translated_text)}")
                 self.p.overlay_publisher._log_trl(
                     "002",
                     (
@@ -282,7 +287,7 @@ class TranslationQueueService:
         return self.p.tr_cache.get(google_key, exact_only=True)
 
     def _cache_key_for_source(self, text: str, source: str) -> str:
-        prefix = "offline" if "offline" in str(source or "").lower() else "google"
+        prefix = "offline" if "offline" in (source or "").lower() else "google"
         return f"{prefix}:{self._resolve_translation_source_language(text)}:{self.p.tgt_language}:{text}"
 
     def _resolve_translation_source_language(self, text: str, *, log_decision: bool = False) -> str:
@@ -300,7 +305,7 @@ class TranslationQueueService:
         return detected
 
     def _detect_text_language(self, text: str) -> str:
-        compact = str(text or "").strip()
+        compact = (text or "").strip()
         cyrillic_count = len(re.findall(r"[\u0400-\u04FF]", compact))
         latin_count = len(re.findall(r"[A-Za-z]", compact))
         if cyrillic_count >= 2 and cyrillic_count >= max(2, latin_count):

@@ -3,6 +3,7 @@ import json
 import difflib
 import subprocess
 import sys
+import os
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -48,9 +49,15 @@ class SettingsStore:
             return False
 
     def merge_payload(self, payload: dict) -> bool:
+        if "app" not in payload and "overlay" not in payload:
+            payload = {"app": payload}
         self.app_settings = self._merge_dict(self.app_settings, payload)
-        if "custom_profiles" in self.app_settings:
-            self.app_settings["custom_profiles"] = self._normalize_custom_profiles(self.app_settings["custom_profiles"])
+        
+        # Ensure nested custom_profiles are normalized
+        app_data = self.app_settings.get("app", self.app_settings)
+        if "custom_profiles" in app_data:
+            app_data["custom_profiles"] = self._normalize_custom_profiles(app_data["custom_profiles"])
+            
         return self.save()
 
     def _merge_dict(self, base: dict, incoming: dict) -> dict:
@@ -112,22 +119,33 @@ class NativeRegionSelector:
     def __init__(self, bridge):
         self.bridge = bridge
 
-    async def run(self) -> None:
+    async def run(self, mode: str = "target") -> None:
         self.bridge.send("log_entry", {"timestamp": "", "level": "INFO", "prefix": "UI", "code": "UI-100", "message": "Native region selector baslatiliyor."})
         self.bridge.send("native_region_selection", {"status": "started"})
         try:
             result = await asyncio.to_thread(self._run_subprocess)
             if result.returncode == 0 and result.stdout.strip():
                 try:
-                    region_data = json.loads(result.stdout.strip())
+                    payload = json.loads(result.stdout.strip())
+                    if payload.get("cancelled"):
+                        self.bridge.send("native_region_selection", {"status": "cancelled"})
+                        return
+                    
+                    region_data = payload.get("region", payload)
                     normalized = self.bridge._normalize_region(region_data)
+                    
                     if normalized:
-                        if self.bridge.worker and getattr(self.bridge.worker.pipeline, "is_running", False):
-                            self.bridge._activate_temporary_region(normalized)
-                            self.bridge.send("native_region_selection", {"status": "completed", "is_temporary": True, "region": normalized})
+                        if mode == "calibration":
+                            self.bridge.persist_calibration_region(normalized)
+                            self.bridge.send("native_region_selection", {"status": "completed", "mode": "calibration", "region": normalized})
                         else:
-                            self.bridge.persist_target_region(normalized)
-                            self.bridge.send("native_region_selection", {"status": "completed", "is_temporary": False, "region": normalized})
+                            if self.bridge.worker and getattr(self.bridge.worker, "is_running", False):
+                                self.bridge._activate_temporary_region(normalized)
+                                self.bridge.send("native_region_selection", {"status": "completed", "is_temporary": True, "region": normalized})
+                            else:
+                                self.bridge.persist_target_region(normalized)
+                                self.bridge.send("native_region_selection", {"status": "completed", "is_temporary": False, "region": normalized})
+                            self.bridge.get_preview_handler().sync_region(normalized)
                     else:
                         self.bridge.send("native_region_selection", {"status": "failed", "error": "Invalid payload format"})
                 except json.JSONDecodeError:
@@ -139,10 +157,8 @@ class NativeRegionSelector:
             self.bridge.send("native_region_selection", {"status": "failed", "error": str(e)})
 
     def _run_subprocess(self) -> subprocess.CompletedProcess:
-        exe_path = Path("ui-tauri/src-tauri/target/release/voidsub.exe").resolve()
-        cmd = [str(exe_path), "--selector-mode"] if exe_path.exists() else ["cargo", "run", "--release", "--", "--selector-mode"]
-        cwd = exe_path.parent.parent.parent.parent if exe_path.exists() else Path("ui-tauri/src-tauri").resolve()
-        return subprocess.run(cmd, capture_output=True, text=True, cwd=str(cwd), creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
+        cmd = [sys.executable, "-m", "core.native_region_selector"]
+        return subprocess.run(cmd, capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
 
 
 class OverlayDispatcher:
@@ -153,13 +169,13 @@ class OverlayDispatcher:
         overlay = self.bridge.native_overlay
         if not overlay: return
         try:
-            if event == "translation_result":
-                overlay.set_text(payload.get("translated_text", ""))
+            if event == "new_translation":
+                overlay.update_last(payload.get("translated_text", ""))
             elif event == "translation_state":
                 if payload.get("running") and payload.get("loading"):
-                    overlay.set_text("Çeviri Motoru Yükleniyor...")
+                    overlay.update_last("Çeviri Motoru Yükleniyor...")
                 elif payload.get("running"):
-                    overlay.set_text("Çeviri Bekleniyor...")
+                    overlay.clear()
                 else:
                     overlay.hide()
             elif event == "saved_regions_update":
@@ -177,11 +193,11 @@ class OverlayDispatcher:
                     overlay.hide()
             elif event == "app_settings":
                 settings = payload.get("settings", {})
-                if "overlay_opacity" in settings: overlay.set_opacity(settings["overlay_opacity"])
-                if "overlay_font_size" in settings: overlay.set_font_size(settings["overlay_font_size"])
-                if "overlay_font_weight" in settings: overlay.set_font_weight(settings["overlay_font_weight"])
-                if "overlay_text_color" in settings: overlay.set_text_color(settings["overlay_text_color"])
-                if "overlay_bg_color" in settings: overlay.set_bg_color(settings["overlay_bg_color"])
+                if "overlay" in settings:
+                    overlay.apply_settings(settings["overlay"])
+                app_set = settings.get("app", settings)
+                if "overlay_snap_to_region" in app_set:
+                    overlay.update_snap_to_region(bool(app_set["overlay_snap_to_region"]))
         except Exception as e:
             self.bridge.logger.error(f"[OverlayDispatcher] Failed to dispatch '{event}': {e}")
 
@@ -233,6 +249,7 @@ class BridgeServer:
         self.store = SettingsStore(self.logger)
         self.broadcaster = WebsocketBroadcaster(self.logger)
         self.native_selector = NativeRegionSelector(self)
+
         self.overlay_dispatcher = OverlayDispatcher(self)
         self.native_overlay = None
         
@@ -246,6 +263,23 @@ class BridgeServer:
         self._restore_saved_regions()
         
     @property
+    def easyocr_manager(self):
+        if not hasattr(self, "_easyocr_manager"):
+            from core.ocr.easyocr_manager import EasyOCRManager
+            import os
+            from pathlib import Path
+            plugins_dir = Path(os.environ.get("LOCALAPPDATA", "C:/")) / "VOIDSUB" / "plugins"
+            self._easyocr_manager = EasyOCRManager(plugins_dir, bridge=self)
+        return self._easyocr_manager
+
+    @property
+    def cuda_manager(self):
+        if not hasattr(self, "_cuda_manager"):
+            from core.cuda_manager import CudaManager
+            self._cuda_manager = CudaManager(bridge=self)
+        return self._cuda_manager
+        
+    @property
     def settings(self) -> dict[str, Any]:
         return self.store.app_settings
         
@@ -257,7 +291,7 @@ class BridgeServer:
         self.logger.info("[BridgeServer] Native overlay attached.")
         self.overlay_dispatcher.dispatch("app_settings", {"settings": self.store.app_settings})
         self._emit_saved_regions()
-        if getattr(self.worker.pipeline, "is_running", False):
+        if self.worker and getattr(self.worker, "is_running", False):
             self.overlay_dispatcher.dispatch("translation_state", {"running": True})
 
     def _normalize_region(self, region: Any) -> dict[str, Any] | None:
@@ -328,6 +362,18 @@ class BridgeServer:
         })
         self._emit_saved_regions()
 
+    def start_native_region_selector(self, mode: str = "target"):
+        asyncio.create_task(self.native_selector.run(mode=mode))
+
+    def get_preview_handler(self):
+        if not hasattr(self, "preview_handler"):
+            from core.debug.session_recorder_preview import PreviewHandler
+            class DummyRecorder: pass
+            self.dummy_recorder = DummyRecorder()
+            setattr(self.dummy_recorder, "bridge", self)
+            self.preview_handler = PreviewHandler(self.dummy_recorder)
+        return self.preview_handler
+
     def _activate_temporary_region(self, region: dict[str, Any]) -> None:
         self.temporary_region = region
         self.temporary_region_active = True
@@ -379,6 +425,8 @@ class BridgeServer:
             self.send("repair_result", {"engine": engine_id, "success": False, "error": str(e)})
 
     async def handler(self, websocket):
+        from core.ocr.easyocr_manager import EasyOCRManager
+        from core.cuda_manager import CudaManager
         self.broadcaster.add_client(websocket)
         self.logger.info("[BridgeServer] Yeni istemci bağlandı.")
         self.send("hello", {"message": "VoidSub Core Bağlandı", "hw_info": self.hw_detector.scan_system()})
@@ -399,20 +447,119 @@ class BridgeServer:
                         if self.store.merge_payload(data):
                             self._emit_app_settings()
                             self.send("log_entry", {"timestamp": "", "level": "SUCCESS", "prefix": "SYS", "code": "SYS-041", "message": "Ayarlar kaydedildi."})
+                            
+                            # Push config updates to worker
+                            if hasattr(self.worker, "update_config"):
+                                valid_keys = {
+                                    "engine_id", "region", "translation_engine", "offline_model_key",
+                                    "performance_tier", "ocr_filters_enabled", "raw_translation_flow_enabled",
+                                    "scene_mode", "quality_threshold", "min_text_chars", "stabilizer_min_samples",
+                                    "variant_budget", "scene_fit_threshold", "clahe_clip_striped", "clahe_clip_floating",
+                                    "bilateral_d", "white_v_min", "floating_gaussian_c", "floating_mean_c",
+                                    "calibration_profile_active", "src_language", "tgt_language"
+                                }
+                                config_updates = {k: v for k, v in data.items() if k in valid_keys}
+                                if "active_calibration_profile_id" in data:
+                                    config_updates["calibration_profile_active"] = bool(data["active_calibration_profile_id"])
+                                if config_updates:
+                                    try:
+                                        self.worker.update_config(**config_updates)
+                                    except Exception as e:
+                                        self.logger.error(f"[BridgeServer] Worker update_config error: {e}")
+                                
                         else:
                             self.send("log_entry", {"timestamp": "", "level": "ERROR", "prefix": "SYS", "code": "SYS-042", "message": "Ayarlar kaydedilemedi."})
-                    elif event == "update_target_region":
-                        self.persist_target_region(data)
+                    elif event == "save_overlay_settings":
+                        if self.store.merge_payload({"overlay": data}):
+                            overlay_data = self.store.app_settings.get("overlay", {})
+                            self.send("overlay_settings_loaded", overlay_data)
+                            if self.native_overlay and hasattr(self.native_overlay, "apply_settings"):
+                                self.native_overlay.apply_settings(overlay_data)
+                    elif event == "change_engine":
+                        engine_id = data.get("engine")
+                        if engine_id:
+                            if hasattr(self.worker, "update_config"):
+                                self.worker.update_config(engine_id=engine_id)
+                            self.store.merge_payload({"ocr_engine": engine_id})
+                            self._emit_app_settings()
+                    elif event == "change_ocr_scene_mode":
+                        scene_mode = data.get("mode")
+                        if scene_mode:
+                            if hasattr(self.worker, "update_config"):
+                                self.worker.update_config(scene_mode=scene_mode)
+                            self.store.merge_payload({"ocr_scene_mode": scene_mode})
+                            self._emit_app_settings()
+                    elif event == "update_target_region" or event == "set_runtime_region":
+                        region_data = data.get("region") if event == "set_runtime_region" else data
+                        self.persist_target_region(region_data)
                     elif event == "activate_temporary_region":
                         self._activate_temporary_region(data)
                     elif event == "deactivate_temporary_region":
                         self._deactivate_temporary_region()
                     elif event == "update_calibration_region":
                         self.persist_calibration_region(data)
-                    elif event == "start_native_region_selection":
-                        asyncio.create_task(self.native_selector.run())
+                    elif event == "request_region_selection":
+                        asyncio.create_task(self.native_selector.run(mode="target"))
+                    elif event == "calibration_select_region":
+                        self.get_preview_handler().select_region()
+                    elif event == "calibration_preview_request":
+                        self.get_preview_handler().request_preview(data)
+                    elif event == "test_overlay_push":
+                        if self.native_overlay is not None:
+                            text = data.get("text", "Örnek Çeviri Metni")
+                            mode = str(self.settings.get("overlay", {}).get("mode", "fixed"))
+                            speed = int(self.settings.get("app", {}).get("reading_speed_cps", 60))
+                            self.native_overlay.update_sequence([text], mode=mode, reading_speed=speed)
+                    elif event == "toggle_overlay_visibility":
+                        if self.native_overlay is not None:
+                            self.native_overlay.toggle()
+                    elif event == "clear_overlay":
+                        if self.native_overlay is not None and hasattr(self.native_overlay, "clear"):
+                            self.native_overlay.clear()
                     elif event == "repair_engine":
                         asyncio.create_task(self._run_engine_repair(data.get("engine_id", "easy")))
+                    elif event == "get_hardware":
+                        self.send("hardware_result", self.hw_detector.scan_system())
+                    elif event == "get_offline_status":
+                        offline_engine = getattr(self.worker, "offline_engine", getattr(self.worker, "offline_translator", None)) if self.worker else None
+                        if offline_engine is not None:
+                            self.send("offline_model_status", offline_engine.get_status())
+                    elif event == "download_offline_models":
+                        models = data.get("models", [])
+                        offline_engine = getattr(self.worker, "offline_engine", getattr(self.worker, "offline_translator", None)) if self.worker else None
+                        if offline_engine is not None and models:
+                            offline_engine.download_models(models)
+                    elif event == "cancel_offline_models":
+                        offline_engine = getattr(self.worker, "offline_engine", getattr(self.worker, "offline_translator", None)) if self.worker else None
+                        if offline_engine is not None:
+                            offline_engine.cancel_download()
+                    elif event == "remove_offline_models":
+                        model = data.get("model")
+                        offline_engine = getattr(self.worker, "offline_engine", getattr(self.worker, "offline_translator", None)) if self.worker else None
+                        if offline_engine is not None and model:
+                            offline_engine.remove_model(model)
+                    elif event == "download_easyocr":
+                        self.easyocr_manager.start()
+                    elif event == "cancel_easyocr":
+                        self.easyocr_manager.cancel()
+                    elif event == "remove_easyocr":
+                        self.easyocr_manager.remove()
+                    elif event == "download_cuda":
+                        self.cuda_manager.start()
+                    elif event == "cancel_cuda":
+                        self.cuda_manager.cancel()
+                    elif event == "remove_cuda":
+                        self.cuda_manager.remove()
+                    elif event == "start_translation":
+                        if hasattr(self.worker, "update_config"):
+                            target = self.saved_regions.get("target")
+                            if target:
+                                self.worker.update_config(region=target)
+                        if hasattr(self.worker, "start_loop"):
+                            asyncio.create_task(self.worker.start_loop())
+                    elif event == "stop_translation":
+                        if hasattr(self.worker, "stop"):
+                            self.worker.stop()
                     elif event == "request_active_session":
                         rec_state = {"active": False, "duration": 0.0}
                         self.send("active_session_state", {

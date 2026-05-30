@@ -192,6 +192,9 @@ export const EnginesPanel: React.FC = () => {
     const offCudaCancel = onEvent('cuda_cancelled', () => {
       setCudaAction(null);
     });
+    const offCudaRemoved = onEvent('cuda_removed', () => {
+      setCudaAction(null);
+    });
     const offCudaError = onEvent('cuda_error', (data: { message?: string }) => {
       setCudaAction(null);
       notify('error', String(data?.message ?? 'CUDA indirme hatası.'));
@@ -214,6 +217,7 @@ export const EnginesPanel: React.FC = () => {
       offCudaProgress();
       offCudaComplete();
       offCudaCancel();
+      offCudaRemoved();
       offCudaError();
     };
   }, [isConnected]);
@@ -363,6 +367,7 @@ export const EnginesPanel: React.FC = () => {
     injectInfoLog('UI-010', 'EasyOCR kaldiriliyor...');
     notify('warning', 'EasyOCR eklentisi kaldirildi.');
     send('remove_easyocr');
+    setTimeout(() => send('get_hardware'), 500);
   };
 
   // CUDA Handlers
@@ -378,8 +383,9 @@ export const EnginesPanel: React.FC = () => {
   };
   const handleCudaRemove = () => {
     injectInfoLog('UI-016', 'CUDA kaldiriliyor...');
-    notify('warning', 'CUDA paketleri sistemden kaldırılıyor...');
+    notify('warning', 'CUDA eklentisi kaldirildi.');
     send('remove_cuda');
+    setTimeout(() => send('get_hardware'), 500);
   };
 
   return (

@@ -115,6 +115,9 @@ export interface AppWebSocketBindings {
   onRegionSelected: (data: RegionState) => void;
   onRegionCancelled: () => void;
   onRegionFailed: (data: ErrorPayload) => void;
+  onCalibrationRegionSelected?: (data: RegionState) => void;
+  onCalibrationRegionCancelled?: () => void;
+  onCalibrationRegionFailed?: (data: ErrorPayload) => void;
   onAsyncError: (data: ErrorPayload) => void;
 }
 
@@ -132,7 +135,7 @@ export function useAppWebSocket(bindings: AppWebSocketBindings) {
   useEffect(() => {
     wsClient.connect();
 
-    const unsubscribeSettings = onEvent('app_settings', (data) => bindings.onSettings(data as AppSettings));
+    const unsubscribeSettings = onEvent('app_settings', (data) => bindings.onSettings((data as any).settings as AppSettings));
     const unsubscribeSettingsLegacy = onEvent('app_settings_loaded', (data) => bindings.onSettings(data as AppSettings));
     
     const unsubscribeHello = onEvent('hello', (data) => {
@@ -160,6 +163,21 @@ export function useAppWebSocket(bindings: AppWebSocketBindings) {
     const unsubscribeRegionFailed = onEvent('region_selection_failed', bindings.onRegionFailed);
     const unsubscribeAsyncError = onEvent('async_error', bindings.onAsyncError);
 
+    const unsubscribeCalibrationSelected = onEvent('calibration_region_selected', (payload) => bindings.onCalibrationRegionSelected?.(payload));
+    const unsubscribeCalibrationCancelled = onEvent('calibration_region_cancelled', () => bindings.onCalibrationRegionCancelled?.());
+    const unsubscribeCalibrationFailed = onEvent('calibration_region_failed', (payload) => bindings.onCalibrationRegionFailed?.(payload));
+
+    const unsubscribeNativeRegionSelection = onEvent('native_region_selection', (payload: any) => {
+      const status = payload.status;
+      if (status === 'completed') {
+        bindings.onRegionSelected(payload);
+      } else if (status === 'cancelled') {
+        bindings.onRegionCancelled();
+      } else if (status === 'failed') {
+        bindings.onRegionFailed(payload);
+      }
+    });
+
     wsClient.send('get_settings');
     wsClient.send('get_hardware');
     wsClient.send('get_offline_status');
@@ -184,6 +202,10 @@ export function useAppWebSocket(bindings: AppWebSocketBindings) {
       unsubscribeRegionSelected();
       unsubscribeRegionCancelled();
       unsubscribeRegionFailed();
+      unsubscribeCalibrationSelected();
+      unsubscribeCalibrationCancelled();
+      unsubscribeCalibrationFailed();
+      unsubscribeNativeRegionSelection();
       unsubscribeAsyncError();
       wsClient.disconnect();
     };

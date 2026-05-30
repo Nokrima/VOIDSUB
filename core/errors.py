@@ -80,7 +80,8 @@ def _build_file_handler() -> RotatingFileHandler:
         backupCount=LOG_BACKUP_COUNT,
         encoding="utf-8",
     )
-    handler.setLevel(logging.DEBUG)
+    # Varsayılan seviye INFO, setup_logger tarafından ezilebilir.
+    handler.setLevel(logging.INFO)
     handler.setFormatter(
         logging.Formatter(
             "%(asctime)s.%(msecs)03d - %(levelname)s - %(message)s",
@@ -93,19 +94,20 @@ def _build_file_handler() -> RotatingFileHandler:
 def setup_logger(level: str = "info") -> logging.Logger:
     """Uygulama logger'ini kurar veya mevcut logger'i dondurur."""
     global _logger, _bridge_handler_attached, _bridge_handler, _file_handler
-    desired_level = LOG_LEVELS.get(str(level).lower(), logging.INFO)
+    desired_level = LOG_LEVELS.get(level.lower(), logging.INFO)
     if _logger is not None:
         _logger.setLevel(logging.DEBUG)
         if _bridge_handler is not None:
             _bridge_handler.setLevel(desired_level)
         if _file_handler is not None:
-            _file_handler.setLevel(logging.DEBUG)
+            _file_handler.setLevel(desired_level)
         return _logger
 
     _logger = logging.getLogger("VoidSubCore")
     _logger.setLevel(logging.DEBUG)
     _logger.propagate = False
     _file_handler = _build_file_handler()
+    _file_handler.setLevel(desired_level)
     _logger.addHandler(_file_handler)
     if not _bridge_handler_attached:
         _bridge_handler = BridgeLogHandler()
@@ -150,7 +152,7 @@ def log_event(
             return
         _throttle_registry[throttle_key] = now
 
-    level_name = str(level).lower()
+    level_name = level.lower()
     log_method = getattr(logger, level_name, logger.info)
     log_method(f"[{prefix}-{code}] {message}")
 

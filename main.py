@@ -150,6 +150,7 @@ async def main() -> None:
 
         try:
             native_overlay = ModernOverlay()
+            native_overlay.start()
             native_overlay.apply_settings(bridge.settings.get("overlay", {}))
         except Exception as exc:
             native_overlay = None
@@ -158,13 +159,30 @@ async def main() -> None:
 
         try:
             pipeline = TranslationPipeline(bridge=bridge, capturer=capturer)
+            app_cfg = bridge.settings.get("app", {})
             pipeline.update_config(
-                engine_id=bridge.settings["app"].get("ocr_engine"),
-                translation_engine=bridge.settings["app"].get("translation_engine"),
-                performance_tier=bridge.settings["app"].get("performance_tier"),
-                scene_mode=bridge.settings["app"].get("ocr_scene_mode"),
-                src_language=bridge.settings["app"].get("src_language"),
-                tgt_language=bridge.settings["app"].get("tgt_language"),
+                engine_id=app_cfg.get("ocr_engine"),
+                region=bridge.saved_regions.get("target"),
+                translation_engine=app_cfg.get("translation_engine"),
+                offline_model_key=app_cfg.get("offline_model_key"),
+                performance_tier=app_cfg.get("performance_tier"),
+                ocr_filters_enabled=app_cfg.get("ocr_filters_enabled"),
+                raw_translation_flow_enabled=app_cfg.get("raw_translation_flow_enabled"),
+                scene_mode=app_cfg.get("ocr_scene_mode"),
+                quality_threshold=app_cfg.get("quality_threshold"),
+                min_text_chars=app_cfg.get("min_text_chars"),
+                stabilizer_min_samples=app_cfg.get("stabilizer_min_samples"),
+                variant_budget=app_cfg.get("variant_budget"),
+                scene_fit_threshold=app_cfg.get("scene_fit_threshold"),
+                clahe_clip_striped=app_cfg.get("clahe_clip_striped"),
+                clahe_clip_floating=app_cfg.get("clahe_clip_floating"),
+                bilateral_d=app_cfg.get("bilateral_d"),
+                white_v_min=app_cfg.get("white_v_min"),
+                floating_gaussian_c=app_cfg.get("floating_gaussian_c"),
+                floating_mean_c=app_cfg.get("floating_mean_c"),
+                calibration_profile_active=bool(app_cfg.get("active_calibration_profile_id")),
+                src_language=app_cfg.get("src_language"),
+                tgt_language=app_cfg.get("tgt_language"),
             )
         except Exception as exc:
             pipeline = None

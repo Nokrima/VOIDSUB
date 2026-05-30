@@ -98,98 +98,68 @@ export const WorkspaceView: React.FC<{
           padding: '14px',
         }}>
           {/* Column 1 — Text Preview */}
-          <div style={{
-            minHeight: 0,
-            borderRadius: 24,
-            background: 'rgba(255,255,255,0.045)',
-            display: 'grid',
-            gridTemplateRows: 'minmax(0, 1fr) minmax(0, 1fr)',
-            padding: '16px',
-            gap: 14,
-          }}>
-            <PreviewColumn
-              sourcePreviewText={ws.sourcePreviewText}
-              translatedPreviewText={ws.translatedPreviewText}
-              shouldShowSourcePreviewHelp={ws.shouldShowSourcePreviewHelp}
-              shouldShowTargetPreviewHelp={ws.shouldShowTargetPreviewHelp}
-            />
-          </div>
+          <PreviewColumn
+            sourcePreviewText={ws.sourcePreviewText}
+            translatedPreviewText={ws.translatedPreviewText}
+            shouldShowSourcePreviewHelp={ws.shouldShowSourcePreviewHelp}
+            shouldShowTargetPreviewHelp={ws.shouldShowTargetPreviewHelp}
+          />
 
           {/* Column 2 — Controls */}
-          <div style={{
-            minHeight: 0,
-            borderRadius: 24,
-            background: 'rgba(255,255,255,0.045)',
-            display: 'grid',
-            gridTemplateRows: 'repeat(5, minmax(0, 1fr))',
-            padding: '14px',
-            gap: 14,
-          }}>
-            <ControlColumn
-              isTranslating={ws.isTranslating}
-              currentPerformance={ws.currentPerformance}
-              previousPerformance={ws.previousPerformance}
-              nextPerformance={ws.nextPerformance}
-              shiftPerformance={ws.shiftPerformance}
-              performanceArrowHover={ws.performanceArrowHover}
-              setPerformanceArrowHover={ws.setPerformanceArrowHover}
-              currentMotor={ws.currentMotor}
-              previousMotor={ws.previousMotor}
-              nextMotor={ws.nextMotor}
-              shiftMotor={ws.shiftMotor}
-              motorArrowHover={ws.motorArrowHover}
-              setMotorArrowHover={ws.setMotorArrowHover}
-              activeService={ws.activeService}
-              previousService={ws.previousService}
-              nextService={ws.nextService}
-              shiftService={ws.shiftService}
-              serviceArrowHover={ws.serviceArrowHover}
-              setServiceArrowHover={ws.setServiceArrowHover}
-              activeModel={ws.activeModel}
-              previousModel={ws.previousModel}
-              nextModel={ws.nextModel}
-              shiftModel={ws.shiftModel}
-              modelEnabled={ws.modelEnabled}
-              modelArrowHover={ws.modelArrowHover}
-              setModelArrowHover={ws.setModelArrowHover}
-              sourceLanguage={ws.sourceLanguage}
-              targetLanguage={ws.targetLanguage}
-              shiftSourceLanguage={ws.shiftSourceLanguage}
-              shiftTargetLanguage={ws.shiftTargetLanguage}
-              swapLanguages={ws.swapLanguages}
-              languageArrowHover={ws.languageArrowHover}
-              setLanguageArrowHover={ws.setLanguageArrowHover}
-              languageSwapHover={ws.languageSwapHover}
-              setLanguageSwapHover={ws.setLanguageSwapHover}
-            />
-          </div>
+          <ControlColumn
+            isTranslating={ws.isTranslating}
+            currentPerformance={ws.currentPerformance}
+            previousPerformance={ws.previousPerformance}
+            nextPerformance={ws.nextPerformance}
+            shiftPerformance={ws.shiftPerformance}
+            performanceArrowHover={ws.performanceArrowHover}
+            setPerformanceArrowHover={ws.setPerformanceArrowHover}
+            currentMotor={ws.currentMotor}
+            previousMotor={ws.previousMotor}
+            nextMotor={ws.nextMotor}
+            shiftMotor={ws.shiftMotor}
+            motorArrowHover={ws.motorArrowHover}
+            setMotorArrowHover={ws.setMotorArrowHover}
+            activeService={ws.activeService}
+            previousService={ws.previousService}
+            nextService={ws.nextService}
+            shiftService={ws.shiftService}
+            serviceArrowHover={ws.serviceArrowHover}
+            setServiceArrowHover={ws.setServiceArrowHover}
+            activeModel={ws.activeModel}
+            previousModel={ws.previousModel}
+            nextModel={ws.nextModel}
+            shiftModel={ws.shiftModel}
+            modelEnabled={ws.modelEnabled}
+            modelArrowHover={ws.modelArrowHover}
+            setModelArrowHover={ws.setModelArrowHover}
+            sourceLanguage={ws.sourceLanguage}
+            targetLanguage={ws.targetLanguage}
+            shiftSourceLanguage={ws.shiftSourceLanguage}
+            shiftTargetLanguage={ws.shiftTargetLanguage}
+            swapLanguages={ws.swapLanguages}
+            languageArrowHover={ws.languageArrowHover}
+            setLanguageArrowHover={ws.setLanguageArrowHover}
+            languageSwapHover={ws.languageSwapHover}
+            setLanguageSwapHover={ws.setLanguageSwapHover}
+          />
 
           {/* Column 3 — Session */}
-          <div style={{
-            minHeight: 0,
-            borderRadius: 24,
-            background: 'rgba(255,255,255,0.045)',
-            display: 'grid',
-            gridTemplateRows: 'repeat(3, minmax(0, 1fr))',
-            padding: '14px',
-            gap: 14,
-          }}>
-            <SessionColumn
-              isTranslating={ws.isTranslating}
-              isLoadingEngine={ws.isLoadingEngine}
-              isFloating={ws.isFloating}
-              sceneModeName={ws.sceneModeName}
-              sceneModeBest={ws.sceneModeBest}
-              applySceneType={ws.applySceneType}
-              scanStatus={ws.scanStatus}
-              motorStatus={ws.motorStatus}
-              loopStatus={ws.loopStatus}
-              regionActionLabel={ws.regionActionLabel}
-              translationActionLabel={ws.translationActionLabel}
-              handleStartRegionSelect={ws.handleStartRegionSelect}
-              handleToggleTranslation={ws.handleToggleTranslation}
-            />
-          </div>
+          <SessionColumn
+            isTranslating={ws.isTranslating}
+            isLoadingEngine={ws.isLoadingEngine}
+            isFloating={ws.isFloating}
+            sceneModeName={ws.sceneModeName}
+            sceneModeBest={ws.sceneModeBest}
+            applySceneType={ws.applySceneType}
+            scanStatus={ws.scanStatus}
+            motorStatus={ws.motorStatus}
+            loopStatus={ws.loopStatus}
+            regionActionLabel={ws.regionActionLabel}
+            translationActionLabel={ws.translationActionLabel}
+            handleStartRegionSelect={ws.handleStartRegionSelect}
+            handleToggleTranslation={ws.handleToggleTranslation}
+          />
         </div>
       </div>
     </div>

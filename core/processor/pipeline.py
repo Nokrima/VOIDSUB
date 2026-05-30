@@ -265,8 +265,16 @@ class TranslationPipeline:
             frame_id, frame, resolved_region, frame_started_monotonic, ocr_duration_ms=None
         )
         if ocr_frame_done:
+            self._empty_frame_count = 0
             await asyncio.sleep(0)
         else:
+            self._empty_frame_count = getattr(self, "_empty_frame_count", 0) + 1
+            if self._empty_frame_count > 3:
+                self.slot_manager.reset()
+                self.bridge.send("clear_overlay", {})
+                self.last_text = ""
+                self.last_detected_text = ""
+                self._active_translation_source = ""
             await asyncio.sleep(min(self.loop_interval, 0.01))
 
 
@@ -455,11 +463,11 @@ class TranslationPipeline:
         )
         if push_result == "rejected":
             self.overlay_publisher._emit_frame_stat(ocr_payload, "rejected", "slot_rejected")
-            del frame; del ocr_payload; return True
+            del frame; del ocr_payload; return False
         if self.slot_manager.get_sample_count() < min_slot_samples:
             self.overlay_publisher._log_ocr("021", f"Stabilizer decision: ACCEPTED=NO, frame_id={frame_id}, samples={self.slot_manager.get_sample_count()}, required={min_slot_samples}, reason=slot_wait")
             self.overlay_publisher._emit_frame_stat(ocr_payload, "rejected", "slot_wait")
-            del frame; del ocr_payload; return True
+            del frame; del ocr_payload; return False
         stabilized_text = self.slot_manager.get_slot()
         if stabilized_text is None:
             self.overlay_publisher._log_ocr("022", f"Stabilizer decision: ACCEPTED=NO, frame_id={frame_id}, reason=stabilizer_none, text={detected_text!r}")
@@ -486,7 +494,7 @@ class TranslationPipeline:
         gate_result = self._apply_text_gates(frame_id, frame, ocr_payload, ocr_duration_ms)
         if gate_result is None:
             del frame; del ocr_payload
-            return True
+            return False
         detected_text, quality_score = gate_result
         self.last_detected_text = detected_text
         self.last_detected_quality = quality_score
@@ -946,7 +954,7 @@ class TranslationPipeline:
             ocr_frame = np.stack([processed_frame] * 3, axis=-1)
         if not self.ocr_engine:
             return None
-        ocr_results = self.ocr_engine.read(cast(np.ndarray, ocr_frame))
+        ocr_results = self.ocr_engine.read(ocr_frame)
         if not ocr_results:
             self.overlay_publisher._log_ocr(
                 "011",
@@ -1207,7 +1215,7 @@ class TranslationPipeline:
         return len(current_normalized) >= len(last_normalized) + 12
 
     def _should_keep_stale_translation(self, translated_source_text: str) -> bool:
-        latest_text = re.sub(r"\s+", " ", str(self.last_text or "").strip())
+        latest_text = re.sub(r"\s+", " ", (self.last_text or "").strip())
         if not latest_text:
             return False
         norm_translated = re.sub(r"\s+", " ", translated_source_text.strip().lower())
@@ -1316,7 +1324,7 @@ class TranslationPipeline:
 
     def _capture_delay(self) -> float:
         base_delay = min(self.loop_interval, float(self._profile_value("active_target_ms", 60)) / 1000) if self._is_subtitle_active() else self.loop_interval
-        repeated = int(self._reused_frame_count)
+        repeated = self._reused_frame_count
         if repeated <= 0:
             return base_delay
         if self.raw_translation_flow_enabled:
@@ -1336,7 +1344,7 @@ class TranslationPipeline:
             int(self._profile_value("min_slot_samples", 1)),
             self.stabilizer_min_samples,
         )
-        text_len = len(str(text or "").strip())
+        text_len = len((text or "").strip())
         if (
             not self.raw_translation_flow_enabled
             and self.ocr_scene_mode == "floating"
@@ -1357,13 +1365,14 @@ class TranslationPipeline:
             return int(self._profile_value("active_variant_budget", 2))
         return int(self._profile_value("variant_budget", 4))
 
-    def _profile_value(self, key: str, default):
+    def _profile_value(self, key: str, default: Any) -> Any:
         tier = get_performance_tier_profile(self._runtime_engine_id(), self.performance_tier, self.translation_engine)
-        return tier.get(key, default)
+        val = tier.get(key, default)
+        return val if val is not None else default
 
 
     def _normalize_translated_text(self, text: str) -> str:
-        return re.sub(r"\s+", " ", str(text or "").strip()).lower()
+        return re.sub(r"\s+", " ", (text or "").strip()).lower()
 
     def _should_skip_translated_emit(self, translated_text: str, source: str = "") -> bool:
         normalized = self._normalize_translated_text(translated_text)
@@ -1372,7 +1381,7 @@ class TranslationPipeline:
         repeat_window_ms = int(self._profile_value("translated_repeat_window_ms", 220))
         if self.raw_translation_flow_enabled:
             repeat_window_ms = max(repeat_window_ms, 1200)
-        elif "offline" in str(source or "").lower():
+        elif "offline" in (source or "").lower():
             return False
         within_window = (time.monotonic() - self._last_translated_emit_time) * 1000 < repeat_window_ms
         if not within_window:
@@ -1402,10 +1411,10 @@ class TranslationPipeline:
         return self.stabilizer_min_samples
 
     def _normalize_source_language(self, source_language: str | None) -> str:
-        return "en" if str(source_language or "").strip().lower() == "en" else "auto"
+        return "en" if (source_language or "").strip().lower() == "en" else "auto"
 
     def _normalize_target_language(self, target_language: str | None) -> str:
-        return "en" if str(target_language or "").strip().lower() == "en" else "tr"
+        return "en" if (target_language or "").strip().lower() == "en" else "tr"
 
     def _configure_ocr_source_profiles(self) -> None:
         normalized = self._normalize_source_language(self.src_language)
@@ -1518,7 +1527,7 @@ class TranslationPipeline:
         return (9999.0, 9999.0)
 
     def _score_candidate_completeness(self, text: str) -> float:
-        compact = re.sub(r"\s+", " ", str(text or "").strip())
+        compact = re.sub(r"\s+", " ", (text or "").strip())
         if not compact:
             return -1.0
         alpha_count = sum(char.isalpha() for char in compact)

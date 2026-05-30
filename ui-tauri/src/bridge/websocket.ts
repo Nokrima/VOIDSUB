@@ -51,6 +51,7 @@ export interface WebSocketEventMap {
   'engine_change_denied': ErrorPayload;
   'settings_save_failed': ErrorPayload;
   'engine_repair_result': EngineRepairResult;
+  'repair_result': EngineRepairResult;
   'offline_model_error': ErrorPayload;
   'offline_model_complete': Record<string, unknown>;
   'translation_engine_fallback': FallbackPayload;
@@ -83,12 +84,14 @@ export interface WebSocketEventMap {
   'easyocr_plugin_complete': Record<string, unknown>;
   'easyocr_plugin_cancelled': Record<string, unknown>;
   'easyocr_plugin_error': Record<string, unknown>;
+  'easyocr_plugin_removed': Record<string, unknown>;
   'download_cuda': void;
   'cancel_cuda': void;
   'remove_cuda': void;
   'cuda_progress': Record<string, unknown>;
   'cuda_complete': Record<string, unknown>;
   'cuda_cancelled': Record<string, unknown>;
+  'cuda_removed': Record<string, unknown>;
   'cuda_error': Record<string, unknown>;
   'save_overlay_settings': Record<string, unknown>;
   'clear_overlay': void;
@@ -209,7 +212,9 @@ const validatePayload = (eventName: string, payload: Record<string, unknown>): b
     case 'new_translation':
       return 'translated_text' in payload;
     case 'ocr_frame_stat':
-      return 'fps' in payload;
+      return 'engine' in payload;
+    case 'performance_stats':
+      return 'timestamp' in payload;
     case 'engine_change_denied':
     case 'settings_save_failed':
     case 'offline_model_error':
@@ -218,6 +223,7 @@ const validatePayload = (eventName: string, payload: Record<string, unknown>): b
     case 'calibration_region_failed':
     case 'temporary_region_failed':
     case 'easyocr_plugin_error':
+      return 'error' in payload || 'message' in payload;
     case 'cuda_error':
       return 'error' in payload;
     case 'translation_engine_fallback':
@@ -227,6 +233,7 @@ const validatePayload = (eventName: string, payload: Record<string, unknown>): b
       return 'message' in payload || 'level' in payload;
     case 'overlay_settings_loaded':
     case 'offline_model_status':
+    case 'repair_result':
     case 'engine_repair_result':
     case 'offline_model_complete':
     case 'offline_model_progress':
@@ -234,11 +241,16 @@ const validatePayload = (eventName: string, payload: Record<string, unknown>): b
     case 'easyocr_plugin_progress':
     case 'easyocr_plugin_complete':
     case 'easyocr_plugin_cancelled':
+    case 'easyocr_plugin_status':
     case 'cuda_progress':
+    case 'cuda_status':
     case 'cuda_complete':
     case 'cuda_cancelled':
+    case 'cuda_removed':
+    case 'easyocr_plugin_removed':
     case 'region_selection_cancelled':
     case 'calibration_region_cancelled':
+    case 'native_region_selection':
     case 'temporary_region_state':
     case 'temporary_region_cancelled':
     case 'shortcut_feedback':

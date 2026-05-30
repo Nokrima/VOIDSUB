@@ -14,7 +14,7 @@ from core.errors import PREFIX_OCR, log_error, log_event
 
 EASYOCR_PLUGIN_REPO = "Nokrima/VoidSub-Plugins"
 EASYOCR_RELEASE_TAG = "latest"  # Veya "v1.0"
-EASYOCR_ASSET_NAME = "voidsub-easyocr-plugin.zip"
+EASYOCR_ASSET_NAME = "virel-easyocr-plugin.zip"
 
 class EasyOCRManager:
     def __init__(self, plugins_dir: Path, bridge=None):
@@ -151,15 +151,31 @@ class EasyOCRManager:
 
     def _get_download_info(self) -> tuple[str, int]:
         import urllib.request
+        import urllib.error
+        import os
         
         # Direkt HuggingFace baglantisi
-        url = "https://huggingface.co/Nokrima/voidsub-easyocr-plugin/resolve/main/voidsub-easyocr-plugin.zip"
+        url = "https://huggingface.co/Nokrima/virel-easyocr-plugin/resolve/main/virel-easyocr-plugin.zip"
         
         try:
-            req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": "VoidSub"})
+            headers = {"User-Agent": "VoidSub"}
+            token = os.environ.get("HF_TOKEN")
+            if not token:
+                try:
+                    from huggingface_hub import get_token
+                    token = get_token()
+                except ImportError:
+                    pass
+            if token:
+                headers["Authorization"] = f"Bearer {token}"
+            req = urllib.request.Request(url, method="HEAD", headers=headers)
             with urllib.request.urlopen(req, timeout=10) as response:
                 total_bytes = int(response.headers.get('Content-Length', 0))
             return url, total_bytes
+        except urllib.error.HTTPError as exc:
+            if exc.code == 401:
+                raise RuntimeError("İndirme izni reddedildi (401). Lütfen sistem ortam değişkenlerine 'HF_TOKEN' ekleyin veya HuggingFace CLI ile giriş yapın.")
+            raise RuntimeError(f"Indirme bilgisi alinamadi: {exc}")
         except Exception as exc:
             raise RuntimeError(f"Indirme bilgisi alinamadi: {exc}")
 
@@ -188,7 +204,17 @@ class EasyOCRManager:
                 self._send_progress()
                 return
 
+            import os
             headers = {"User-Agent": "VoidSub"}
+            token = os.environ.get("HF_TOKEN")
+            if not token:
+                try:
+                    from huggingface_hub import get_token
+                    token = get_token()
+                except ImportError:
+                    pass
+            if token:
+                headers["Authorization"] = f"Bearer {token}"
             mode = "wb"
             if existing_size > 0:
                 headers["Range"] = f"bytes={existing_size}-"

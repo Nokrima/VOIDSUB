@@ -172,7 +172,6 @@ export const MiniRailBlock = ({
         <div
           onWheel={(event) => {
             if (isEditingValue) return;
-            event.preventDefault();
             onShift(event.deltaY > 0 ? 1 : -1);
           }}
           style={{

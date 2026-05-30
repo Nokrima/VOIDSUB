@@ -285,12 +285,17 @@ class ModernOverlay:
             
             self.window.setGeometry(self.x, self.y, self.w, self.h)
             
+            self.window.setGeometry(self.x, self.y, self.w, self.h)
+            
+            print("[OVERLAY DEBUG] Window prepared. Starting app.exec()...")
             self._ready.set()
             if self.app:
                 self.app.exec()
+            print("[OVERLAY DEBUG] PySide6 loop exited cleanly.")
         except Exception as exc:
             self._available = False
             self._ready.set()
+            print(f"[OVERLAY DEBUG] CRASH inside _run_qt: {exc}\n{traceback.format_exc()}")
             log_error(PREFIX_SYS, "018", f"[Arayüz (Overlay)] -> BAŞLATILAMADI | Hata: {exc}", "Modern overlay baslatilamadi.")
 
     def _drag_start(self, x: int, y: int):

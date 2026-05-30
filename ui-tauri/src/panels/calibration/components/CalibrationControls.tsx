@@ -31,7 +31,6 @@ export const CalibrationSliderControl = ({
       onMouseEnter={() => onInfoFocus?.(item.key)}
       onWheel={(event) => {
         if (disabled) return;
-        event.preventDefault();
         onInfoFocus?.(item.key);
         adjustByStep(event.deltaY > 0 ? -1 : 1);
       }}

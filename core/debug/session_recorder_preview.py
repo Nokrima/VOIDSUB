@@ -44,11 +44,13 @@ class PreviewHandler:
             script = Path(__file__).resolve().parents[1] / "native_region_selector.py"
             flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
                 
-            result = await asyncio.to_thread(
-                subprocess.run, [str(exe), str(script)],
-                capture_output=True, text=True, encoding="utf-8", errors="replace", creationflags=flags, timeout=120
-            )
+            def run_subprocess():
+                return subprocess.run(
+                    [exe, str(script)],
+                    capture_output=True, text=True, encoding="utf-8", errors="replace", creationflags=flags, timeout=120
+                )
             
+            result = await asyncio.to_thread(run_subprocess)
             stdout = (result.stdout or "").strip().splitlines()
             payload = json.loads(stdout[-1]) if stdout else {}
             
@@ -88,6 +90,29 @@ class PreviewHandler:
             self.bridge.send("calibration_region_failed", {
                 "message": f"Kalibrasyon alanı seçimi başlatılamadı: {exc}",
             })
+
+    def sync_region(self, region: dict) -> None:
+        """Verilen bir bölgeyi kalibrasyon için eşitler ve anlık kare yakalar."""
+        asyncio.create_task(self._sync_region_async(region))
+
+    async def _sync_region_async(self, region: dict) -> None:
+        try:
+            pipeline = getattr(self.bridge, "worker", None)
+            if not pipeline: return
+            frame = await asyncio.to_thread(pipeline.capturer.capture_region, region)
+            if frame is None: return
+            self.recorder.preview_region = region
+            self.recorder.preview_frame = frame
+            if hasattr(self.bridge, "persist_calibration_region"):
+                self.bridge.persist_calibration_region(region, frame)
+            self.bridge.send("calibration_region_selected", {
+                "x1": region.get("left", 0), "y1": region.get("top", 0),
+                "x2": region.get("left", 0) + region.get("width", 0),
+                "y2": region.get("top", 0) + region.get("height", 0),
+                "preview_image": numpy_to_base64(frame),
+            })
+        except Exception as exc:
+            logger.error(f"[DBG-012] Sync region error: {exc}", exc_info=True)
 
     def request_preview(self, payload: dict) -> None:
         """Gonderilen config parametreleri ile anlik isleme uygular."""

@@ -39,6 +39,7 @@ export interface AppSettingsState {
   offline_model_key?: 'opus_mt_en_tr' | 'nllb';
   performance_tier?: string;
   reading_speed_cps?: number;
+  target_region?: { top: number; left: number; width: number; height: number } | null;
   last_region?: { top: number; left: number; width: number; height: number } | null;
   last_calibration_region?: { top: number; left: number; width: number; height: number } | null;
   active_calibration_profile_id?: string | null;
@@ -238,7 +239,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       
       restoreWindowSettingRef.current = nextSettings.restore_window_after_region_selection ?? true;
-      if (nextSettings.last_region) {
+      if (nextSettings.target_region || nextSettings.last_region) {
         localStorage.setItem('has-selected-region', 'true');
         setHasSelectedRegion(true);
         if (!restoredRegionNoticeShownRef.current) {
@@ -314,7 +315,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       restoreAfterRegionSelection().catch(() => undefined);
       const region = (data && typeof data === 'object' && 'region' in data) ? (data as { region?: unknown }).region : null;
       if (region && typeof region === 'object') {
-        setSettings((current) => (current ? { ...current, last_region: region as AppSettingsState['last_region'] } : current));
+        setSettings((current) => (current ? { ...current, last_region: region as AppSettingsState['last_region'], target_region: region as AppSettingsState['target_region'] } : current));
       }
       localStorage.setItem('has-selected-region', 'true');
       setHasSelectedRegion(true);

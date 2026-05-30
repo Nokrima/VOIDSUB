@@ -421,7 +421,7 @@ class OfflineModelManager:
             log_event(PREFIX_TRL, "048", f"[Model İndirme] -> İNDİRİLİYOR | Dosya: {name} ({index}/{len(files)}) | Boyut: {self._format_bytes(size) if size else 'Bilinmiyor'}")
             started_at = time.monotonic()
             try:
-                self._download_file(name, size)
+                self._download_file(name, size, downloaded, total)
             except Exception as exc:
                 log_error(PREFIX_TRL, "049", f"[Model İndirme] -> İNDİRME BAŞARISIZ | Model: {self.model_key} | Dosya: {name} | Hata: {exc}", "Offline model dosyasi indirilemedi.")
                 raise
@@ -432,7 +432,7 @@ class OfflineModelManager:
             log_event(PREFIX_TRL, "050", f"[Model İndirme] -> İNDİRİLDİ | Dosya: {name} | Süre(ms): {elapsed_ms}")
         self._verify_download_plan(files)
 
-    def _download_file(self, filename: str, total_bytes: int) -> None:
+    def _download_file(self, filename: str, total_bytes: int, global_downloaded: int = 0, global_total: int = 0) -> None:
         is_compiled = getattr(sys, "frozen", False) or "__compiled__" in globals()
         executable = str(self._get_plugin_python()) if is_compiled else sys.executable
         
@@ -447,7 +447,14 @@ class OfflineModelManager:
         watch_path = self.tmp_dir
         while True:
             try:
-                self._run_process(command, f"Model dosyası indirilemedi: {filename}", watch_path=watch_path, total_bytes=total_bytes)
+                self._run_process(
+                    command, 
+                    f"Model dosyası indirilemedi: {filename}", 
+                    watch_path=watch_path, 
+                    total_bytes=total_bytes,
+                    global_downloaded=global_downloaded,
+                    global_total=global_total
+                )
                 return
             except RuntimeError:
                 if self._cancel.is_set():
@@ -469,8 +476,14 @@ class OfflineModelManager:
     def _convert_model(self) -> None:
         self._set_stage("converting", 68, "CTranslate2 dönüşümü")
         copy_files = [name for name in self.spec["tokenizer_files"] if (self.tmp_dir / name).exists()]
+        
+        is_compiled = getattr(sys, "frozen", False) or "__compiled__" in globals()
+        executable = str(self._get_plugin_python()) if is_compiled else sys.executable
+        
         command = [
-            str(self._converter_path()),
+            executable,
+            "-m",
+            "ctranslate2.converters.transformers",
             "--model",
             str(self.tmp_dir),
             "--output_dir",
@@ -587,6 +600,8 @@ class OfflineModelManager:
         watch_path: Path | None = None,
         total_bytes: int = 0,
         log_stdout: bool = False,
+        global_downloaded: int = 0,
+        global_total: int = 0,
     ) -> None:
         import collections
         import threading
@@ -625,6 +640,8 @@ class OfflineModelManager:
         t_out.start()
         t_err.start()
 
+        last_progress_time = 0.0
+
         while self.active_proc.poll() is None:
             if self._cancel.is_set():
                 self.active_proc.terminate()
@@ -646,8 +663,15 @@ class OfflineModelManager:
             if watch_path is not None and total_bytes > 0:
                 current_bytes = max(0, self._measure_path(watch_path) - base_bytes)
                 current_bytes = min(current_bytes, total_bytes)
-                self.bytes_label = f"{self._format_bytes(current_bytes)} / {self._format_bytes(total_bytes)}"
-                self._send_progress()
+                new_label = f"{self._format_bytes(current_bytes)} / {self._format_bytes(total_bytes)}"
+                
+                now = time.monotonic()
+                if new_label != self.bytes_label and (now - last_progress_time) >= 1.0:
+                    self.bytes_label = new_label
+                    if global_total > 0:
+                        self.percent = 10 + int(((global_downloaded + current_bytes) / global_total) * 50)
+                    self._send_progress()
+                    last_progress_time = now
             time.sleep(0.25)
             
         t_out.join(timeout=1)
@@ -720,18 +744,6 @@ class OfflineModelManager:
     def _delete_path(self, path: Path) -> None:
         if path.exists():
             shutil.rmtree(path, ignore_errors=True)
-
-    def _converter_path(self) -> Path | str:
-        is_compiled = getattr(sys, "frozen", False) or "__compiled__" in globals()
-        if is_compiled:
-            plugin_python = self._get_plugin_python()
-            if plugin_python:
-                converter = plugin_python.parent / "Scripts" / "ct2-transformers-converter.exe"
-                if converter.exists():
-                    return converter
-        
-        converter = Path(sys.executable).with_name("ct2-transformers-converter.exe")
-        return converter if converter.exists() else "ct2-transformers-converter"
 
     def _internet_available(self) -> bool:
         for host, port in (("huggingface.co", 443), ("1.1.1.1", 53)):

@@ -148,7 +148,7 @@ class CudaManager:
             elapsed_ms = int((time.monotonic() - self._install_started_at) * 1000)
             log_event(PREFIX_SYS, "099", f"[CUDA Kaldırma] -> TAMAMLANDI | Süre(ms): {elapsed_ms}")
             self._send_status()
-            self._send("cuda_complete", {"percent": 0, "elapsed_ms": elapsed_ms})
+            self._send("cuda_removed", {"percent": 0, "elapsed_ms": elapsed_ms})
             
         except RuntimeError as exc:
             if str(exc) == "cancelled" or self._cancel.is_set():

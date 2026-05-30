@@ -184,7 +184,6 @@ export const ControlColumn: React.FC<ControlColumnProps> = ({
     sample={
       <div
         onWheel={(event) => {
-          event.preventDefault();
           shiftPerformance(event.deltaY > 0 ? 1 : -1);
         }}
         style={{
@@ -282,7 +281,6 @@ export const ControlColumn: React.FC<ControlColumnProps> = ({
     sample={
       <div
         onWheel={(event) => {
-          event.preventDefault();
           shiftMotor(event.deltaY > 0 ? 1 : -1);
         }}
         style={{
@@ -401,7 +399,6 @@ export const ControlColumn: React.FC<ControlColumnProps> = ({
         >
           <div
             onWheel={(event) => {
-              event.preventDefault();
               shiftSourceLanguage(event.deltaY > 0 ? 1 : -1);
             }}
             style={{
@@ -515,7 +512,6 @@ export const ControlColumn: React.FC<ControlColumnProps> = ({
           </button>
           <div
             onWheel={(event) => {
-              event.preventDefault();
               shiftTargetLanguage(event.deltaY > 0 ? 1 : -1);
             }}
             style={{
@@ -614,7 +610,6 @@ export const ControlColumn: React.FC<ControlColumnProps> = ({
     sample={
       <div
         onWheel={(event) => {
-          event.preventDefault();
           shiftService(event.deltaY > 0 ? 1 : -1);
         }}
         style={{
@@ -713,7 +708,6 @@ export const ControlColumn: React.FC<ControlColumnProps> = ({
        <div style={{ width: '100%', height: '100%', alignSelf: 'stretch', position: 'relative' }}>
         <div
           onWheel={(event) => {
-            event.preventDefault();
             if (modelEnabled && previousModel != null) shiftModel(event.deltaY > 0 ? 1 : -1);
           }}
           style={{
