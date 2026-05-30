@@ -191,6 +191,32 @@ class TranslationPipeline:
                 },
             )
             return False
+
+        if self.translation_engine == "google":
+            if not self.translator.is_available():
+                self.logger.error(f"[{PREFIX_SYS}-046] [Çeviri Motoru] -> İNTERNET YOK | Motor: google")
+                self.bridge.send(
+                    "translation_state",
+                    {
+                        "running": False,
+                        "reason": "engine_unavailable",
+                        "message": "Çevrimiçi (Google) çeviri için aktif bir internet bağlantısı bulunamadı.",
+                    },
+                )
+                return False
+        elif self.translation_engine == "offline":
+            if not self.offline_translator.is_available():
+                self.logger.error(f"[{PREFIX_SYS}-046] [Çeviri Motoru] -> MODEL YOK | Motor: offline")
+                self.bridge.send(
+                    "translation_state",
+                    {
+                        "running": False,
+                        "reason": "engine_unavailable",
+                        "message": "Seçili Çevrimdışı (Offline) model indirilmemiş. Lütfen Ayarlar > Modeller kısmından yükleyin.",
+                    },
+                )
+                return False
+
         self.is_running = True
         self.performance_monitor.start()
         self._notify_runtime_engine_fallback(runtime_engine)

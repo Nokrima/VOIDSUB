@@ -73,8 +73,14 @@ class GoogleTranslationEngine(TranslationEngine):
         return text, "error"
 
     def is_available(self) -> bool:
-        """Şimdilik her zaman True dönüyor, ileride ping atılarak internet kontrolü eklenebilir."""
-        return self._is_ready
+        """İnternet bağlantısı kontrolü yapar."""
+        import socket
+        try:
+            # Hızlı DNS ping atarak internetin olduğunu doğrula
+            socket.create_connection(("8.8.8.8", 53), timeout=2.0)
+            return True
+        except OSError:
+            return False
 
     def _cache_key(self, text: str, src: str, tgt: str) -> str:
         return f"google:{src}:{tgt}:{text}"
