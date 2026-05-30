@@ -321,31 +321,25 @@ class EventRouter:
                 self.bridge.native_overlay.set_region(region)
 
     def handle_request_region_selection(self, payload: dict):
-        if self.bridge._temporary_region_active:
+        if getattr(self.bridge, "temporary_region_active", False):
             self.bridge.send(
                 "region_selection_failed",
                 {"message": "Gecici alan aktifken ana tarama alani degistirilemez."},
             )
             return
-        if not self.bridge._region_selector_running:
-            self.bridge._region_selector_running = True
-            self.bridge._region_selector_mode = "primary"
-            asyncio.create_task(self.bridge._run_native_region_selector())
+        self.bridge.start_native_region_selector(mode="target")
 
     def handle_toggle_temporary_region(self, payload: dict):
-        if self.bridge._temporary_region_active:
+        if getattr(self.bridge, "temporary_region_active", False):
             self.bridge._deactivate_temporary_region()
             return
-        if not self.bridge._has_selected_region:
+        if not self.bridge.saved_regions.get("target"):
             self.bridge.send(
                 "temporary_region_failed",
                 {"message": "Once ana tarama alani secilmelidir."},
             )
             return
-        if not self.bridge._region_selector_running:
-            self.bridge._region_selector_running = True
-            self.bridge._region_selector_mode = "temporary"
-            asyncio.create_task(self.bridge._run_native_region_selector())
+        self.bridge.start_native_region_selector(mode="temporary")
 
     def handle_change_engine(self, payload: dict):
         engine_id = payload.get("engine")
