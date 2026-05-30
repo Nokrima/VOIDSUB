@@ -1,82 +1,134 @@
-import React, { useState, useEffect } from 'react';
-import { PanelStage } from './PanelStage';
-import { LogPanel } from './LogPanel';
-import { getEventHistory, onEvent, send, useWebSocket } from '../bridge/websocket';
-import { useAppContext } from '../context/AppContext';
-import { validateShortcutKey, suspendHotkeys, resumeHotkeys, syncHotkeysToRust, type ShortcutAction } from '../hooks/useShortcutManager';
-import { useAutoUpdater } from '../hooks/useAutoUpdater';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect } from "react";
+import { PanelStage } from "./PanelStage";
+import { LogPanel } from "./LogPanel";
+import {
+  getEventHistory,
+  onEvent,
+  send,
+  useWebSocket,
+} from "../bridge/websocket";
+import { useAppContext } from "../context/AppContext";
+import {
+  validateShortcutKey,
+  suspendHotkeys,
+  resumeHotkeys,
+  syncHotkeysToRust,
+  type ShortcutAction,
+} from "../hooks/useShortcutManager";
+import { useAutoUpdater } from "../hooks/useAutoUpdater";
+import { motion } from "framer-motion";
 
 const colors = {
-  bgGlass: 'rgba(255,255,255,0.015)',
-  borderGlass: '1px solid rgba(255,255,255,0.05)',
-  accent: 'rgba(125,211,252,0.9)',
-  textPrimary: '#fff',
-  textMuted: 'rgba(159,183,207,0.55)'
+  bgGlass: "rgba(255,255,255,0.015)",
+  borderGlass: "1px solid rgba(255,255,255,0.05)",
+  accent: "rgba(125,211,252,0.9)",
+  textPrimary: "#fff",
+  textMuted: "rgba(159,183,207,0.55)",
 };
 
 const TS = {
-  boxTitle: { fontSize: 11, textTransform: 'uppercase' as const, letterSpacing: '0.14em', fontWeight: 700, color: 'rgba(191,215,242,0.72)' }
+  boxTitle: {
+    fontSize: 11,
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.14em",
+    fontWeight: 700,
+    color: "rgba(191,215,242,0.72)",
+  },
 };
 
 const G = ({ p, stroke = colors.accent }: { p: string; stroke?: string }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.8" style={{ width: 16, height: 16 }}>
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={stroke}
+    strokeWidth="1.8"
+    style={{ width: 16, height: 16 }}
+  >
     <path d={p} strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
 
-const SettingsRow = ({ label, active, onChange }: { label: string, active: boolean, onChange: (v: boolean) => void }) => {
+const SettingsRow = ({
+  label,
+  active,
+  onChange,
+}: {
+  label: string;
+  active: boolean;
+  onChange: (v: boolean) => void;
+}) => {
   const [hovered, setHovered] = React.useState(false);
   return (
-    <div 
+    <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={() => onChange(!active)}
-      style={{ 
-        display: 'flex', alignItems: 'center', padding: '6px 8px', 
-        cursor: 'pointer', transition: 'all 0.2s ease',
-        background: 'transparent',
+      style={{
+        display: "flex",
+        alignItems: "center",
+        padding: "6px 8px",
+        cursor: "pointer",
+        transition: "all 0.2s ease",
+        background: "transparent",
         borderRadius: 8,
-        margin: '0 -4px'
+        margin: "0 -4px",
       }}
     >
-      <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: hovered ? '#fff' : 'rgba(255,255,255,0.6)', transition: 'color 0.2s ease' }}>
+      <span
+        style={{
+          flex: 1,
+          fontSize: 13,
+          fontWeight: 500,
+          color: hovered ? "#fff" : "rgba(255,255,255,0.6)",
+          transition: "color 0.2s ease",
+        }}
+      >
         {label}
       </span>
       <button
         type="button"
         style={{
-          border: 'none',
+          border: "none",
           padding: 0,
-          cursor: 'pointer',
-          position: 'relative',
+          cursor: "pointer",
+          position: "relative",
           width: 44,
           height: 24,
           borderRadius: 999,
-          background: 'linear-gradient(180deg, rgba(7,11,17,0.88), rgba(4,8,13,0.94))',
-          boxShadow: hovered 
-            ? 'inset 0 1px 0 rgba(255,255,255,0.06), inset 0 -1px 0 rgba(0,0,0,0.34), 0 0 0 1px rgba(255,255,255,0.05)'
-            : 'inset 0 1px 0 rgba(255,255,255,0.03), inset 0 -1px 0 rgba(0,0,0,0.34), 0 0 0 1px rgba(255,255,255,0.02)',
-          overflow: 'hidden',
-          pointerEvents: 'none', // parent onClick handles the toggle
-          transition: 'box-shadow 0.2s ease'
+          background:
+            "linear-gradient(180deg, rgba(7,11,17,0.88), rgba(4,8,13,0.94))",
+          boxShadow: hovered
+            ? "inset 0 1px 0 rgba(255,255,255,0.06), inset 0 -1px 0 rgba(0,0,0,0.34), 0 0 0 1px rgba(255,255,255,0.05)"
+            : "inset 0 1px 0 rgba(255,255,255,0.03), inset 0 -1px 0 rgba(0,0,0,0.34), 0 0 0 1px rgba(255,255,255,0.02)",
+          overflow: "hidden",
+          pointerEvents: "none", // parent onClick handles the toggle
+          transition: "box-shadow 0.2s ease",
         }}
       >
         <div
           style={{
-            position: 'absolute',
+            position: "absolute",
             top: 2,
             bottom: 2,
-            left: active ? 'calc(100% - 22px)' : 2,
+            left: active ? "calc(100% - 22px)" : 2,
             width: 20,
             borderRadius: 999,
-            background: active 
-              ? (hovered ? 'linear-gradient(180deg, rgba(125,211,252,0.68), rgba(125,211,252,0.24))' : 'linear-gradient(180deg, rgba(125,211,252,0.48), rgba(125,211,252,0.14))')
-              : (hovered ? 'linear-gradient(180deg, rgba(255,255,255,0.28), rgba(255,255,255,0.12))' : 'linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.08))'),
-            boxShadow: active 
-              ? (hovered ? 'inset 0 1px 0 rgba(255,255,255,0.38), 0 0 16px rgba(125,211,252,0.38)' : 'inset 0 1px 0 rgba(255,255,255,0.18), 0 0 12px rgba(125,211,252,0.18)')
-              : (hovered ? 'inset 0 1px 0 rgba(255,255,255,0.15)' : 'inset 0 1px 0 rgba(255,255,255,0.08)'),
-            transition: 'left 220ms ease, background 180ms ease, box-shadow 180ms ease',
+            background: active
+              ? hovered
+                ? "linear-gradient(180deg, rgba(125,211,252,0.68), rgba(125,211,252,0.24))"
+                : "linear-gradient(180deg, rgba(125,211,252,0.48), rgba(125,211,252,0.14))"
+              : hovered
+                ? "linear-gradient(180deg, rgba(255,255,255,0.28), rgba(255,255,255,0.12))"
+                : "linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.08))",
+            boxShadow: active
+              ? hovered
+                ? "inset 0 1px 0 rgba(255,255,255,0.38), 0 0 16px rgba(125,211,252,0.38)"
+                : "inset 0 1px 0 rgba(255,255,255,0.18), 0 0 12px rgba(125,211,252,0.18)"
+              : hovered
+                ? "inset 0 1px 0 rgba(255,255,255,0.15)"
+                : "inset 0 1px 0 rgba(255,255,255,0.08)",
+            transition:
+              "left 220ms ease, background 180ms ease, box-shadow 180ms ease",
           }}
         />
       </button>
@@ -84,16 +136,24 @@ const SettingsRow = ({ label, active, onChange }: { label: string, active: boole
   );
 };
 
-
-
-const ShortcutRow = ({ label, value, onChange }: { label: string, value: string, onChange: (v: string) => void }) => {
+const ShortcutRow = ({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) => {
   const [hovered, setHovered] = React.useState(false);
   const [editing, setEditing] = React.useState(false);
-  const [testState, setTestState] = React.useState<'idle' | 'pending' | 'success'>('idle');
+  const [testState, setTestState] = React.useState<
+    "idle" | "pending" | "success"
+  >("idle");
 
   React.useEffect(() => {
     if (editing) {
-      document.body.dataset.shortcutEditing = 'true';
+      document.body.dataset.shortcutEditing = "true";
       suspendHotkeys();
     } else {
       delete document.body.dataset.shortcutEditing;
@@ -112,10 +172,13 @@ const ShortcutRow = ({ label, value, onChange }: { label: string, value: string,
       setEditing(false);
     };
     // TÃ„Â±klamayÃ„Â± hemen yakalamamasÃ„Â± iÃƒÂ§in kÃƒÂ¼ÃƒÂ§ÃƒÂ¼k bir gecikme
-    const timer = setTimeout(() => window.addEventListener('mousedown', handleMouseDown), 10);
+    const timer = setTimeout(
+      () => window.addEventListener("mousedown", handleMouseDown),
+      10,
+    );
     return () => {
       clearTimeout(timer);
-      window.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener("mousedown", handleMouseDown);
     };
   }, [editing]);
 
@@ -126,98 +189,128 @@ const ShortcutRow = ({ label, value, onChange }: { label: string, value: string,
         e.preventDefault();
         e.stopPropagation();
 
-        if (e.key === 'Escape') {
+        if (e.key === "Escape") {
           setEditing(false);
           return;
         }
 
-        let keyText = '';
-        if (e.ctrlKey) keyText += 'Ctrl+';
-        if (e.shiftKey) keyText += 'Shift+';
-        if (e.altKey) keyText += 'Alt+';
-        
+        let keyText = "";
+        if (e.ctrlKey) keyText += "Ctrl+";
+        if (e.shiftKey) keyText += "Shift+";
+        if (e.altKey) keyText += "Alt+";
+
         const keyName = e.key;
-        if (keyName !== 'Control' && keyName !== 'Shift' && keyName !== 'Alt' && keyName !== 'Meta') {
+        if (
+          keyName !== "Control" &&
+          keyName !== "Shift" &&
+          keyName !== "Alt" &&
+          keyName !== "Meta"
+        ) {
           keyText += keyName.toUpperCase();
-          
+
           onChange(keyText);
-          setTestState('success');
+          setTestState("success");
           setEditing(false);
-          setTimeout(() => setTestState('idle'), 2000);
+          setTimeout(() => setTestState("idle"), 2000);
         }
       } else {
         // Test kontrolÃƒÂ¼
-        let keyText = '';
-        if (e.ctrlKey) keyText += 'Ctrl+';
-        if (e.shiftKey) keyText += 'Shift+';
-        if (e.altKey) keyText += 'Alt+';
+        let keyText = "";
+        if (e.ctrlKey) keyText += "Ctrl+";
+        if (e.shiftKey) keyText += "Shift+";
+        if (e.altKey) keyText += "Alt+";
         const keyName = e.key;
-        if (keyName !== 'Control' && keyName !== 'Shift' && keyName !== 'Alt' && keyName !== 'Meta') {
+        if (
+          keyName !== "Control" &&
+          keyName !== "Shift" &&
+          keyName !== "Alt" &&
+          keyName !== "Meta"
+        ) {
           keyText += keyName.toUpperCase();
           if (keyText === value.toUpperCase()) {
-            setTestState('success');
-            setTimeout(() => setTestState('idle'), 1500);
+            setTestState("success");
+            setTimeout(() => setTestState("idle"), 1500);
           }
         }
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [editing, value, onChange]);
 
   // Duruma gÃƒÂ¶re stil
   const renderKeys = () => {
     if (editing) {
       return (
-        <div style={{
-          background: 'rgba(125,211,252,0.15)',
-          border: '1px solid rgba(125,211,252,0.4)',
-          boxShadow: '0 0 12px rgba(125,211,252,0.2)',
-          borderRadius: 6,
-          padding: '4px 12px',
-          fontSize: 10, fontWeight: 700, color: '#7dd3fc',
-          animation: 'conceptBlink 1s infinite',
-          letterSpacing: '0.05em'
-        }}>
+        <div
+          style={{
+            background: "rgba(125,211,252,0.15)",
+            border: "1px solid rgba(125,211,252,0.4)",
+            boxShadow: "0 0 12px rgba(125,211,252,0.2)",
+            borderRadius: 6,
+            padding: "4px 12px",
+            fontSize: 10,
+            fontWeight: 700,
+            color: "#7dd3fc",
+            animation: "conceptBlink 1s infinite",
+            letterSpacing: "0.05em",
+          }}
+        >
           YENİ TUŞ BEKLENİYOR
         </div>
       );
     }
 
-    if (!value || typeof value !== 'string') {
-      return <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>Tuş atanmadı</div>;
+    if (!value || typeof value !== "string") {
+      return (
+        <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 12 }}>
+          Tuş atanmadı
+        </div>
+      );
     }
 
-    const parts = value.split('+');
-    let glowColor = 'transparent';
-    if (testState === 'success') glowColor = 'rgba(52, 211, 153, 0.4)';
-    else if (testState === 'pending') glowColor = 'rgba(251, 191, 36, 0.4)';
+    const parts = value.split("+");
+    let glowColor = "transparent";
+    if (testState === "success") glowColor = "rgba(52, 211, 153, 0.4)";
+    else if (testState === "pending") glowColor = "rgba(251, 191, 36, 0.4)";
 
-    let borderColor = 'rgba(255,255,255,0.1)';
-    if (testState === 'success') borderColor = 'rgba(52, 211, 153, 0.6)';
-    else if (testState === 'pending') borderColor = 'rgba(251, 191, 36, 0.6)';
+    let borderColor = "rgba(255,255,255,0.1)";
+    if (testState === "success") borderColor = "rgba(52, 211, 153, 0.6)";
+    else if (testState === "pending") borderColor = "rgba(251, 191, 36, 0.6)";
 
     return (
-      <div style={{ display: 'flex', gap: 4 }}>
+      <div style={{ display: "flex", gap: 4 }}>
         {parts.map((p, i) => (
-          <kbd key={i} style={{
-            background: hovered ? 'rgba(30,35,40,0.8)' : 'rgba(15,18,22,0.8)',
-            border: `1px solid ${borderColor}`,
-            borderBottom: testState === 'idle' ? '2px solid rgba(0,0,0,0.6)' : `2px solid ${borderColor}`,
-            borderRadius: 6,
-            padding: '4px 8px',
-            fontSize: 10,
-            fontWeight: 700,
-            color: testState === 'success' ? '#34d399' : testState === 'pending' ? '#fbbf24' : '#fff',
-            boxShadow: `inset 0 1px 0 rgba(255,255,255,0.05), 0 0 10px ${glowColor}`,
-            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-            fontFamily: '"SF Pro Display", -apple-system, sans-serif',
-            letterSpacing: '0.05em',
-            display: 'inline-block',
-            minWidth: 20,
-            textAlign: 'center',
-            transform: (hovered && testState === 'idle') ? 'translateY(-1px)' : 'none'
-          }}>
+          <kbd
+            key={i}
+            style={{
+              background: hovered ? "rgba(30,35,40,0.8)" : "rgba(15,18,22,0.8)",
+              border: `1px solid ${borderColor}`,
+              borderBottom:
+                testState === "idle"
+                  ? "2px solid rgba(0,0,0,0.6)"
+                  : `2px solid ${borderColor}`,
+              borderRadius: 6,
+              padding: "4px 8px",
+              fontSize: 10,
+              fontWeight: 700,
+              color:
+                testState === "success"
+                  ? "#34d399"
+                  : testState === "pending"
+                    ? "#fbbf24"
+                    : "#fff",
+              boxShadow: `inset 0 1px 0 rgba(255,255,255,0.05), 0 0 10px ${glowColor}`,
+              transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+              fontFamily: '"SF Pro Display", -apple-system, sans-serif',
+              letterSpacing: "0.05em",
+              display: "inline-block",
+              minWidth: 20,
+              textAlign: "center",
+              transform:
+                hovered && testState === "idle" ? "translateY(-1px)" : "none",
+            }}
+          >
             {p}
           </kbd>
         ))}
@@ -226,31 +319,72 @@ const ShortcutRow = ({ label, value, onChange }: { label: string, value: string,
   };
 
   return (
-    <div 
+    <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      style={{ 
-        display: 'flex', alignItems: 'center', padding: '8px 10px', 
-        background: 'transparent',
-        borderRadius: 10, margin: '0 -4px', transition: 'background 0.2s ease',
-        cursor: 'pointer'
+      style={{
+        display: "flex",
+        alignItems: "center",
+        padding: "8px 10px",
+        background: "transparent",
+        borderRadius: 10,
+        margin: "0 -4px",
+        transition: "background 0.2s ease",
+        cursor: "pointer",
       }}
-      onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+      onClick={(e) => {
+        e.stopPropagation();
+        setEditing(true);
+      }}
     >
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ 
-          width: 28, height: 28, borderRadius: 8, 
-          background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: hovered ? '#7dd3fc' : 'rgba(255,255,255,0.4)', transition: 'color 0.2s ease'
-        }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+      <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 10 }}>
+        <div
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 8,
+            background: "rgba(255,255,255,0.03)",
+            border: "1px solid rgba(255,255,255,0.05)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: hovered ? "#7dd3fc" : "rgba(255,255,255,0.4)",
+            transition: "color 0.2s ease",
+          }}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
         </div>
-        <span style={{ fontSize: 13, fontWeight: 500, color: hovered ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.6)', transition: 'color 0.2s ease' }}>
+        <span
+          style={{
+            fontSize: 13,
+            fontWeight: 500,
+            color: hovered ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.6)",
+            transition: "color 0.2s ease",
+          }}
+        >
           {label}
         </span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', minWidth: 100 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "flex-end",
+          minWidth: 100,
+        }}
+      >
         {renderKeys()}
       </div>
     </div>
@@ -258,93 +392,129 @@ const ShortcutRow = ({ label, value, onChange }: { label: string, value: string,
 };
 
 const UpdaterRow = () => {
-  const { status, progress, versionInfo, checkForUpdates, installUpdate } = useAutoUpdater();
+  const { status, progress, versionInfo, checkForUpdates, installUpdate } =
+    useAutoUpdater();
 
-  let statusColor = 'rgba(159,183,207,0.7)'; // "Sistem Güncel" text color
-  let statusText = 'Sistem Güncel';
-  let dotColor = '#10b981'; // Green dot for up-to-date
-  
-  if (status === 'checking') {
-    statusColor = '#7dd3fc';
-    statusText = 'Denetleniyor...';
-    dotColor = '#7dd3fc';
-  } else if (status === 'available') {
-    statusColor = '#fcd34d';
+  let statusColor = "rgba(159,183,207,0.7)"; // "Sistem Güncel" text color
+  let statusText = "Sistem Güncel";
+  let dotColor = "#10b981"; // Green dot for up-to-date
+
+  if (status === "checking") {
+    statusColor = "#7dd3fc";
+    statusText = "Denetleniyor...";
+    dotColor = "#7dd3fc";
+  } else if (status === "available") {
+    statusColor = "#fcd34d";
     statusText = `Yeni Sürüm: ${versionInfo}`;
-    dotColor = '#fcd34d';
-  } else if (status === 'downloading') {
-    statusColor = '#7dd3fc';
+    dotColor = "#fcd34d";
+  } else if (status === "downloading") {
+    statusColor = "#7dd3fc";
     statusText = `İndiriliyor: %${progress}`;
-    dotColor = '#7dd3fc';
-  } else if (status === 'ready') {
-    statusColor = '#86efac';
-    statusText = 'Yeniden başlatılıyor...';
-    dotColor = '#86efac';
-  } else if (status === 'error') {
-    statusColor = '#fca5a5';
-    statusText = 'Güncelleme başarısız';
-    dotColor = '#fca5a5';
-  } else if (status === 'up-to-date') {
-    statusColor = 'rgba(159,183,207,0.7)';
-    statusText = 'Sistem Güncel';
-    dotColor = '#10b981';
+    dotColor = "#7dd3fc";
+  } else if (status === "ready") {
+    statusColor = "#86efac";
+    statusText = "Yeniden başlatılıyor...";
+    dotColor = "#86efac";
+  } else if (status === "error") {
+    statusColor = "#fca5a5";
+    statusText = "Güncelleme başarısız";
+    dotColor = "#fca5a5";
+  } else if (status === "up-to-date") {
+    statusColor = "rgba(159,183,207,0.7)";
+    statusText = "Sistem Güncel";
+    dotColor = "#10b981";
   }
 
-  const isWorking = status === 'checking' || status === 'downloading';
-  const showInstall = status === 'available';
-  
+  const isWorking = status === "checking" || status === "downloading";
+  const showInstall = status === "available";
+
   const handleAction = () => {
-    if (isWorking || status === 'ready') return;
+    if (isWorking || status === "ready") return;
     if (showInstall) installUpdate();
     else checkForUpdates();
   };
 
-  const actionLabel = showInstall ? 'İNDİR VE KUR' : status === 'downloading' ? 'İNDİRİLİYOR...' : status === 'checking' ? 'DENETLENİYOR...' : 'DENETLE';
+  const actionLabel = showInstall
+    ? "İNDİR VE KUR"
+    : status === "downloading"
+      ? "İNDİRİLİYOR..."
+      : status === "checking"
+        ? "DENETLENİYOR..."
+        : "DENETLE";
 
   return (
-    <div 
-      style={{ 
-        display: 'flex', alignItems: 'center', padding: '12px 0px', 
-        background: 'transparent',
-        justifyContent: 'space-between'
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        padding: "12px 0px",
+        background: "transparent",
+        justifyContent: "space-between",
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         {/* Kalkan İkonu Kutusu */}
-        <div style={{ 
-          width: 44, height: 44, borderRadius: 12, 
-          background: 'rgba(125,211,252,0.02)', 
-          border: '1px solid rgba(125,211,252,0.12)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.02)',
-          color: '#7dd3fc'
-        }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <div
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 12,
+            background: "rgba(125,211,252,0.02)",
+            border: "1px solid rgba(125,211,252,0.12)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow:
+              "0 4px 12px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.02)",
+            color: "#7dd3fc",
+          }}
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             <line x1="12" y1="8" x2="12" y2="12" />
             <line x1="12" y1="16" x2="12.01" y2="16" />
           </svg>
         </div>
-        
+
         {/* Metin Bloğu */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={{ fontSize: 16, fontWeight: 700, color: '#f8fafc', letterSpacing: '0.01em' }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span
+            style={{
+              fontSize: 16,
+              fontWeight: 700,
+              color: "#f8fafc",
+              letterSpacing: "0.01em",
+            }}
+          >
             VoidSub V2
           </span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ 
-              width: 6, height: 6, borderRadius: '50%', 
-              background: dotColor, 
-              boxShadow: `0 0 8px ${dotColor}`,
-              animation: isWorking ? 'conceptBlink 1.5s infinite' : 'none'
-            }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: dotColor,
+                boxShadow: `0 0 8px ${dotColor}`,
+                animation: isWorking ? "conceptBlink 1.5s infinite" : "none",
+              }}
+            />
             <span style={{ fontSize: 12, fontWeight: 500, color: statusColor }}>
               v2.5.0 • {statusText}
             </span>
           </div>
         </div>
       </div>
-      
+
       {/* Sağ taraftaki Buton */}
       <div>
         <motion.button
@@ -353,45 +523,68 @@ const UpdaterRow = () => {
           whileHover={{ scale: isWorking ? 1 : 1.02 }}
           whileTap={{ scale: isWorking ? 1 : 0.98 }}
           style={{
-            border: '1px solid rgba(255,255,255,0.06)',
+            border: "1px solid rgba(255,255,255,0.06)",
             borderRadius: 999,
-            background: 'rgba(255,255,255,0.02)',
-            backdropFilter: 'blur(12px)',
-            color: '#eef2f6',
-            padding: '0 16px',
+            background: "rgba(255,255,255,0.02)",
+            backdropFilter: "blur(12px)",
+            color: "#eef2f6",
+            padding: "0 16px",
             fontSize: 11,
             fontWeight: 700,
-            letterSpacing: '0.05em',
-            cursor: isWorking ? 'wait' : 'pointer',
+            letterSpacing: "0.05em",
+            cursor: isWorking ? "wait" : "pointer",
             height: 32,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
             gap: 6,
-            position: 'relative',
-            overflow: 'hidden'
+            position: "relative",
+            overflow: "hidden",
           }}
         >
           {isWorking && (
             <motion.div
-              initial={{ width: '0%', opacity: 0 }}
-              animate={{ width: status === 'downloading' ? `${progress}%` : '90%', opacity: 1 }}
-              transition={{ duration: status === 'downloading' ? 0.2 : 4.5, ease: 'easeOut' }}
+              initial={{ width: "0%", opacity: 0 }}
+              animate={{
+                width: status === "downloading" ? `${progress}%` : "90%",
+                opacity: 1,
+              }}
+              transition={{
+                duration: status === "downloading" ? 0.2 : 4.5,
+                ease: "easeOut",
+              }}
               style={{
-                position: 'absolute',
+                position: "absolute",
                 top: 0,
                 left: 0,
-                height: '100%',
-                background: 'linear-gradient(90deg, rgba(252, 211, 77, 0.0) 0%, rgba(252, 211, 77, 0.2) 100%)',
+                height: "100%",
+                background:
+                  "linear-gradient(90deg, rgba(252, 211, 77, 0.0) 0%, rgba(252, 211, 77, 0.2) 100%)",
                 zIndex: 0,
                 borderRadius: 999,
               }}
             />
           )}
-          
-          <span style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+
+          <span
+            style={{
+              position: "relative",
+              zIndex: 1,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
             {isWorking && (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              >
                 <style>
                   {`
                     @keyframes fadePulse {
@@ -400,25 +593,122 @@ const UpdaterRow = () => {
                     }
                   `}
                 </style>
-                <line x1="12" y1="2" x2="12" y2="6" style={{ animation: 'fadePulse 0.8s linear infinite', animationDelay: '-0.7s' }} />
-                <line x1="12" y1="2" x2="12" y2="6" transform="rotate(45 12 12)" style={{ animation: 'fadePulse 0.8s linear infinite', animationDelay: '-0.6s' }} />
-                <line x1="12" y1="2" x2="12" y2="6" transform="rotate(90 12 12)" style={{ animation: 'fadePulse 0.8s linear infinite', animationDelay: '-0.5s' }} />
-                <line x1="12" y1="2" x2="12" y2="6" transform="rotate(135 12 12)" style={{ animation: 'fadePulse 0.8s linear infinite', animationDelay: '-0.4s' }} />
-                <line x1="12" y1="2" x2="12" y2="6" transform="rotate(180 12 12)" style={{ animation: 'fadePulse 0.8s linear infinite', animationDelay: '-0.3s' }} />
-                <line x1="12" y1="2" x2="12" y2="6" transform="rotate(225 12 12)" style={{ animation: 'fadePulse 0.8s linear infinite', animationDelay: '-0.2s' }} />
-                <line x1="12" y1="2" x2="12" y2="6" transform="rotate(270 12 12)" style={{ animation: 'fadePulse 0.8s linear infinite', animationDelay: '-0.1s' }} />
-                <line x1="12" y1="2" x2="12" y2="6" transform="rotate(315 12 12)" style={{ animation: 'fadePulse 0.8s linear infinite', animationDelay: '0s' }} />
+                <line
+                  x1="12"
+                  y1="2"
+                  x2="12"
+                  y2="6"
+                  style={{
+                    animation: "fadePulse 0.8s linear infinite",
+                    animationDelay: "-0.7s",
+                  }}
+                />
+                <line
+                  x1="12"
+                  y1="2"
+                  x2="12"
+                  y2="6"
+                  transform="rotate(45 12 12)"
+                  style={{
+                    animation: "fadePulse 0.8s linear infinite",
+                    animationDelay: "-0.6s",
+                  }}
+                />
+                <line
+                  x1="12"
+                  y1="2"
+                  x2="12"
+                  y2="6"
+                  transform="rotate(90 12 12)"
+                  style={{
+                    animation: "fadePulse 0.8s linear infinite",
+                    animationDelay: "-0.5s",
+                  }}
+                />
+                <line
+                  x1="12"
+                  y1="2"
+                  x2="12"
+                  y2="6"
+                  transform="rotate(135 12 12)"
+                  style={{
+                    animation: "fadePulse 0.8s linear infinite",
+                    animationDelay: "-0.4s",
+                  }}
+                />
+                <line
+                  x1="12"
+                  y1="2"
+                  x2="12"
+                  y2="6"
+                  transform="rotate(180 12 12)"
+                  style={{
+                    animation: "fadePulse 0.8s linear infinite",
+                    animationDelay: "-0.3s",
+                  }}
+                />
+                <line
+                  x1="12"
+                  y1="2"
+                  x2="12"
+                  y2="6"
+                  transform="rotate(225 12 12)"
+                  style={{
+                    animation: "fadePulse 0.8s linear infinite",
+                    animationDelay: "-0.2s",
+                  }}
+                />
+                <line
+                  x1="12"
+                  y1="2"
+                  x2="12"
+                  y2="6"
+                  transform="rotate(270 12 12)"
+                  style={{
+                    animation: "fadePulse 0.8s linear infinite",
+                    animationDelay: "-0.1s",
+                  }}
+                />
+                <line
+                  x1="12"
+                  y1="2"
+                  x2="12"
+                  y2="6"
+                  transform="rotate(315 12 12)"
+                  style={{
+                    animation: "fadePulse 0.8s linear infinite",
+                    animationDelay: "0s",
+                  }}
+                />
               </svg>
             )}
-            {(!isWorking && !showInstall) && (
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            {!isWorking && !showInstall && (
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <polyline points="23 4 23 10 17 10"></polyline>
                 <polyline points="1 20 1 14 7 14"></polyline>
                 <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
               </svg>
             )}
             {showInstall && (
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                 <polyline points="7 10 12 15 17 10" />
                 <line x1="12" y1="15" x2="12" y2="3" />
@@ -435,177 +725,378 @@ const UpdaterRow = () => {
 export const SettingsPanel: React.FC = () => {
   const { isConnected } = useWebSocket();
   const getAppSet = () => {
-    const history = getEventHistory('app_settings_loaded') || [];
+    const history = getEventHistory("app_settings_loaded") || [];
     return history.length > 0 ? history[history.length - 1] : {};
   };
 
   const [settings, setSettings] = useState<any>(getAppSet());
 
   useEffect(() => {
-    if (isConnected) send('get_settings');
-    const off = onEvent('app_settings_loaded', (data) => setSettings(data));
+    if (isConnected) send("get_settings");
+    const off = onEvent("app_settings_loaded", (data) => setSettings(data));
     return () => off();
   }, [isConnected]);
 
   const updateSetting = (key: string, value: any) => {
     setSettings((prev: any) => ({ ...prev, [key]: value }));
-    send('save_settings', { [key]: value });
+    send("save_settings", { [key]: value });
   };
 
   const startOnLogin = settings.start_on_login ?? false;
   const minimizeToTray = settings.minimize_to_tray ?? true;
-  const restoreWindowAfterRegionSelection = settings.restore_window_after_region_selection ?? true;
+  const restoreWindowAfterRegionSelection =
+    settings.restore_window_after_region_selection ?? true;
   const overlaySnapToRegion = settings.overlay_snap_to_region ?? true;
 
   const shortcuts = settings.shortcuts ?? {
-    start_stop: 'F8',
-    select_region: 'F9',
-    temporary_region: 'F10',
-    hide_overlay: 'F11'
+    start_stop: "F8",
+    select_region: "F9",
+    temporary_region: "F10",
+    hide_overlay: "F11",
   };
 
   const { notify } = useAppContext();
 
   const updateShortcut = async (key: string, value: string) => {
     // Validasyon: çakışma + sistem tuşu + boş tuş kontrolü
-    const validation = validateShortcutKey(value, key as ShortcutAction, shortcuts);
+    const validation = validateShortcutKey(
+      value,
+      key as ShortcutAction,
+      shortcuts,
+    );
     if (!validation.valid) {
-      notify('warning', validation.error!, `shortcut:conflict:${value}`);
+      notify("warning", validation.error!, `shortcut:conflict:${value}`);
       return;
     }
-    
+
     const newShortcuts = { ...shortcuts, [key]: value };
     // Local state'i hemen güncelle
     setSettings((prev: any) => ({ ...prev, shortcuts: newShortcuts }));
     // Backend'e kaydet
-    send('save_settings', { shortcuts: newShortcuts, _skip_emit: true });
+    send("save_settings", { shortcuts: newShortcuts, _skip_emit: true });
     // Rust'a güncel kısayolları gönder (thread-safe channel üzerinden)
     await syncHotkeysToRust(newShortcuts);
   };
 
   return (
-    <PanelStage css={`
-      .settings-bg-grid {
-        position: absolute;
-        inset: 0;
-        background-image: 
-          linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-        background-size: 32px 32px;
-        mask-image: radial-gradient(circle at 50% 50%, black 20%, transparent 80%);
-        -webkit-mask-image: radial-gradient(circle at 50% 50%, black 20%, transparent 80%);
-      }
-      .settings-dial {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        border-radius: 50%;
-        border: 1px dashed rgba(125, 211, 252, 0.15);
-        animation: concept-settings-dial-spin 60s linear infinite;
-        pointer-events: none;
-      }
-      .settings-dial-inner {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        border-radius: 50%;
-        border: 1px solid rgba(125, 211, 252, 0.05);
-        border-top: 1px solid rgba(125, 211, 252, 0.3);
-        animation: concept-settings-dial-spin-reverse 40s linear infinite;
-        pointer-events: none;
-      }
-      @keyframes concept-settings-dial-spin {
-        from { transform: translate3d(-50%, -50%, 0) rotate(0deg); }
-        to { transform: translate3d(-50%, -50%, 0) rotate(360deg); }
-      }
-      @keyframes concept-settings-dial-spin-reverse {
-        from { transform: translate3d(-50%, -50%, 0) rotate(360deg); }
-        to { transform: translate3d(-50%, -50%, 0) rotate(0deg); }
-      }
-      .settings-core-glow {
-        position: absolute;
-        inset: 0;
-        background: radial-gradient(circle at 50% 50%, rgba(125, 211, 252, 0.03) 0%, transparent 70%);
-        pointer-events: none;
-      }
-    `} layers={[
-      { inset: 0, background: 'linear-gradient(180deg, rgba(7, 10, 15, 0.98), rgba(4, 6, 9, 1))' },
-      { inset: 0, background: 'radial-gradient(circle at 80% -20%, rgba(125, 211, 252, 0.04), transparent 50%), radial-gradient(circle at -20% 120%, rgba(167, 139, 250, 0.03), transparent 50%)' }
-    ]}>
-      <div style={{ position: 'absolute', inset: 0, filter: 'blur(4px)', pointerEvents: 'none', opacity: 0.85 }}>
+    <PanelStage
+      css={`
+        .settings-bg-grid {
+          position: absolute;
+          inset: 0;
+          background-image:
+            linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+            linear-gradient(
+              90deg,
+              rgba(255, 255, 255, 0.02) 1px,
+              transparent 1px
+            );
+          background-size: 32px 32px;
+          mask-image: radial-gradient(
+            circle at 50% 50%,
+            black 20%,
+            transparent 80%
+          );
+          -webkit-mask-image: radial-gradient(
+            circle at 50% 50%,
+            black 20%,
+            transparent 80%
+          );
+        }
+        .settings-dial {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          border-radius: 50%;
+          border: 1px dashed rgba(125, 211, 252, 0.15);
+          animation: concept-settings-dial-spin 60s linear infinite;
+          pointer-events: none;
+        }
+        .settings-dial-inner {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          border-radius: 50%;
+          border: 1px solid rgba(125, 211, 252, 0.05);
+          border-top: 1px solid rgba(125, 211, 252, 0.3);
+          animation: concept-settings-dial-spin-reverse 40s linear infinite;
+          pointer-events: none;
+        }
+        @keyframes concept-settings-dial-spin {
+          from {
+            transform: translate3d(-50%, -50%, 0) rotate(0deg);
+          }
+          to {
+            transform: translate3d(-50%, -50%, 0) rotate(360deg);
+          }
+        }
+        @keyframes concept-settings-dial-spin-reverse {
+          from {
+            transform: translate3d(-50%, -50%, 0) rotate(360deg);
+          }
+          to {
+            transform: translate3d(-50%, -50%, 0) rotate(0deg);
+          }
+        }
+        .settings-core-glow {
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(
+            circle at 50% 50%,
+            rgba(125, 211, 252, 0.03) 0%,
+            transparent 70%
+          );
+          pointer-events: none;
+        }
+      `}
+      layers={[
+        {
+          inset: 0,
+          background:
+            "linear-gradient(180deg, rgba(7, 10, 15, 0.98), rgba(4, 6, 9, 1))",
+        },
+        {
+          inset: 0,
+          background:
+            "radial-gradient(circle at 80% -20%, rgba(125, 211, 252, 0.04), transparent 50%), radial-gradient(circle at -20% 120%, rgba(167, 139, 250, 0.03), transparent 50%)",
+        },
+      ]}
+    >
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          filter: "blur(4px)",
+          pointerEvents: "none",
+          opacity: 0.85,
+        }}
+      >
         <div className="settings-bg-grid" />
         <div className="settings-dial" style={{ width: 600, height: 600 }} />
-        <div className="settings-dial" style={{ width: 800, height: 800, opacity: 0.5, animationDuration: '90s' }} />
-        <div className="settings-dial-inner" style={{ width: 450, height: 450 }} />
-        <div className="settings-dial-inner" style={{ width: 300, height: 300, borderTopColor: 'rgba(167, 139, 250, 0.3)', animationDuration: '25s' }} />
+        <div
+          className="settings-dial"
+          style={{
+            width: 800,
+            height: 800,
+            opacity: 0.5,
+            animationDuration: "90s",
+          }}
+        />
+        <div
+          className="settings-dial-inner"
+          style={{ width: 450, height: 450 }}
+        />
+        <div
+          className="settings-dial-inner"
+          style={{
+            width: 300,
+            height: 300,
+            borderTopColor: "rgba(167, 139, 250, 0.3)",
+            animationDuration: "25s",
+          }}
+        />
       </div>
-      
+
       <div className="settings-core-glow" />
 
-      <div style={{ position: 'relative', zIndex: 1, width: '100%', height: '100%', minHeight: 0, overflow: 'hidden', padding: '62px 34px 32px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column' }}>
+      <div
+        style={{
+          position: "relative",
+          zIndex: 1,
+          width: "100%",
+          height: "100%",
+          minHeight: 0,
+          overflow: "hidden",
+          padding: "62px 34px 32px",
+          boxSizing: "border-box",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
         <div style={{ flexShrink: 0 }}>
-          <h1 style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.18em', fontWeight: 700, color: 'rgba(125,211,252,0.55)', margin: 0 }}>AYARLAR</h1>
-          <div style={{ fontSize: 13, fontWeight: 400, color: 'rgba(159,183,207,0.55)', marginTop: 4 }}>
+          <h1
+            style={{
+              fontSize: 11,
+              textTransform: "uppercase",
+              letterSpacing: "0.18em",
+              fontWeight: 700,
+              color: "rgba(125,211,252,0.55)",
+              margin: 0,
+            }}
+          >
+            AYARLAR
+          </h1>
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 400,
+              color: "rgba(159,183,207,0.55)",
+              marginTop: 4,
+            }}
+          >
             Tercihlerinizi yapılandırın ve uygulama davranışını özelleştirin.
           </div>
         </div>
 
         {/* SKELETON LAYOUT */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16, flex: 1, marginTop: 24, minHeight: 0 }}>
-          
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+            gap: 16,
+            flex: 1,
+            marginTop: 24,
+            minHeight: 0,
+          }}
+        >
           {/* SOL KOLON (ORANTILI DAGILIM) */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
-            <div className="log-panel-scroll" style={{ background: colors.bgGlass, border: colors.borderGlass, borderRadius: 20, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 36, flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', scrollbarGutter: 'stable' as const }}>
-              
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
+              minHeight: 0,
+            }}
+          >
+            <div
+              className="log-panel-scroll"
+              style={{
+                background: colors.bgGlass,
+                border: colors.borderGlass,
+                borderRadius: 20,
+                padding: "16px 20px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 36,
+                flex: 1,
+                minHeight: 0,
+                overflowY: "auto",
+                overflowX: "hidden",
+                scrollbarGutter: "stable" as const,
+              }}
+            >
               {/* UYGULAMA DAVRANISI */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, ...TS.boxTitle }}>
-                  <G p="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" stroke="rgba(191,215,242,0.72)" />
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    ...TS.boxTitle,
+                  }}
+                >
+                  <G
+                    p="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
+                    stroke="rgba(191,215,242,0.72)"
+                  />
                   <span>UYGULAMA DAVRANISI</span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <SettingsRow label="Sistem başlatıldığında arka planda çalış" active={startOnLogin} onChange={(v) => updateSetting('start_on_login', v)} />
-                  <SettingsRow label="Pencereyi kapatınca tepsiye küçült" active={minimizeToTray} onChange={(v) => updateSetting('minimize_to_tray', v)} />
-                  <SettingsRow label="Tarama seçiminden sonra pencereyi öne getir" active={restoreWindowAfterRegionSelection} onChange={(v) => updateSetting('restore_window_after_region_selection', v)} />
-                  <SettingsRow label="Katmanı tarama alanına hizala" active={overlaySnapToRegion} onChange={(v) => updateSetting('overlay_snap_to_region', v)} />
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 2 }}
+                >
+                  <SettingsRow
+                    label="Sistem başlatıldığında arka planda çalış"
+                    active={startOnLogin}
+                    onChange={(v) => updateSetting("start_on_login", v)}
+                  />
+                  <SettingsRow
+                    label="Pencereyi kapatınca tepsiye küçült"
+                    active={minimizeToTray}
+                    onChange={(v) => updateSetting("minimize_to_tray", v)}
+                  />
+                  <SettingsRow
+                    label="Tarama seçiminden sonra pencereyi öne getir"
+                    active={restoreWindowAfterRegionSelection}
+                    onChange={(v) =>
+                      updateSetting("restore_window_after_region_selection", v)
+                    }
+                  />
+                  <SettingsRow
+                    label="Katmanı tarama alanına hizala"
+                    active={overlaySnapToRegion}
+                    onChange={(v) => updateSetting("overlay_snap_to_region", v)}
+                  />
                 </div>
-
               </div>
 
-
-
               {/* KISAYOLLAR */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, ...TS.boxTitle }}>
-                  <G p="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM7 10h.01M11 10h.01M15 10h.01M7 14h10" stroke="rgba(191,215,242,0.72)" />
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    ...TS.boxTitle,
+                  }}
+                >
+                  <G
+                    p="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM7 10h.01M11 10h.01M15 10h.01M7 14h10"
+                    stroke="rgba(191,215,242,0.72)"
+                  />
                   <span>KISAYOLLAR</span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <ShortcutRow label="Çeviriyi Başlat / Durdur" value={shortcuts.start_stop} onChange={(v) => updateShortcut('start_stop', v)} />
-                  <ShortcutRow label="Çeviri Bölgesi Seç" value={shortcuts.select_region} onChange={(v) => updateShortcut('select_region', v)} />
-                  <ShortcutRow label="Geçici Alan Seçimi" value={shortcuts.temporary_region} onChange={(v) => updateShortcut('temporary_region', v)} />
-                  <ShortcutRow label="Katmanı Gizle / Göster" value={shortcuts.hide_overlay} onChange={(v) => updateShortcut('hide_overlay', v)} />
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 2 }}
+                >
+                  <ShortcutRow
+                    label="Çeviriyi Başlat / Durdur"
+                    value={shortcuts.start_stop}
+                    onChange={(v) => updateShortcut("start_stop", v)}
+                  />
+                  <ShortcutRow
+                    label="Çeviri Bölgesi Seç"
+                    value={shortcuts.select_region}
+                    onChange={(v) => updateShortcut("select_region", v)}
+                  />
+                  <ShortcutRow
+                    label="Geçici Alan Seçimi"
+                    value={shortcuts.temporary_region}
+                    onChange={(v) => updateShortcut("temporary_region", v)}
+                  />
+                  <ShortcutRow
+                    label="Katmanı Gizle / Göster"
+                    value={shortcuts.hide_overlay}
+                    onChange={(v) => updateShortcut("hide_overlay", v)}
+                  />
                 </div>
               </div>
 
               {/* SÜRÜM DURUMU */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, ...TS.boxTitle }}>
-                  <G p="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" stroke="rgba(191,215,242,0.72)" />
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    ...TS.boxTitle,
+                  }}
+                >
+                  <G
+                    p="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                    stroke="rgba(191,215,242,0.72)"
+                  />
                   <span>SÜRÜM DURUMU</span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 2 }}
+                >
                   <UpdaterRow />
                 </div>
               </div>
-
             </div>
           </div>
 
           {/* SAG KOLON (TERMINAL) */}
-          <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              minHeight: 0,
+              flex: 1,
+            }}
+          >
             <LogPanel embedded />
           </div>
         </div>
@@ -613,5 +1104,3 @@ export const SettingsPanel: React.FC = () => {
     </PanelStage>
   );
 };
-
-

@@ -1,4 +1,4 @@
-export type ConceptAEngineId = 'easy' | 'winonly';
+export type ConceptAEngineId = "easy" | "winonly";
 
 export type ConceptAEngineOption = {
   id: ConceptAEngineId;
@@ -6,13 +6,14 @@ export type ConceptAEngineOption = {
 };
 
 export const workspaceEngineLabels: Record<ConceptAEngineId, string> = {
-  easy: 'EasyOCR',
-  winonly: 'WinOCR',
+  easy: "EasyOCR",
+  winonly: "WinOCR",
 };
 
-export const workspaceEngineOrder: ConceptAEngineId[] = ['winonly', 'easy'];
+export const workspaceEngineOrder: ConceptAEngineId[] = ["winonly", "easy"];
 
-export const workspaceEngineOptions: ConceptAEngineOption[] = workspaceEngineOrder.map((id) => ({
-  id,
-  label: workspaceEngineLabels[id],
-}));
+export const workspaceEngineOptions: ConceptAEngineOption[] =
+  workspaceEngineOrder.map((id) => ({
+    id,
+    label: workspaceEngineLabels[id],
+  }));

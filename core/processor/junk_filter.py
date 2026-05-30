@@ -1,4 +1,5 @@
 """JunkFilter: OCR ciktisini cop, yari-kirli ve kopuk parca diye ayirir."""
+
 from __future__ import annotations
 
 import re
@@ -7,57 +8,459 @@ from core.errors import PREFIX_OCR, log_event
 from core.processor.types import TextAnalysisResult
 
 COMMON_ENGLISH_WORDS = {
-    "the", "be", "to", "of", "and", "a", "in", "that", "have", "i",
-    "it", "for", "not", "on", "with", "he", "as", "you", "do", "at",
-    "this", "but", "his", "by", "from", "they", "we", "say", "her", "she",
-    "or", "an", "will", "my", "one", "all", "would", "there", "their",
-    "what", "so", "up", "out", "if", "about", "who", "get", "which", "go",
-    "me", "when", "make", "can", "like", "time", "no", "just", "him", "know",
-    "take", "people", "into", "year", "your", "good", "some", "could", "them",
-    "see", "other", "than", "then", "now", "look", "only", "come", "its", "over",
-    "think", "also", "back", "after", "use", "two", "how", "our", "work",
-    "first", "well", "way", "even", "new", "want", "because", "any", "these",
-    "give", "day", "most", "us", "is", "was", "are", "been", "being",
-    "has", "had", "does", "did", "should", "may", "might", "must", "going", "tell",
-    "ask", "answer", "help", "call", "play", "find", "try", "feel", "move", "live",
-    "open", "close", "walk", "talk", "listen", "wait", "stand", "sit", "run",
-    "drive", "write", "read", "show", "bad", "big", "small", "long", "short",
-    "high", "low", "old", "right", "left", "top", "bottom", "hot", "cold",
-    "yes", "ok", "okay", "hello", "hi", "bye", "thanks", "please", "sorry",
-    "watch", "hear", "need", "love", "hate", "believe", "understand", "remember",
-    "forget", "learn", "teach", "speak", "communicate", "explain", "describe",
-    "receive", "bring", "carry", "hold", "pick", "drop", "throw", "catch", "hit",
-    "kick", "push", "pull", "touch", "grab", "release", "turn", "point", "follow",
-    "lead", "meet", "greet", "welcome", "visit", "stay", "leave", "arrive", "enter",
-    "exit", "climb", "jump", "fall", "break", "fix", "build", "destroy", "create",
-    "form", "shape", "cut", "press", "stretch", "twist", "roll", "spin", "shake",
-    "wave", "swing", "sleep", "wake", "rise", "kneel", "reach", "raise", "lift",
-    "man", "woman", "child", "person", "boy", "girl", "baby", "adult", "father",
-    "mother", "parent", "brother", "sister", "family", "friend", "enemy", "doctor",
-    "nurse", "teacher", "student", "soldier", "captain", "chief", "leader", "boss",
-    "worker", "hunter", "merchant", "house", "home", "room", "door", "window",
-    "wall", "floor", "roof", "kitchen", "bedroom", "bathroom", "office", "store",
-    "school", "church", "street", "road", "path", "gate", "bridge", "river",
-    "mountain", "forest", "field", "garden", "farm", "city", "town", "village",
-    "country", "money", "gold", "silver", "coin", "bank", "price", "cost", "value",
-    "trade", "buy", "sell", "pay", "spend", "save", "earn", "lose", "win", "profit",
-    "food", "drink", "eat", "cook", "bake", "boil", "bread", "meat", "fish",
-    "chicken", "milk", "cheese", "apple", "banana", "orange", "fruit", "vegetable",
-    "rice", "corn", "bean", "potato", "carrot", "onion", "salt", "pepper", "sugar",
-    "water", "wine", "beer", "coffee", "tea", "music", "song", "dance", "art",
-    "paint", "draw", "book", "paper", "pen", "pencil", "color", "red", "blue",
-    "green", "yellow", "black", "white", "gray", "brown", "pink", "purple",
-    "light", "dark", "bright", "clear", "cloudy", "sunny", "rainy", "windy",
-    "snow", "rain", "wind", "storm", "fire", "air", "earth", "stone", "rock",
-    "sand", "dirt", "dust", "smoke", "fog", "car", "truck", "bus", "train", "ship",
-    "boat", "plane", "bike", "horse", "weapon", "sword", "gun", "bow", "arrow",
-    "shield", "armor", "tool", "knife", "axe", "hammer", "rope", "chain", "lock",
-    "key", "number", "three", "four", "five", "six", "seven", "eight", "nine",
-    "ten", "eleven", "twelve", "twenty", "thirty", "forty", "fifty", "hundred",
-    "thousand", "million", "second", "third", "fourth", "fifth", "last", "true",
-    "false", "real", "fake", "whole", "half", "quarter", "plus", "minus", "game",
-    "score", "point", "level", "round", "match", "here", "where", "why", "same",
-    "different", "such", "another", "warning", "protocol", "integrity", "suit",
+    "the",
+    "be",
+    "to",
+    "of",
+    "and",
+    "a",
+    "in",
+    "that",
+    "have",
+    "i",
+    "it",
+    "for",
+    "not",
+    "on",
+    "with",
+    "he",
+    "as",
+    "you",
+    "do",
+    "at",
+    "this",
+    "but",
+    "his",
+    "by",
+    "from",
+    "they",
+    "we",
+    "say",
+    "her",
+    "she",
+    "or",
+    "an",
+    "will",
+    "my",
+    "one",
+    "all",
+    "would",
+    "there",
+    "their",
+    "what",
+    "so",
+    "up",
+    "out",
+    "if",
+    "about",
+    "who",
+    "get",
+    "which",
+    "go",
+    "me",
+    "when",
+    "make",
+    "can",
+    "like",
+    "time",
+    "no",
+    "just",
+    "him",
+    "know",
+    "take",
+    "people",
+    "into",
+    "year",
+    "your",
+    "good",
+    "some",
+    "could",
+    "them",
+    "see",
+    "other",
+    "than",
+    "then",
+    "now",
+    "look",
+    "only",
+    "come",
+    "its",
+    "over",
+    "think",
+    "also",
+    "back",
+    "after",
+    "use",
+    "two",
+    "how",
+    "our",
+    "work",
+    "first",
+    "well",
+    "way",
+    "even",
+    "new",
+    "want",
+    "because",
+    "any",
+    "these",
+    "give",
+    "day",
+    "most",
+    "us",
+    "is",
+    "was",
+    "are",
+    "been",
+    "being",
+    "has",
+    "had",
+    "does",
+    "did",
+    "should",
+    "may",
+    "might",
+    "must",
+    "going",
+    "tell",
+    "ask",
+    "answer",
+    "help",
+    "call",
+    "play",
+    "find",
+    "try",
+    "feel",
+    "move",
+    "live",
+    "open",
+    "close",
+    "walk",
+    "talk",
+    "listen",
+    "wait",
+    "stand",
+    "sit",
+    "run",
+    "drive",
+    "write",
+    "read",
+    "show",
+    "bad",
+    "big",
+    "small",
+    "long",
+    "short",
+    "high",
+    "low",
+    "old",
+    "right",
+    "left",
+    "top",
+    "bottom",
+    "hot",
+    "cold",
+    "yes",
+    "ok",
+    "okay",
+    "hello",
+    "hi",
+    "bye",
+    "thanks",
+    "please",
+    "sorry",
+    "watch",
+    "hear",
+    "need",
+    "love",
+    "hate",
+    "believe",
+    "understand",
+    "remember",
+    "forget",
+    "learn",
+    "teach",
+    "speak",
+    "communicate",
+    "explain",
+    "describe",
+    "receive",
+    "bring",
+    "carry",
+    "hold",
+    "pick",
+    "drop",
+    "throw",
+    "catch",
+    "hit",
+    "kick",
+    "push",
+    "pull",
+    "touch",
+    "grab",
+    "release",
+    "turn",
+    "point",
+    "follow",
+    "lead",
+    "meet",
+    "greet",
+    "welcome",
+    "visit",
+    "stay",
+    "leave",
+    "arrive",
+    "enter",
+    "exit",
+    "climb",
+    "jump",
+    "fall",
+    "break",
+    "fix",
+    "build",
+    "destroy",
+    "create",
+    "form",
+    "shape",
+    "cut",
+    "press",
+    "stretch",
+    "twist",
+    "roll",
+    "spin",
+    "shake",
+    "wave",
+    "swing",
+    "sleep",
+    "wake",
+    "rise",
+    "kneel",
+    "reach",
+    "raise",
+    "lift",
+    "man",
+    "woman",
+    "child",
+    "person",
+    "boy",
+    "girl",
+    "baby",
+    "adult",
+    "father",
+    "mother",
+    "parent",
+    "brother",
+    "sister",
+    "family",
+    "friend",
+    "enemy",
+    "doctor",
+    "nurse",
+    "teacher",
+    "student",
+    "soldier",
+    "captain",
+    "chief",
+    "leader",
+    "boss",
+    "worker",
+    "hunter",
+    "merchant",
+    "house",
+    "home",
+    "room",
+    "door",
+    "window",
+    "wall",
+    "floor",
+    "roof",
+    "kitchen",
+    "bedroom",
+    "bathroom",
+    "office",
+    "store",
+    "school",
+    "church",
+    "street",
+    "road",
+    "path",
+    "gate",
+    "bridge",
+    "river",
+    "mountain",
+    "forest",
+    "field",
+    "garden",
+    "farm",
+    "city",
+    "town",
+    "village",
+    "country",
+    "money",
+    "gold",
+    "silver",
+    "coin",
+    "bank",
+    "price",
+    "cost",
+    "value",
+    "trade",
+    "buy",
+    "sell",
+    "pay",
+    "spend",
+    "save",
+    "earn",
+    "lose",
+    "win",
+    "profit",
+    "food",
+    "drink",
+    "eat",
+    "cook",
+    "bake",
+    "boil",
+    "bread",
+    "meat",
+    "fish",
+    "chicken",
+    "milk",
+    "cheese",
+    "apple",
+    "banana",
+    "orange",
+    "fruit",
+    "vegetable",
+    "rice",
+    "corn",
+    "bean",
+    "potato",
+    "carrot",
+    "onion",
+    "salt",
+    "pepper",
+    "sugar",
+    "water",
+    "wine",
+    "beer",
+    "coffee",
+    "tea",
+    "music",
+    "song",
+    "dance",
+    "art",
+    "paint",
+    "draw",
+    "book",
+    "paper",
+    "pen",
+    "pencil",
+    "color",
+    "red",
+    "blue",
+    "green",
+    "yellow",
+    "black",
+    "white",
+    "gray",
+    "brown",
+    "pink",
+    "purple",
+    "light",
+    "dark",
+    "bright",
+    "clear",
+    "cloudy",
+    "sunny",
+    "rainy",
+    "windy",
+    "snow",
+    "rain",
+    "wind",
+    "storm",
+    "fire",
+    "air",
+    "earth",
+    "stone",
+    "rock",
+    "sand",
+    "dirt",
+    "dust",
+    "smoke",
+    "fog",
+    "car",
+    "truck",
+    "bus",
+    "train",
+    "ship",
+    "boat",
+    "plane",
+    "bike",
+    "horse",
+    "weapon",
+    "sword",
+    "gun",
+    "bow",
+    "arrow",
+    "shield",
+    "armor",
+    "tool",
+    "knife",
+    "axe",
+    "hammer",
+    "rope",
+    "chain",
+    "lock",
+    "key",
+    "number",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+    "eleven",
+    "twelve",
+    "twenty",
+    "thirty",
+    "forty",
+    "fifty",
+    "hundred",
+    "thousand",
+    "million",
+    "second",
+    "third",
+    "fourth",
+    "fifth",
+    "last",
+    "true",
+    "false",
+    "real",
+    "fake",
+    "whole",
+    "half",
+    "quarter",
+    "plus",
+    "minus",
+    "game",
+    "score",
+    "point",
+    "level",
+    "round",
+    "match",
+    "here",
+    "where",
+    "why",
+    "same",
+    "different",
+    "such",
+    "another",
+    "warning",
+    "protocol",
+    "integrity",
+    "suit",
 }
 
 _ASCII_VOWELS = set("aeiouyAEIOUY")
@@ -72,7 +475,9 @@ _BROKEN_TOKEN_RE = re.compile(
     r"(?:[A-Za-z]{3,}[0-9][A-Za-z0-9]*|[A-Za-z]+(?:[A-Z][a-z]+){1,}|[A-Z]{2,}[a-z]{2,}[A-Za-z]*)"
 )
 _LOWER_TOKEN_RE = re.compile(r"[a-z']+")
-_TIP2_SUSPECT_RE = re.compile(r"(?:youcopy|wehave|backand|frombeneath|cock[vx]|frohescort|hkd\b)", re.IGNORECASE)
+_TIP2_SUSPECT_RE = re.compile(
+    r"(?:youcopy|wehave|backand|frombeneath|cock[vx]|frohescort|hkd\b)", re.IGNORECASE
+)
 _ALPHA_ONLY_RE = re.compile(r"^[A-Za-z]+$")
 
 
@@ -95,7 +500,11 @@ class JunkFilter:
         suspicious_symbol_ratio = suspicious_symbol_count / visible_length
 
         tokens = _TOKEN_RE.findall(cleaned)
-        recognized_words = [word for word in _ENGLISH_WORD_RE.findall(cleaned.lower()) if word in COMMON_ENGLISH_WORDS]
+        recognized_words = [
+            word
+            for word in _ENGLISH_WORD_RE.findall(cleaned.lower())
+            if word in COMMON_ENGLISH_WORDS
+        ]
         recognized_count = len(recognized_words)
         recognized_ratio = recognized_count / max(len(tokens), 1)
 
@@ -122,7 +531,11 @@ class JunkFilter:
                 if len(suspicious_token_list) < 6:
                     suspicious_token_list.append(token)
                 token_is_broken = True
-            elif token.isalpha() and token.lower() not in COMMON_ENGLISH_WORDS and _CONSONANT_CLUSTER_RE.search(token):
+            elif (
+                token.isalpha()
+                and token.lower() not in COMMON_ENGLISH_WORDS
+                and _CONSONANT_CLUSTER_RE.search(token)
+            ):
                 suspicious_tokens += 1
                 if len(suspicious_token_list) < 6:
                     suspicious_token_list.append(token)
@@ -135,7 +548,9 @@ class JunkFilter:
                     broken_tokens.append(token)
 
         proper_name_like = cls._looks_like_name_sequence(tokens)
-        looks_like_sentence = bool(cleaned and cleaned[0].isupper() and cleaned[-1] in ".!?:;,")
+        looks_like_sentence = bool(
+            cleaned and cleaned[0].isupper() and cleaned[-1] in ".!?:;,"
+        )
         unknown_long_alpha_count = cls._count_unknown_long_alpha_tokens(tokens)
         speaker_prefix_suspicious = cls._is_suspicious_speaker_prefix(cleaned)
         tail_tokens = [token for token in tokens[-3:] if len(token) >= 3]
@@ -143,20 +558,22 @@ class JunkFilter:
         joined_word_hits = cls._find_joined_word_hits(tokens)
         merged_token_hits = cls._find_merged_token_hits(tokens)
         minor_merge_hits = cls._find_minor_merge_hits(tokens)
-        connected_noise_runs, connected_noise_tokens = cls._find_connected_noise(tokens, broken_tokens, suspicious_token_list)
+        connected_noise_runs, connected_noise_tokens = cls._find_connected_noise(
+            tokens, broken_tokens, suspicious_token_list
+        )
         malformed_common_word_hits = cls._find_malformed_common_word_hits(tokens)
-        tip2_suspect = (
-            recognized_count >= 3
-            and (
-                broken_token_count >= 1
-                or len(joined_word_hits) >= 1
-                or len(merged_token_hits) >= 1
-                or len(minor_merge_hits) >= 1
-                or (len(malformed_common_word_hits) >= 1 and (broken_token_count >= 1 or suspicious_tokens >= 1))
-                or len(tail_broken_tokens) >= 1
-                or connected_noise_runs >= 1
-                or bool(_TIP2_SUSPECT_RE.search(cleaned))
+        tip2_suspect = recognized_count >= 3 and (
+            broken_token_count >= 1
+            or len(joined_word_hits) >= 1
+            or len(merged_token_hits) >= 1
+            or len(minor_merge_hits) >= 1
+            or (
+                len(malformed_common_word_hits) >= 1
+                and (broken_token_count >= 1 or suspicious_tokens >= 1)
             )
+            or len(tail_broken_tokens) >= 1
+            or connected_noise_runs >= 1
+            or bool(_TIP2_SUSPECT_RE.search(cleaned))
         )
 
         health_score = 100
@@ -172,9 +589,18 @@ class JunkFilter:
             health_score -= min(20, broken_token_count * 6)
         if unknown_long_alpha_count >= 2 and broken_token_count >= 1:
             health_score -= min(18, unknown_long_alpha_count * 5)
-        if unknown_long_alpha_count >= 1 and len(tokens) >= 6 and recognized_ratio < 0.38 and broken_token_count >= 1:
+        if (
+            unknown_long_alpha_count >= 1
+            and len(tokens) >= 6
+            and recognized_ratio < 0.38
+            and broken_token_count >= 1
+        ):
             health_score -= 10
-        if unknown_long_alpha_count >= 2 and len(tokens) >= 6 and recognized_ratio < 0.22:
+        if (
+            unknown_long_alpha_count >= 2
+            and len(tokens) >= 6
+            and recognized_ratio < 0.22
+        ):
             health_score -= min(18, unknown_long_alpha_count * 6)
         if speaker_prefix_suspicious and broken_token_count >= 1:
             health_score -= 16
@@ -184,15 +610,27 @@ class JunkFilter:
             health_score -= 8
         if minor_merge_hits and len(tokens) >= 6:
             health_score -= min(10, len(minor_merge_hits) * 4)
-        if malformed_common_word_hits and (broken_token_count >= 1 or suspicious_tokens >= 1):
+        if malformed_common_word_hits and (
+            broken_token_count >= 1 or suspicious_tokens >= 1
+        ):
             health_score -= min(12, len(malformed_common_word_hits) * 6)
         if connected_noise_runs:
             health_score -= min(24, connected_noise_runs * 12)
         if recognized_count == 0 and len(tokens) >= 2 and not proper_name_like:
             health_score -= 12
-        if len(tokens) >= 6 and recognized_ratio < 0.42 and broken_token_count >= 1 and not proper_name_like:
+        if (
+            len(tokens) >= 6
+            and recognized_ratio < 0.42
+            and broken_token_count >= 1
+            and not proper_name_like
+        ):
             health_score -= 14
-        if vowel_ratio < 0.24 and recognized_count == 0 and len(tokens) >= 2 and not proper_name_like:
+        if (
+            vowel_ratio < 0.24
+            and recognized_count == 0
+            and len(tokens) >= 2
+            and not proper_name_like
+        ):
             health_score -= 15
         if proper_name_like:
             health_score += 8
@@ -200,7 +638,13 @@ class JunkFilter:
             health_score += 6
 
         health_score = max(0, min(100, health_score))
-        if health_score > 75 and suspicious_tokens == 0 and broken_token_count == 0 and not merged_token_hits and not minor_merge_hits:
+        if (
+            health_score > 75
+            and suspicious_tokens == 0
+            and broken_token_count == 0
+            and not merged_token_hits
+            and not minor_merge_hits
+        ):
             health_verdict = "safe"
         elif health_score > 60 and suspicious_tokens <= 1 and broken_token_count <= 1:
             health_verdict = "suspicious"
@@ -292,23 +736,42 @@ class JunkFilter:
         is_short = len(cleaned) < 30
         if is_short and recognized_count == 0 and not proper_name_like:
             return reject("Tip3_short_unrecognized")
-        if is_short and suspicious_tokens >= 1 and recognized_count <= 1 and not proper_name_like and not looks_like_sentence:
+        if (
+            is_short
+            and suspicious_tokens >= 1
+            and recognized_count <= 1
+            and not proper_name_like
+            and not looks_like_sentence
+        ):
             return reject("Tip3_short_dirty")
         if suspicious_tokens >= 3 and recognized_count <= 1 and not proper_name_like:
             return reject("suspicious_tokens")
-        if broken_token_count >= 3 and recognized_count == 0 and health_score < 45 and not proper_name_like:
+        if (
+            broken_token_count >= 3
+            and recognized_count == 0
+            and health_score < 45
+            and not proper_name_like
+        ):
             return reject("broken_tokens_heavy")
         if (
             len(tokens) >= 6
             and recognized_count >= 4
             and (
-                (len(analysis["merged_token_hits"]) >= 1 and analysis["recognized_ratio"] < 0.45)
-                or
-                (len(analysis["malformed_common_word_hits"]) >= 2 and (broken_token_count >= 1 or suspicious_tokens >= 1))
+                (
+                    len(analysis["merged_token_hits"]) >= 1
+                    and analysis["recognized_ratio"] < 0.45
+                )
+                or (
+                    len(analysis["malformed_common_word_hits"]) >= 2
+                    and (broken_token_count >= 1 or suspicious_tokens >= 1)
+                )
                 or (broken_token_count >= 2 and suspicious_tokens >= 1)
                 or (broken_token_count >= 1 and len(analysis["joined_word_hits"]) >= 2)
                 or (analysis["speaker_prefix_suspicious"] and broken_token_count >= 1)
-                or (analysis["unknown_long_alpha_count"] >= 2 and analysis["recognized_ratio"] < 0.42)
+                or (
+                    analysis["unknown_long_alpha_count"] >= 2
+                    and analysis["recognized_ratio"] < 0.42
+                )
             )
             and health_score < 92
             and not proper_name_like
@@ -334,7 +797,13 @@ class JunkFilter:
             and not proper_name_like
         ):
             return reject("very_low_recognition_long_text")
-        if recognized_count == 0 and len(tokens) >= 2 and not proper_name_like and vowel_ratio < 0.24 and not looks_like_sentence:
+        if (
+            recognized_count == 0
+            and len(tokens) >= 2
+            and not proper_name_like
+            and vowel_ratio < 0.24
+            and not looks_like_sentence
+        ):
             return reject("letter_salad")
 
         if len(tokens) >= 3:
@@ -428,7 +897,12 @@ class JunkFilter:
         return hits
 
     @classmethod
-    def _find_connected_noise(cls, tokens: list[str], broken_tokens: list[str], suspicious_token_list: list[str]) -> tuple[int, list[str]]:
+    def _find_connected_noise(
+        cls,
+        tokens: list[str],
+        broken_tokens: list[str],
+        suspicious_token_list: list[str],
+    ) -> tuple[int, list[str]]:
         noisy = set(broken_tokens) | set(suspicious_token_list)
         runs = 0
         current_run: list[str] = []

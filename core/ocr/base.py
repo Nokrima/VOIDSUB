@@ -1,10 +1,12 @@
 """
 Motorların Anayasası (OCREngine): Tüm OCR motorlarının uyması gereken şablon.
-KURAL 02: Her public fonksiyon docstring içerir. 
+KURAL 02: Her public fonksiyon docstring içerir.
 Bu dosya 'Soyut Sınıf' mantığıyla çalışır, diğer motorlar bundan türer.
 """
+
 from abc import ABC, abstractmethod
 import numpy as np
+
 
 class OCREngine(ABC):
     def __init__(self):
@@ -42,7 +44,7 @@ class OCREngine(ABC):
     def system_check(self) -> dict:
         """
         DEĞİŞTİRME: UI (Arayüz) için motorun sağlık raporunu çıkartır.
-        Zorunlu Sözlük Formatı: 
+        Zorunlu Sözlük Formatı:
         {available: bool, reason: str, requirements: str, critical_component: str, cpu_ok: bool, gpu_ok: bool, ram_ok: bool}
         """
         pass

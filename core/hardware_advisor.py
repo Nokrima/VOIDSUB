@@ -7,8 +7,17 @@ def recommend_device(hardware_result: dict) -> dict:
     gpu = hardware_result.get("gpu", {}) if isinstance(hardware_result, dict) else {}
     vram_mb = int(gpu.get("vram_mb", 0) or 0)
     gpu_available = bool(gpu.get("available", False))
-    cuda_available = bool(hardware_result.get("cuda_available", False)) if isinstance(hardware_result, dict) else False
-    cpu_threads = int((hardware_result.get("cpu", {}) if isinstance(hardware_result, dict) else {}).get("threads", 4) or 4)
+    cuda_available = (
+        bool(hardware_result.get("cuda_available", False))
+        if isinstance(hardware_result, dict)
+        else False
+    )
+    cpu_threads = int(
+        (
+            hardware_result.get("cpu", {}) if isinstance(hardware_result, dict) else {}
+        ).get("threads", 4)
+        or 4
+    )
 
     if gpu_available and cuda_available and vram_mb >= 4000:
         return {

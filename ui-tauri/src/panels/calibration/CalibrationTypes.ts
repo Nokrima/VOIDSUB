@@ -1,10 +1,8 @@
-
-export type HoverState = 'up' | 'down' | null;
-
+export type HoverState = "up" | "down" | null;
 
 export interface CalibrationPreviewResult {
   error?: string;
-  decision?: 'accepted' | 'rejected';
+  decision?: "accepted" | "rejected";
   rejection_reason?: string | null;
   quality_score?: number;
   detected_text?: string;
@@ -12,20 +10,18 @@ export interface CalibrationPreviewResult {
   time_ms?: number;
 }
 
-
 export type CalibrationControlKey =
-  | 'sensitivity'
-  | 'characters'
-  | 'balance'
-  | 'attempts'
-  | 'match'
-  | 'claheStriped'
-  | 'clahePlain'
-  | 'whiteThreshold'
-  | 'bilateral'
-  | 'gaussianC'
-  | 'meanC';
-
+  | "sensitivity"
+  | "characters"
+  | "balance"
+  | "attempts"
+  | "match"
+  | "claheStriped"
+  | "clahePlain"
+  | "whiteThreshold"
+  | "bilateral"
+  | "gaussianC"
+  | "meanC";
 
 export type CalibrationControlConfig = {
   key: CalibrationControlKey;
@@ -41,7 +37,6 @@ export type CalibrationControlConfig = {
   glow: string;
   dependsOnImageFilters?: boolean;
 };
-
 
 export type ConceptCalibrationSnapshot = {
   values: CalibrationValues;
@@ -61,12 +56,11 @@ export type ConceptCalibrationDraftProfile = {
 
 export type CalibrationInfoKey =
   | CalibrationControlKey
-  | 'overview'
-  | 'groupDecision'
-  | 'groupFlow'
-  | 'groupScene'
-  | 'groupImage';
-
+  | "overview"
+  | "groupDecision"
+  | "groupFlow"
+  | "groupScene"
+  | "groupImage";
 
 export type CalibrationInfoContent = {
   title: string;
@@ -76,9 +70,6 @@ export type CalibrationInfoContent = {
   mode: string;
 };
 
+export type ImprovementMode = "filters" | "rawFlow";
 
-export type ImprovementMode = 'filters' | 'rawFlow';
-
-
-export type CalibrationAreaMode = 'status' | 'quality';
-
+export type CalibrationAreaMode = "status" | "quality";

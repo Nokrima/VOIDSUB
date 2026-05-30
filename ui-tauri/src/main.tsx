@@ -1,24 +1,21 @@
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
-import './styles/global.css';
+import "./styles/global.css";
 
 // Kök seviyede global tuş ve arayüz kısıtlamaları
-document.addEventListener('keydown', (e) => {
+document.addEventListener("keydown", (e) => {
   // F5 (Yenile) ve Ctrl+R (Yenile) tuşlarını engelle. (F12 Test için açık bırakıldı)
-  if (
-    e.key === 'F5' || 
-    (e.ctrlKey && e.key.toLowerCase() === 'r')
-  ) {
+  if (e.key === "F5" || (e.ctrlKey && e.key.toLowerCase() === "r")) {
     e.preventDefault();
   }
 });
 
 // İmleç bekleyince açılan (title) can sıkıcı native ipucu kutularını tamamen yok et
-document.addEventListener('mouseover', (e) => {
+document.addEventListener("mouseover", (e) => {
   const target = e.target as HTMLElement;
-  if (target && target.hasAttribute && target.hasAttribute('title')) {
-    target.removeAttribute('title');
+  if (target && target.hasAttribute && target.hasAttribute("title")) {
+    target.removeAttribute("title");
   }
 });
 
@@ -27,13 +24,13 @@ document.addEventListener('mouseover', (e) => {
 // document.addEventListener('contextmenu', (e) => e.preventDefault());
 
 // Orta veya Sağ tık ile butonlara basıldığında oluşan gereksiz 'tıklanma' görsel efektlerini engelle
-document.addEventListener('mousedown', (e) => {
+document.addEventListener("mousedown", (e) => {
   // 0: Sol, 1: Orta, 2: Sağ. Sol tık harici bir tuşa basıldıysa:
   if (e.button !== 0) {
     const target = e.target as HTMLElement;
     // Tıklanan öğe bir buton ise varsayılan basılma (active) eylemini iptal et.
     // (Orta tıklama boş bir alana yapıldığında kaydırma -auto scroll- çalışmaya devam eder)
-    if (target.closest('button')) {
+    if (target.closest("button")) {
       e.preventDefault();
     }
   }

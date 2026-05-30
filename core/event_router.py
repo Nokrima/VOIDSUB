@@ -1,5 +1,4 @@
 import asyncio
-import json
 from copy import deepcopy
 from typing import Any, Callable
 
@@ -18,6 +17,7 @@ from core.errors import (
 
 logger = get_logger()
 
+
 class EventRouter:
     """Merkezi Event Yoneticisi: Spagetti event bloklarini ve state mutation'i engeller."""
 
@@ -34,11 +34,21 @@ class EventRouter:
     def _register_validators(self):
         self.validators["update_region"] = self._validate_region
         self.validators["set_runtime_region"] = self._validate_region
-        self.validators["change_engine"] = lambda p: isinstance(p.get("engine"), str) and bool(p["engine"])
-        self.validators["repair_engine"] = lambda p: isinstance(p.get("engine"), str) and bool(p["engine"])
-        self.validators["download_offline_models"] = lambda p: isinstance(p.get("model"), str) or isinstance(p.get("models"), list)
-        self.validators["remove_offline_models"] = lambda p: isinstance(p.get("model"), str)
-        self.validators["test_overlay_push"] = lambda p: isinstance(p, dict) and isinstance(p.get("text", ""), str)
+        self.validators["change_engine"] = lambda p: (
+            isinstance(p.get("engine"), str) and bool(p["engine"])
+        )
+        self.validators["repair_engine"] = lambda p: (
+            isinstance(p.get("engine"), str) and bool(p["engine"])
+        )
+        self.validators["download_offline_models"] = lambda p: (
+            isinstance(p.get("model"), str) or isinstance(p.get("models"), list)
+        )
+        self.validators["remove_offline_models"] = lambda p: isinstance(
+            p.get("model"), str
+        )
+        self.validators["test_overlay_push"] = lambda p: (
+            isinstance(p, dict) and isinstance(p.get("text", ""), str)
+        )
         self.validators["save_settings"] = self._validate_save_settings
         self.validators["save_overlay_settings"] = self._validate_save_overlay_settings
         self.validators["debug_preview_request"] = lambda p: isinstance(p, dict)
@@ -86,7 +96,9 @@ class EventRouter:
                 return False
         # font_color must be a hex string if present
         color = payload.get("font_color")
-        if color is not None and not (isinstance(color, str) and color.startswith("#") and len(color) in (4, 7, 9)):
+        if color is not None and not (
+            isinstance(color, str) and color.startswith("#") and len(color) in (4, 7, 9)
+        ):
             return False
         return True
 
@@ -143,19 +155,28 @@ class EventRouter:
         handler = self.routes.get(event)
         if not handler:
             return
-            
+
         validator = self.validators.get(event)
         if validator:
             try:
                 if not validator(payload):
                     from core.errors import log_error
-                    log_error(PREFIX_SYS, "050", f"Event validation failed: {event}", f"Etkinlik doğrulanamadı: {event}")
+
+                    log_error(
+                        PREFIX_SYS,
+                        "050",
+                        f"Event validation failed: {event}",
+                        f"Etkinlik doğrulanamadı: {event}",
+                    )
                     return
             except Exception as e:
                 from core.errors import log_error
-                log_error(PREFIX_SYS, "050", f"Event validation error: {event} - {e}", str(e))
+
+                log_error(
+                    PREFIX_SYS, "050", f"Event validation error: {event} - {e}", str(e)
+                )
                 return
-                
+
         if asyncio.iscoroutinefunction(handler):
             await handler(payload)
         else:
@@ -163,40 +184,78 @@ class EventRouter:
 
     def handle_start_translation(self, payload: dict):
         if not self.bridge._has_selected_region:
-            self.bridge.send("translation_state", {"running": False, "reason": "region_required"})
+            self.bridge.send(
+                "translation_state", {"running": False, "reason": "region_required"}
+            )
             return
-        log_event(PREFIX_SYS, "028", "Ceviri dongusu baslatma istegi alindi.", throttle_key="start_translation", throttle_seconds=0.5)
+        log_event(
+            PREFIX_SYS,
+            "028",
+            "Ceviri dongusu baslatma istegi alindi.",
+            throttle_key="start_translation",
+            throttle_seconds=0.5,
+        )
         if hasattr(self.bridge.worker, "start_loop"):
             asyncio.create_task(self.bridge.worker.start_loop())
 
     def handle_stop_translation(self, payload: dict):
-        log_event(PREFIX_SYS, "029", "Ceviri dongusu durdurma istegi alindi.", throttle_key="stop_translation", throttle_seconds=0.5)
+        log_event(
+            PREFIX_SYS,
+            "029",
+            "Ceviri dongusu durdurma istegi alindi.",
+            throttle_key="stop_translation",
+            throttle_seconds=0.5,
+        )
         self.bridge._session_recorder.stop_session()
         if hasattr(self.bridge.worker, "stop"):
             self.bridge.worker.stop()
 
     def handle_get_hardware(self, payload: dict):
-        log_event(PREFIX_SYS, "030", "Donanim taramasi istendi.", throttle_key="hardware_scan", throttle_seconds=1.0)
+        log_event(
+            PREFIX_SYS,
+            "030",
+            "Donanim taramasi istendi.",
+            throttle_key="hardware_scan",
+            throttle_seconds=1.0,
+        )
+
         def _scan():
             try:
                 res = self.bridge.scanner.scan_system()
                 if self.bridge.loop and not self.bridge.loop.is_closed():
-                    self.bridge.loop.call_soon_threadsafe(self.bridge.send, "hardware_result", res)
+                    self.bridge.loop.call_soon_threadsafe(
+                        self.bridge.send, "hardware_result", res
+                    )
             except Exception:
                 pass
+
         import threading
+
         threading.Thread(target=_scan, daemon=True).start()
 
     def handle_repair_engine(self, payload: dict):
         engine_id = payload.get("engine")
-        if engine_id and getattr(self.bridge.worker, "is_running", False) and getattr(self.bridge.worker, "active_engine", None) != engine_id:
-            self.bridge.send("engine_change_denied", {"reason": "Ceviri aktifken motor degistirilemez. Once donguyu durdurun."})
+        if (
+            engine_id
+            and getattr(self.bridge.worker, "is_running", False)
+            and getattr(self.bridge.worker, "active_engine", None) != engine_id
+        ):
+            self.bridge.send(
+                "engine_change_denied",
+                {
+                    "reason": "Ceviri aktifken motor degistirilemez. Once donguyu durdurun."
+                },
+            )
             return
         if engine_id:
             asyncio.create_task(self.bridge._run_engine_repair(str(engine_id)))
 
     def handle_get_offline_status(self, payload: dict):
-        offline_engine = getattr(self.bridge.worker, "offline_engine", getattr(self.bridge.worker, "offline_translator", None))
+        offline_engine = getattr(
+            self.bridge.worker,
+            "offline_engine",
+            getattr(self.bridge.worker, "offline_translator", None),
+        )
         if offline_engine is not None:
             self.bridge.send("offline_model_status", offline_engine.get_status())
 
@@ -206,7 +265,9 @@ class EventRouter:
             if isinstance(requested_models, list):
                 self.bridge.worker.offline_translator.download_models(requested_models)
             else:
-                self.bridge.worker.offline_translator.download_models(payload.get("model"))
+                self.bridge.worker.offline_translator.download_models(
+                    payload.get("model")
+                )
 
     def handle_download_easyocr(self, payload: dict):
         self.bridge.easyocr_manager.start()
@@ -230,7 +291,11 @@ class EventRouter:
         self.bridge.cuda_manager._send_status()
 
     def handle_cancel_offline_models(self, payload: dict):
-        offline_engine = getattr(self.bridge.worker, "offline_engine", getattr(self.bridge.worker, "offline_translator", None))
+        offline_engine = getattr(
+            self.bridge.worker,
+            "offline_engine",
+            getattr(self.bridge.worker, "offline_translator", None),
+        )
         if offline_engine is not None:
             offline_engine.cancel_download()
 
@@ -257,7 +322,10 @@ class EventRouter:
 
     def handle_request_region_selection(self, payload: dict):
         if self.bridge._temporary_region_active:
-            self.bridge.send("region_selection_failed", {"message": "Gecici alan aktifken ana tarama alani degistirilemez."})
+            self.bridge.send(
+                "region_selection_failed",
+                {"message": "Gecici alan aktifken ana tarama alani degistirilemez."},
+            )
             return
         if not self.bridge._region_selector_running:
             self.bridge._region_selector_running = True
@@ -269,7 +337,10 @@ class EventRouter:
             self.bridge._deactivate_temporary_region()
             return
         if not self.bridge._has_selected_region:
-            self.bridge.send("temporary_region_failed", {"message": "Once ana tarama alani secilmelidir."})
+            self.bridge.send(
+                "temporary_region_failed",
+                {"message": "Once ana tarama alani secilmelidir."},
+            )
             return
         if not self.bridge._region_selector_running:
             self.bridge._region_selector_running = True
@@ -286,7 +357,10 @@ class EventRouter:
             if self.bridge._save_settings():
                 self.bridge._emit_app_settings()
             else:
-                self.bridge.send("settings_save_failed", {"scope": "app", "message": "Motor tercihi kaydedilemedi."})
+                self.bridge.send(
+                    "settings_save_failed",
+                    {"scope": "app", "message": "Motor tercihi kaydedilemedi."},
+                )
 
     def handle_change_ocr_scene_mode(self, payload: dict):
         scene_mode = payload.get("mode")
@@ -297,7 +371,10 @@ class EventRouter:
             if self.bridge._save_settings():
                 self.bridge._emit_app_settings()
             else:
-                self.bridge.send("settings_save_failed", {"scope": "app", "message": "OCR sahne modu kaydedilemedi."})
+                self.bridge.send(
+                    "settings_save_failed",
+                    {"scope": "app", "message": "OCR sahne modu kaydedilemedi."},
+                )
 
     def handle_save_settings(self, payload: dict):
         previous = deepcopy(self.bridge.settings["app"])
@@ -309,49 +386,122 @@ class EventRouter:
             next_payload["tgt_language"] = "tr"
         if next_payload.get("offline_model_key") not in VALID_OFFLINE_MODEL_KEYS:
             next_payload["offline_model_key"] = "opus_mt_en_tr"
-        if next_payload.get("translation_engine") == "offline" and next_payload.get("offline_model_key") == "opus_mt_en_tr" and next_payload.get("src_language") != "en":
+        if (
+            next_payload.get("translation_engine") == "offline"
+            and next_payload.get("offline_model_key") == "opus_mt_en_tr"
+            and next_payload.get("src_language") != "en"
+        ):
             next_payload["src_language"] = "en"
-        next_payload["custom_calibration_profiles"] = self.bridge._normalize_custom_profiles(next_payload.get("custom_calibration_profiles"))
+        next_payload["custom_calibration_profiles"] = (
+            self.bridge._normalize_custom_profiles(
+                next_payload.get("custom_calibration_profiles")
+            )
+        )
         self.bridge.settings["app"] = next_payload
         set_log_level(self.bridge.settings["app"].get("log_level", "info"))
 
-        if self.bridge.native_overlay is not None and hasattr(self.bridge.native_overlay, "update_snap_to_region"):
-            self.bridge.native_overlay.update_snap_to_region(bool(self.bridge.settings["app"].get("overlay_snap_to_region", True)))
+        if self.bridge.native_overlay is not None and hasattr(
+            self.bridge.native_overlay, "update_snap_to_region"
+        ):
+            self.bridge.native_overlay.update_snap_to_region(
+                bool(self.bridge.settings["app"].get("overlay_snap_to_region", True))
+            )
 
         if hasattr(self.bridge.worker, "update_config"):
             config_updates = {}
-            for key in ["translation_engine", "offline_model_key", "performance_tier", "ocr_filters_enabled", "raw_translation_flow_enabled", "quality_threshold", "min_text_chars", "stabilizer_min_samples", "scene_fit_threshold", "variant_budget", "clahe_clip_striped", "clahe_clip_floating", "bilateral_d", "white_v_min", "floating_gaussian_c", "floating_mean_c", "src_language", "tgt_language"]:
+            for key in [
+                "translation_engine",
+                "offline_model_key",
+                "performance_tier",
+                "ocr_filters_enabled",
+                "raw_translation_flow_enabled",
+                "quality_threshold",
+                "min_text_chars",
+                "stabilizer_min_samples",
+                "scene_fit_threshold",
+                "variant_budget",
+                "clahe_clip_striped",
+                "clahe_clip_floating",
+                "bilateral_d",
+                "white_v_min",
+                "floating_gaussian_c",
+                "floating_mean_c",
+                "src_language",
+                "tgt_language",
+            ]:
                 if previous.get(key) != self.bridge.settings["app"].get(key):
                     config_updates[key] = self.bridge.settings["app"].get(key)
-            if previous.get("active_calibration_profile_id") != self.bridge.settings["app"].get("active_calibration_profile_id"):
-                config_updates["calibration_profile_active"] = bool(self.bridge.settings["app"].get("active_calibration_profile_id"))
+            if previous.get("active_calibration_profile_id") != self.bridge.settings[
+                "app"
+            ].get("active_calibration_profile_id"):
+                config_updates["calibration_profile_active"] = bool(
+                    self.bridge.settings["app"].get("active_calibration_profile_id")
+                )
             self.bridge.worker.update_config(**config_updates)
 
-        if previous.get("translation_engine") != self.bridge.settings["app"].get("translation_engine"):
-            log_event(PREFIX_CFG, "009", f"Ceviri servisi: {self.bridge.settings['app'].get('translation_engine')}")
-        if previous.get("performance_tier") != self.bridge.settings["app"].get("performance_tier"):
-            log_event(PREFIX_CFG, "010", f"Performans kademesi: {self.bridge.settings['app'].get('performance_tier')}")
+        if previous.get("translation_engine") != self.bridge.settings["app"].get(
+            "translation_engine"
+        ):
+            log_event(
+                PREFIX_CFG,
+                "009",
+                f"Ceviri servisi: {self.bridge.settings['app'].get('translation_engine')}",
+            )
+        if previous.get("performance_tier") != self.bridge.settings["app"].get(
+            "performance_tier"
+        ):
+            log_event(
+                PREFIX_CFG,
+                "010",
+                f"Performans kademesi: {self.bridge.settings['app'].get('performance_tier')}",
+            )
         if previous.get("log_level") != self.bridge.settings["app"].get("log_level"):
-            log_event(PREFIX_CFG, "011", f"Kayit ayrinti seviyesi: {self.bridge.settings['app'].get('log_level')}")
+            log_event(
+                PREFIX_CFG,
+                "011",
+                f"Kayit ayrinti seviyesi: {self.bridge.settings['app'].get('log_level')}",
+            )
         if previous.get("shortcuts") != self.bridge.settings["app"].get("shortcuts"):
-            shortcuts_text = ", ".join(f"{k}={v}" for k, v in (self.bridge.settings["app"].get("shortcuts") or {}).items())
+            shortcuts_text = ", ".join(
+                f"{k}={v}"
+                for k, v in (self.bridge.settings["app"].get("shortcuts") or {}).items()
+            )
             log_event(PREFIX_CFG, "020", f"Tuş atamaları: {shortcuts_text}")
 
         if self.bridge._save_settings():
             if not payload.get("_skip_emit"):
                 self.bridge._emit_app_settings()
         else:
-            self.bridge.send("settings_save_failed", {"scope": "app", "message": "Uygulama ayarlari kaydedilemedi."})
+            self.bridge.send(
+                "settings_save_failed",
+                {"scope": "app", "message": "Uygulama ayarlari kaydedilemedi."},
+            )
 
     def handle_save_overlay_settings(self, payload: dict):
-        log_event(PREFIX_CFG, "008", "Ceviri Katmani ayarlari kaydedildi.", throttle_key="save_overlay_settings", throttle_seconds=0.25)
-        self.bridge.settings["overlay"] = self.bridge._merge_dict(self.bridge.settings["overlay"], payload)
-        if self.bridge.native_overlay is not None and hasattr(self.bridge.native_overlay, "apply_settings"):
+        log_event(
+            PREFIX_CFG,
+            "008",
+            "Ceviri Katmani ayarlari kaydedildi.",
+            throttle_key="save_overlay_settings",
+            throttle_seconds=0.25,
+        )
+        self.bridge.settings["overlay"] = self.bridge._merge_dict(
+            self.bridge.settings["overlay"], payload
+        )
+        if self.bridge.native_overlay is not None and hasattr(
+            self.bridge.native_overlay, "apply_settings"
+        ):
             self.bridge.native_overlay.apply_settings(self.bridge.settings["overlay"])
         if self.bridge._save_settings():
             self.bridge.send("overlay_settings_loaded", self.bridge.settings["overlay"])
         else:
-            self.bridge.send("settings_save_failed", {"scope": "overlay", "message": "Ceviri Katmani ayarlari kaydedilemedi."})
+            self.bridge.send(
+                "settings_save_failed",
+                {
+                    "scope": "overlay",
+                    "message": "Ceviri Katmani ayarlari kaydedilemedi.",
+                },
+            )
 
     def handle_toggle_overlay_visibility(self, payload: dict):
         if self.bridge.native_overlay is not None:
@@ -359,14 +509,26 @@ class EventRouter:
 
     def handle_test_overlay_push(self, payload: dict):
         if self.bridge.native_overlay is not None:
-            self.bridge.native_overlay.push_sequence([str(payload.get("text", "Örnek Çeviri Metni"))], mode=str(self.bridge.settings["overlay"].get("mode", "fixed")), reading_speed=int(self.bridge.settings["app"].get("reading_speed_cps", 60)))
+            self.bridge.native_overlay.push_sequence(
+                [str(payload.get("text", "Örnek Çeviri Metni"))],
+                mode=str(self.bridge.settings["overlay"].get("mode", "fixed")),
+                reading_speed=int(
+                    self.bridge.settings["app"].get("reading_speed_cps", 60)
+                ),
+            )
 
     def handle_clear_overlay(self, payload: dict):
-        if self.bridge.native_overlay is not None and hasattr(self.bridge.native_overlay, "clear"):
+        if self.bridge.native_overlay is not None and hasattr(
+            self.bridge.native_overlay, "clear"
+        ):
             self.bridge.native_overlay.clear()
 
     def handle_shutdown(self, payload: dict):
-        log_event(PREFIX_SYS, "099", "Arayuzden guvenli kapanis (graceful shutdown) sinyali alindi.")
+        log_event(
+            PREFIX_SYS,
+            "099",
+            "Arayuzden guvenli kapanis (graceful shutdown) sinyali alindi.",
+        )
         if self.bridge.worker is not None and hasattr(self.bridge.worker, "shutdown"):
             self.bridge.worker.shutdown()
         if self.bridge.shutdown_event is not None:
@@ -403,7 +565,12 @@ class EventRouter:
         self.bridge._session_recorder.region_clear()
 
     def handle_shutdown_core(self, payload: dict):
-        log_event(PREFIX_SYS, "039", "Arayuz istegiyle Python core kapatiliyor.", level="warning")
+        log_event(
+            PREFIX_SYS,
+            "039",
+            "Arayuz istegiyle Python core kapatiliyor.",
+            level="warning",
+        )
         if hasattr(self.bridge.worker, "offline_translator"):
             self.bridge.worker.offline_translator.cancel_download()
         if hasattr(self.bridge.worker, "stop"):

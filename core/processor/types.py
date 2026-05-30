@@ -1,5 +1,6 @@
 from typing import TypedDict
 
+
 class TextAnalysisResult(TypedDict):
     cleaned: str
     tokens: list[str]
@@ -30,6 +31,7 @@ class TextAnalysisResult(TypedDict):
     health_score: int
     health_verdict: str
     tip2_suspect: bool
+
 
 class RegionDict(TypedDict, total=False):
     top: int

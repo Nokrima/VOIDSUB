@@ -26,7 +26,7 @@
   --glass-base: rgba(255, 255, 255, 0.04);
   --glass-strong: rgba(255, 255, 255, 0.06);
   --border-base: rgba(255, 255, 255, 0.08);
-  --border-accent: rgba(56, 130, 220, 0.30);
+  --border-accent: rgba(56, 130, 220, 0.3);
   --blur-surface: 14px;
   --blur-card: 20px;
   --blur-card-strong: 24px;
@@ -34,9 +34,9 @@
 
   /* Border radius ölçek sistemi */
   --radius-panel: 18px;
-  --radius-card: 18px;    /* büyük kart, panel çerçevesi */
+  --radius-card: 18px; /* büyük kart, panel çerçevesi */
   --radius-control: 14px; /* buton, input, tab */
-  --radius-sm: 10px;      /* banner, küçük badge, iç kart */
+  --radius-sm: 10px; /* banner, küçük badge, iç kart */
 
   /* Tipografi token seti */
   --type-kicker-size: 10px;
@@ -55,9 +55,10 @@
   --type-body-line: 1.65;
   --type-note-size: 12px;
   --type-note-line: 1.55;
-  --type-sm-size: 11px;   /* panel iç etiket, log satır */
-  --type-xs-size: 9px;    /* badge, durum noktası yanı */
-  --type-ui-family: -apple-system, 'SF Pro Display', 'Inter', system-ui, sans-serif;
+  --type-sm-size: 11px; /* panel iç etiket, log satır */
+  --type-xs-size: 9px; /* badge, durum noktası yanı */
+  --type-ui-family:
+    -apple-system, "SF Pro Display", "Inter", system-ui, sans-serif;
   --type-code-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   /* Shadow standardı */
@@ -152,7 +153,9 @@ body[data-window-mode="region-selector"] #root {
     align-items: center;
     justify-content: center;
     align-self: stretch;
-    transition: background 120ms ease, color 120ms ease;
+    transition:
+      background 120ms ease,
+      color 120ms ease;
   }
 
   .window-chrome-button::after {
@@ -172,7 +175,7 @@ body[data-window-mode="region-selector"] #root {
   }
 
   .window-chrome-close:hover {
-    background: #E81123;
+    background: #e81123;
     color: #ffffff;
   }
 
@@ -181,12 +184,16 @@ body[data-window-mode="region-selector"] #root {
   }
 
   .window-chrome-close:active {
-    background: #F1707A;
+    background: #f1707a;
   }
 
   .app-surface {
     @apply h-full w-full overflow-hidden border;
-    background: linear-gradient(180deg, rgba(18, 24, 35, 0.96), rgba(10, 14, 22, 0.94));
+    background: linear-gradient(
+      180deg,
+      rgba(18, 24, 35, 0.96),
+      rgba(10, 14, 22, 0.94)
+    );
     border-color: rgba(255, 255, 255, 0.06);
     border-radius: var(--radius-panel);
     box-shadow: var(--shadow-panel);
@@ -199,11 +206,17 @@ body[data-window-mode="region-selector"] #root {
 
   .app-card {
     @apply min-w-0 border px-3 py-2.5;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.028));
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.055),
+      rgba(255, 255, 255, 0.028)
+    );
     border-color: var(--surface-border);
     border-radius: var(--radius-card);
     box-shadow: var(--shadow-soft);
-    transition: border-color var(--dur-fast) ease, background var(--dur-fast) ease;
+    transition:
+      border-color var(--dur-fast) ease,
+      background var(--dur-fast) ease;
   }
 
   .app-card-muted {
@@ -211,12 +224,18 @@ body[data-window-mode="region-selector"] #root {
     background: rgba(5, 8, 13, 0.42);
     border-color: rgba(255, 255, 255, 0.08);
     border-radius: var(--radius-card);
-    transition: border-color var(--dur-fast) ease, background var(--dur-fast) ease;
+    transition:
+      border-color var(--dur-fast) ease,
+      background var(--dur-fast) ease;
   }
 
   .app-card:hover {
     border-color: var(--surface-border);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.028));
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.055),
+      rgba(255, 255, 255, 0.028)
+    );
   }
 
   .app-section-title {
@@ -338,7 +357,11 @@ body[data-window-mode="region-selector"] #root {
 
   .app-tab-active {
     @apply text-white;
-    background: linear-gradient(135deg, rgba(47, 125, 255, 0.86), rgba(94, 167, 255, 0.78));
+    background: linear-gradient(
+      135deg,
+      rgba(47, 125, 255, 0.86),
+      rgba(94, 167, 255, 0.78)
+    );
     box-shadow: 0 10px 24px rgba(47, 125, 255, 0.22);
   }
 
@@ -408,7 +431,7 @@ body[data-window-mode="region-selector"] #root {
     @apply flex h-full flex-col border-r pt-5;
     background: rgba(8, 12, 18, 0.95);
     border-color: rgba(255, 255, 255, 0.04);
-    box-shadow: 1px 0 20px rgba(0,0,0,0.4);
+    box-shadow: 1px 0 20px rgba(0, 0, 0, 0.4);
   }
 
   .app-sidebar-button {
@@ -470,7 +493,9 @@ body[data-window-mode="region-selector"] #root {
     top: 50%;
     transform: translateY(-50%);
     white-space: nowrap;
-    transition: opacity 180ms ease, transform 180ms ease;
+    transition:
+      opacity 180ms ease,
+      transform 180ms ease;
   }
 
   .app-sidebar-footer-text {
@@ -508,7 +533,9 @@ body[data-window-mode="region-selector"] #root {
     width: 18px;
     border-radius: 999px;
     background: currentColor;
-    transition: transform 180ms ease, opacity 180ms ease;
+    transition:
+      transform 180ms ease,
+      opacity 180ms ease;
   }
 
   .app-hamburger.is-open .app-hamburger-line:nth-child(1) {
@@ -546,16 +573,25 @@ body[data-window-mode="region-selector"] #root {
 
   /* Üst çizgi efekti — topHighlight JS nesnesinin CSS karşılığı */
   .app-glass-top-line::before {
-    content: '';
+    content: "";
     position: absolute;
     inset: 0 0 auto 0;
     height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.15),
+      transparent
+    );
     pointer-events: none;
   }
 
   .glass-panel {
-    background: linear-gradient(180deg, rgba(16, 22, 32, 0.9), rgba(9, 12, 18, 0.92));
+    background: linear-gradient(
+      180deg,
+      rgba(16, 22, 32, 0.9),
+      rgba(9, 12, 18, 0.92)
+    );
     backdrop-filter: blur(var(--blur-surface));
     -webkit-backdrop-filter: blur(var(--blur-surface));
     border: 1px solid rgba(40, 52, 69, 0.75);
@@ -578,12 +614,15 @@ body[data-window-mode="region-selector"] #root {
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
     gap: 12px;
   }
-
 }
 
 @keyframes anim-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes rail-slide-up {
@@ -643,7 +682,10 @@ body[data-window-mode="region-selector"] #root {
 }
 
 button {
-  transition: transform 100ms ease, background 150ms ease, border-color 150ms ease;
+  transition:
+    transform 100ms ease,
+    background 150ms ease,
+    border-color 150ms ease;
   position: relative;
   overflow: hidden;
   isolation: isolate;
@@ -657,10 +699,17 @@ button::after {
   content: "";
   position: absolute;
   inset: -28%;
-  background: radial-gradient(circle, rgba(230, 240, 255, 0.18) 0%, rgba(230, 240, 255, 0.08) 24%, rgba(230, 240, 255, 0) 66%);
+  background: radial-gradient(
+    circle,
+    rgba(230, 240, 255, 0.18) 0%,
+    rgba(230, 240, 255, 0.08) 24%,
+    rgba(230, 240, 255, 0) 66%
+  );
   opacity: 0;
   transform: scale(0.4);
-  transition: opacity 180ms ease, transform 220ms ease;
+  transition:
+    opacity 180ms ease,
+    transform 220ms ease;
   pointer-events: none;
   z-index: 0;
 }

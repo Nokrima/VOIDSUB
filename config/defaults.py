@@ -2,9 +2,9 @@
 VoidSub - Evrensel Sabitler
 Bu dosya projenin konfigurasyon merkezidir. Sadece sabitleri icerir.
 """
+
 import os
 from pathlib import Path
-import sys
 
 APP_NAME = "VoidSub"
 APP_VERSION = "2.0.0"
@@ -14,17 +14,22 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # USER_DATA_DIR: Yazılabilir kullanıcı dizini (%LOCALAPPDATA%\VoidSub)
 # Uygulama logları, ayarları ve geçici dosyaları her zaman buraya kaydedilir
-USER_DATA_DIR = Path(os.getenv("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / "VoidSub"
+USER_DATA_DIR = (
+    Path(os.getenv("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / "VoidSub"
+)
 USER_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # DOCS_DIR: Kullanıcının görebileceği, erişebileceği dosyalar (Belgelerim\VoidSub)
 # Hata raporları ve loglar, kullanıcının bize kolayca ulaştırabilmesi için buraya kaydedilir
 try:
     import ctypes.wintypes
+
     CSIDL_PERSONAL = 5  # My Documents
     SHGFP_TYPE_CURRENT = 0
     buf = ctypes.create_unicode_buffer(ctypes.wintypes.MAX_PATH)
-    ctypes.windll.shell32.SHGetFolderPathW(None, CSIDL_PERSONAL, None, SHGFP_TYPE_CURRENT, buf)
+    ctypes.windll.shell32.SHGetFolderPathW(
+        None, CSIDL_PERSONAL, None, SHGFP_TYPE_CURRENT, buf
+    )
     DOCS_DIR = Path(buf.value) / "VoidSub"
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
 except Exception:
@@ -41,7 +46,9 @@ DIAGNOSTICS_DIR = DOCS_DIR / "logs" / "ocr_diagnostics"
 
 MODELS_DIR = USER_DATA_DIR / "models"
 WEBSOCKET_HOST = "127.0.0.1"
-WEBSOCKET_PORT = int(os.getenv("VOIDSUB_PORT", "0"))  # Dev ortamında 27491, Production'da 0 (dinamik port) olacak
+WEBSOCKET_PORT = int(
+    os.getenv("VOIDSUB_PORT", "0")
+)  # Dev ortamında 27491, Production'da 0 (dinamik port) olacak
 
 LOG_MAX_BYTES = 5 * 1024 * 1024
 LOG_BACKUP_COUNT = 3
@@ -152,7 +159,6 @@ PERFORMANCE_TIER_ENGINE_OVERRIDES = {
             "fast_quality_floor": 36,
         },
     },
-
 }
 
 TRANSLATION_SERVICE_TIER_OVERRIDES = {
@@ -229,17 +235,23 @@ TRANSLATION_SERVICE_TIER_OVERRIDES = {
 }
 
 
-def get_performance_tier_profile(engine_id: str | None, tier_name: str | None, translation_engine: str | None = None) -> dict:
+def get_performance_tier_profile(
+    engine_id: str | None, tier_name: str | None, translation_engine: str | None = None
+) -> dict:
     normalized_tier = (tier_name or "standard").strip().lower()
-    base_profile = PERFORMANCE_TIERS.get(normalized_tier, PERFORMANCE_TIERS["standard"]).copy()
+    base_profile = PERFORMANCE_TIERS.get(
+        normalized_tier, PERFORMANCE_TIERS["standard"]
+    ).copy()
     normalized_engine = (engine_id or "").strip().lower()
     engine_overrides = PERFORMANCE_TIER_ENGINE_OVERRIDES.get(normalized_engine, {})
     base_profile.update(engine_overrides.get(normalized_tier, {}))
     normalized_translation_engine = (translation_engine or "auto").strip().lower()
-    service_overrides = TRANSLATION_SERVICE_TIER_OVERRIDES.get(normalized_translation_engine, {})
+    service_overrides = TRANSLATION_SERVICE_TIER_OVERRIDES.get(
+        normalized_translation_engine, {}
+    )
     base_profile.update(service_overrides.get(normalized_tier, {}))
     return base_profile
 
+
 DEFAULT_OCR_FILTERS_ENABLED = True
 DEFAULT_RAW_TRANSLATION_FLOW_ENABLED = False
-

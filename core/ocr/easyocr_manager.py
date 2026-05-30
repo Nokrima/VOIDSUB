@@ -1,10 +1,6 @@
 from __future__ import annotations
 
-import json
 import shutil
-import socket
-import subprocess
-import sys
 import threading
 import time
 import os
@@ -16,25 +12,32 @@ EASYOCR_PLUGIN_REPO = "Nokrima/VoidSub-Plugins"
 EASYOCR_RELEASE_TAG = "latest"  # Veya "v1.0"
 EASYOCR_ASSET_NAME = "virel-easyocr-plugin.zip"
 
+
 class EasyOCRManager:
     def __init__(self, plugins_dir: Path, bridge=None):
         self.plugins_dir = plugins_dir
         self.bridge = bridge
         self.plugin_dir = plugins_dir / "easyocr"
         self.tmp_dir = plugins_dir / "easyocr-tmp"
-        
+
         self.state = "idle"
         self.percent = 0
         self.detail = "EasyOCR eklentisi bekleniyor."
         self.bytes_label = ""
-        
+
         self._cancel = threading.Event()
         self._thread: threading.Thread | None = None
         self._install_started_at = 0.0
 
     def get_status(self) -> dict:
         ready = self._is_ready()
-        busy = self.state in {"planning", "downloading", "extracting", "verifying", "remove"}
+        busy = self.state in {
+            "planning",
+            "downloading",
+            "extracting",
+            "verifying",
+            "remove",
+        }
         return {
             "plugin": "easyocr",
             "label": "EasyOCR Yapay Zeka Motoru",
@@ -51,16 +54,25 @@ class EasyOCRManager:
         if bridge is not None:
             self.bridge = bridge
         if self._is_ready():
-            log_event(PREFIX_OCR, "080", "[EasyOCR Kurulumu] -> ATLANDI | Eklenti zaten hazir")
+            log_event(
+                PREFIX_OCR, "080", "[EasyOCR Kurulumu] -> ATLANDI | Eklenti zaten hazir"
+            )
             self._send_status()
             return
         if self._thread and self._thread.is_alive():
-            log_event(PREFIX_OCR, "081", "[EasyOCR Kurulumu] -> REDDEDILDI | Kurulum suruyor", level="warning")
+            log_event(
+                PREFIX_OCR,
+                "081",
+                "[EasyOCR Kurulumu] -> REDDEDILDI | Kurulum suruyor",
+                level="warning",
+            )
             self._send_status()
             return
-        
+
         self._cancel.clear()
-        self._thread = threading.Thread(target=self._install_worker, name="easyocr-plugin-install", daemon=True)
+        self._thread = threading.Thread(
+            target=self._install_worker, name="easyocr-plugin-install", daemon=True
+        )
         self._thread.start()
 
     def cancel(self) -> None:
@@ -69,8 +81,12 @@ class EasyOCRManager:
         self.percent = 0
         self.detail = "Kurulum iptal edildi."
         self.bytes_label = ""
-        log_event(PREFIX_OCR, "082", "[EasyOCR Kurulumu] -> IPTAL EDILDI", level="warning")
-        self._send("easyocr_plugin_cancelled", {"message": "EasyOCR kurulumu iptal edildi."})
+        log_event(
+            PREFIX_OCR, "082", "[EasyOCR Kurulumu] -> IPTAL EDILDI", level="warning"
+        )
+        self._send(
+            "easyocr_plugin_cancelled", {"message": "EasyOCR kurulumu iptal edildi."}
+        )
         self._send_status()
 
     def remove(self) -> None:
@@ -81,12 +97,12 @@ class EasyOCRManager:
         self.detail = "Eklenti kaldırılıyor."
         self.bytes_label = ""
         self._send_progress()
-        
+
         if self.tmp_dir.exists():
             shutil.rmtree(self.tmp_dir, ignore_errors=True)
         if self.plugin_dir.exists():
             shutil.rmtree(self.plugin_dir, ignore_errors=True)
-            
+
         self._reset_idle_state()
         log_event(PREFIX_OCR, "084", "[EasyOCR Kaldirma] -> TAMAMLANDI")
         self._send_status()
@@ -96,39 +112,45 @@ class EasyOCRManager:
         try:
             self.plugins_dir.mkdir(parents=True, exist_ok=True)
             log_event(PREFIX_OCR, "085", "[EasyOCR Kurulumu] -> BASLADI")
-            
+
             self._prepare_workspace()
             self._raise_if_cancelled()
-            
+
             # 1. GitHub API uzerinden indirme linkini bul
             self._set_stage("planning", 5, "İndirme bağlantısı aranıyor")
             download_url, size = self._get_download_info()
             self._raise_if_cancelled()
-            
+
             # 2. Dosyayi indir
             self._download_file(download_url, size)
             self._raise_if_cancelled()
-            
+
             # 3. Zip'ten cikar
             self._extract_plugin()
             self._raise_if_cancelled()
-            
+
             # 4. Dogrula
             self._verify_plugin()
-            
+
             if self.tmp_dir.exists():
                 shutil.rmtree(self.tmp_dir, ignore_errors=True)
-                
+
             self.state = "ready"
             self.percent = 100
             self.detail = "EasyOCR Eklentisi hazır."
             self.bytes_label = ""
-            
+
             elapsed_ms = int((time.monotonic() - self._install_started_at) * 1000)
-            log_event(PREFIX_OCR, "086", f"[EasyOCR Kurulumu] -> TAMAMLANDI | Sure(ms): {elapsed_ms}")
+            log_event(
+                PREFIX_OCR,
+                "086",
+                f"[EasyOCR Kurulumu] -> TAMAMLANDI | Sure(ms): {elapsed_ms}",
+            )
             self._send_status()
-            self._send("easyocr_plugin_complete", {"percent": 100, "elapsed_ms": elapsed_ms})
-            
+            self._send(
+                "easyocr_plugin_complete", {"percent": 100, "elapsed_ms": elapsed_ms}
+            )
+
         except RuntimeError as exc:
             if str(exc) == "cancelled" or self._cancel.is_set():
                 if self.tmp_dir.exists():
@@ -139,8 +161,14 @@ class EasyOCRManager:
             self._fail(str(exc))
         except Exception as exc:
             import traceback
+
             traceback_str = traceback.format_exc()
-            log_error(PREFIX_OCR, "089", f"[EasyOCR Kurulumu] -> BEKLENMEYEN HATA:\n{traceback_str}", "Bilinmeyen bir hata oluştu.")
+            log_error(
+                PREFIX_OCR,
+                "089",
+                f"[EasyOCR Kurulumu] -> BEKLENMEYEN HATA:\n{traceback_str}",
+                "Bilinmeyen bir hata oluştu.",
+            )
             self._fail(str(exc))
 
     def _prepare_workspace(self) -> None:
@@ -153,16 +181,17 @@ class EasyOCRManager:
         import urllib.request
         import urllib.error
         import os
-        
+
         # Direkt HuggingFace baglantisi
         url = "https://huggingface.co/Nokrima/virel-easyocr-plugin/resolve/main/virel-easyocr-plugin.zip"
-        
+
         try:
             headers = {"User-Agent": "VoidSub"}
             token = os.environ.get("HF_TOKEN")
             if not token:
                 try:
                     from huggingface_hub import get_token
+
                     token = get_token()
                 except ImportError:
                     pass
@@ -170,11 +199,13 @@ class EasyOCRManager:
                 headers["Authorization"] = f"Bearer {token}"
             req = urllib.request.Request(url, method="HEAD", headers=headers)
             with urllib.request.urlopen(req, timeout=10) as response:
-                total_bytes = int(response.headers.get('Content-Length', 0))
+                total_bytes = int(response.headers.get("Content-Length", 0))
             return url, total_bytes
         except urllib.error.HTTPError as exc:
             if exc.code == 401:
-                raise RuntimeError("İndirme izni reddedildi (401). Lütfen sistem ortam değişkenlerine 'HF_TOKEN' ekleyin veya HuggingFace CLI ile giriş yapın.")
+                raise RuntimeError(
+                    "İndirme izni reddedildi (401). Lütfen sistem ortam değişkenlerine 'HF_TOKEN' ekleyin veya HuggingFace CLI ile giriş yapın."
+                )
             raise RuntimeError(f"Indirme bilgisi alinamadi: {exc}")
         except Exception as exc:
             raise RuntimeError(f"Indirme bilgisi alinamadi: {exc}")
@@ -182,21 +213,21 @@ class EasyOCRManager:
     def _download_file(self, url: str, total_bytes: int) -> None:
         import urllib.request
         import time
-        
+
         zip_path = self.tmp_dir / EASYOCR_ASSET_NAME
         max_retries = 5
         retry_delay = 2.0
-        
+
         for attempt in range(max_retries):
             self._raise_if_cancelled()
-            
+
             existing_size = 0
             if zip_path.exists():
                 existing_size = zip_path.stat().st_size
                 if total_bytes > 0 and existing_size > total_bytes:
                     zip_path.unlink()
                     existing_size = 0
-                
+
             if total_bytes > 0 and existing_size == total_bytes:
                 self.percent = 80
                 self.detail = "İndirme tamamlandı, doğrulanıyor..."
@@ -205,11 +236,13 @@ class EasyOCRManager:
                 return
 
             import os
+
             headers = {"User-Agent": "VoidSub"}
             token = os.environ.get("HF_TOKEN")
             if not token:
                 try:
                     from huggingface_hub import get_token
+
                     token = get_token()
                 except ImportError:
                     pass
@@ -228,30 +261,36 @@ class EasyOCRManager:
                     else:
                         downloaded = 0
                         mode = "wb"
-                        
+
                     last_send = time.monotonic()
                     with open(zip_path, mode) as f:
                         while True:
                             self._raise_if_cancelled()
-                            chunk = response.read(8192 * 16) # 128KB chunks
+                            chunk = response.read(8192 * 16)  # 128KB chunks
                             if not chunk:
                                 break
                             f.write(chunk)
                             downloaded += len(chunk)
-                            
+
                             now = time.monotonic()
                             if now - last_send > 0.2 or downloaded == total_bytes:
-                                self.percent = 10 + int((downloaded / total_bytes) * 70) if total_bytes > 0 else 50
+                                self.percent = (
+                                    10 + int((downloaded / total_bytes) * 70)
+                                    if total_bytes > 0
+                                    else 50
+                                )
                                 self.detail = f"{EASYOCR_ASSET_NAME} indiriliyor"
                                 self.bytes_label = f"{self._format_bytes(downloaded)} / {self._format_bytes(total_bytes)}"
                                 self._send_progress()
                                 last_send = now
-                                
+
                     if total_bytes > 0 and downloaded < total_bytes:
-                        raise RuntimeError(f"Bağlantı kesildi. İndirme eksik kaldı: {self._format_bytes(downloaded)} / {self._format_bytes(total_bytes)}")
-                        
+                        raise RuntimeError(
+                            f"Bağlantı kesildi. İndirme eksik kaldı: {self._format_bytes(downloaded)} / {self._format_bytes(total_bytes)}"
+                        )
+
                 return  # Başarıyla tamamlandı
-                
+
             except RuntimeError as e:
                 if str(e) == "cancelled" or self._cancel.is_set():
                     raise e
@@ -265,34 +304,48 @@ class EasyOCRManager:
                 if attempt < max_retries - 1:
                     time.sleep(retry_delay)
                     continue
-                raise RuntimeError(f"İndirme {max_retries} denemeden sonra başarısız oldu: {e}")
+                raise RuntimeError(
+                    f"İndirme {max_retries} denemeden sonra başarısız oldu: {e}"
+                )
 
     def _extract_plugin(self) -> None:
-        self._set_stage("extracting", 85, "Eklenti çıkartılıyor... (Bu işlem birkaç dakika sürebilir)")
+        self._set_stage(
+            "extracting",
+            85,
+            "Eklenti çıkartılıyor... (Bu işlem birkaç dakika sürebilir)",
+        )
         import zipfile
         import time
-        
+
         zip_path = self.tmp_dir / EASYOCR_ASSET_NAME
         if not zip_path.exists():
             raise RuntimeError("Indirilen zip dosyasi bulunamadi!")
-            
+
         try:
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            with zipfile.ZipFile(zip_path, "r") as zip_ref:
                 members = zip_ref.infolist()
                 total_files = len(members)
                 last_send = time.monotonic()
-                
+
                 for i, member in enumerate(members):
                     self._raise_if_cancelled()
-                    
+
                     # Zip Slip koruması
                     target_path = (self.plugin_dir / member.filename).resolve()
                     base_path = self.plugin_dir.resolve()
-                    if os.path.commonpath([str(base_path), str(target_path)]) != str(base_path) or '..' in member.filename or member.filename.startswith('/') or member.filename.startswith('\\'):
-                        raise RuntimeError(f"Güvenlik ihlali: Zip slip denemesi engellendi ({member.filename})")
-                        
+                    if (
+                        os.path.commonpath([str(base_path), str(target_path)])
+                        != str(base_path)
+                        or ".." in member.filename
+                        or member.filename.startswith("/")
+                        or member.filename.startswith("\\")
+                    ):
+                        raise RuntimeError(
+                            f"Güvenlik ihlali: Zip slip denemesi engellendi ({member.filename})"
+                        )
+
                     zip_ref.extract(member, self.plugin_dir)
-                    
+
                     now = time.monotonic()
                     # Arayuzu ve loglari bogmamak icin her 0.3 saniyede bir veya son dosyada guncelle
                     if now - last_send > 0.3 or i == total_files - 1:
@@ -300,11 +353,17 @@ class EasyOCRManager:
                         self.percent = min(95, progress_percent)
                         self.detail = f"Dosyalar çıkartılıyor... ({i}/{total_files})"
                         self._send_progress()
-                        log_event(PREFIX_OCR, "095", f"[Zip Çıkartma] -> DEVAM EDİYOR | Dosya: {i}/{total_files} | Çıkartılan: {member.filename}")
+                        log_event(
+                            PREFIX_OCR,
+                            "095",
+                            f"[Zip Çıkartma] -> DEVAM EDİYOR | Dosya: {i}/{total_files} | Çıkartılan: {member.filename}",
+                        )
                         last_send = now
-                        
+
         except zipfile.BadZipFile:
-            raise RuntimeError("İndirilen zip dosyası bozuk veya bağlantı kopması nedeniyle eksik! Lütfen tekrar deneyin.")
+            raise RuntimeError(
+                "İndirilen zip dosyası bozuk veya bağlantı kopması nedeniyle eksik! Lütfen tekrar deneyin."
+            )
         except Exception as exc:
             raise RuntimeError(f"Zip cikartma hatasi: {exc}")
 
@@ -356,7 +415,12 @@ class EasyOCRManager:
         self.percent = 0
         self.detail = message
         self.bytes_label = ""
-        log_error(PREFIX_OCR, "088", f"[EasyOCR Kurulumu] -> HATA: {message}", "Eklenti kurulumu tamamlanamadı.")
+        log_error(
+            PREFIX_OCR,
+            "088",
+            f"[EasyOCR Kurulumu] -> HATA: {message}",
+            "Eklenti kurulumu tamamlanamadı.",
+        )
         self._send("easyocr_plugin_error", {"message": message})
         self._send_status()
 

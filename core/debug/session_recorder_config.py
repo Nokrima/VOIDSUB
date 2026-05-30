@@ -31,7 +31,9 @@ class ConfigPatcher:
             def patched_stabilizer_push(text, min_samples=None, force=False):
                 if not force or min_samples is None:
                     min_samples = int(overrides["stabilizer_min_samples"])
-                return self.original_methods["stabilizer_push"](text, min_samples=min_samples, force=force)
+                return self.original_methods["stabilizer_push"](
+                    text, min_samples=min_samples, force=force
+                )
 
             pipeline.stabilizer.push = patched_stabilizer_push
 

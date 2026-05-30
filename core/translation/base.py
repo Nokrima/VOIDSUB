@@ -1,9 +1,11 @@
 """
 Çeviri Motorlarının Anayasası (TranslationEngine): Tüm çeviri motorlarının şablonu.
-KURAL 02: Her public fonksiyon docstring içerir. 
+KURAL 02: Her public fonksiyon docstring içerir.
 Bu dosya 'Soyut Sınıf' mantığıyla çalışır, diğer çevirmenler bundan türer.
 """
+
 from abc import ABC, abstractmethod
+
 
 class TranslationEngine(ABC):
     @property

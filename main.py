@@ -2,6 +2,7 @@
 VoidSub - ANA CEKIRDEK (main.py)
 ISLEV: Sistem guvenligini denetler, kopruyu kurar ve pipeline'i baslatir.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -52,9 +53,14 @@ ensure_project_venv()
 # atmak yerine gercek bir log dosyasina yaz ki izini surebilelim.
 try:
     from config.defaults import DOCS_DIR
+
     _log_dir = DOCS_DIR / "logs"
 except Exception:
-    _log_dir = Path(os.getenv("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / "VoidSub" / "logs"
+    _log_dir = (
+        Path(os.getenv("LOCALAPPDATA", str(Path.home() / "AppData" / "Local")))
+        / "VoidSub"
+        / "logs"
+    )
 _log_dir.mkdir(parents=True, exist_ok=True)
 
 if sys.stdout is None:
@@ -65,12 +71,23 @@ if sys.stderr is None:
 try:
     from core.bridge import BridgeServer
     from core.capture import ScreenCapturer
-    from core.errors import PREFIX_SYS, get_logger, log_error, log_event, set_bridge_emitter, setup_crash_handler
+    from core.errors import (
+        PREFIX_SYS,
+        get_logger,
+        log_error,
+        log_event,
+        set_bridge_emitter,
+        setup_crash_handler,
+    )
     from core.modern_overlay import ModernOverlay
     from core.processor.pipeline import TranslationPipeline
-    from core.runtime_cleanup import cleanup_runtime_artifacts, cleanup_startup_artifacts
-except Exception as exc:
+    from core.runtime_cleanup import (
+        cleanup_runtime_artifacts,
+        cleanup_startup_artifacts,
+    )
+except Exception:
     import traceback
+
     with open(_log_dir / "fatal_crash.log", "a", encoding="utf-8") as f:
         f.write("\n--- TOP LEVEL IMPORT CRASH ---\n")
         f.write(traceback.format_exc())
@@ -84,13 +101,16 @@ if hasattr(sys.stderr, "reconfigure"):
 
 import signal
 
+
 async def main() -> None:
     setup_crash_handler()
     cleanup_startup_artifacts()
-    
+
     # Graceful Shutdown Sinyal Yakalayıcılar
     def handle_sigint(*args):
-        print("\n[SISTEM] Kapanma sinyali (SIGINT/SIGTERM) alındı. Zombiler temizleniyor...")
+        print(
+            "\n[SISTEM] Kapanma sinyali (SIGINT/SIGTERM) alındı. Zombiler temizleniyor..."
+        )
         raise KeyboardInterrupt()
 
     try:
@@ -145,8 +165,16 @@ async def main() -> None:
                 ),
             )
         except Exception as exc:
-            log_error(PREFIX_SYS, "071", f"Capture bootstrap failed: {type(exc).__name__}: {exc}", "Capture baslatilamadi.")
-            bridge.send("capture_unavailable", {"message": str(exc), "error_type": type(exc).__name__})
+            log_error(
+                PREFIX_SYS,
+                "071",
+                f"Capture bootstrap failed: {type(exc).__name__}: {exc}",
+                "Capture baslatilamadi.",
+            )
+            bridge.send(
+                "capture_unavailable",
+                {"message": str(exc), "error_type": type(exc).__name__},
+            )
 
         try:
             native_overlay = ModernOverlay()
@@ -154,8 +182,16 @@ async def main() -> None:
             native_overlay.apply_settings(bridge.settings.get("overlay", {}))
         except Exception as exc:
             native_overlay = None
-            log_error(PREFIX_SYS, "018", f"Overlay bootstrap failed: {type(exc).__name__}: {exc}", "Overlay baslatilamadi.")
-            bridge.send("overlay_unavailable", {"message": str(exc), "error_type": type(exc).__name__})
+            log_error(
+                PREFIX_SYS,
+                "018",
+                f"Overlay bootstrap failed: {type(exc).__name__}: {exc}",
+                "Overlay baslatilamadi.",
+            )
+            bridge.send(
+                "overlay_unavailable",
+                {"message": str(exc), "error_type": type(exc).__name__},
+            )
 
         try:
             pipeline = TranslationPipeline(bridge=bridge, capturer=capturer)
@@ -167,7 +203,9 @@ async def main() -> None:
                 offline_model_key=app_cfg.get("offline_model_key"),
                 performance_tier=app_cfg.get("performance_tier"),
                 ocr_filters_enabled=app_cfg.get("ocr_filters_enabled"),
-                raw_translation_flow_enabled=app_cfg.get("raw_translation_flow_enabled"),
+                raw_translation_flow_enabled=app_cfg.get(
+                    "raw_translation_flow_enabled"
+                ),
                 scene_mode=app_cfg.get("ocr_scene_mode"),
                 quality_threshold=app_cfg.get("quality_threshold"),
                 min_text_chars=app_cfg.get("min_text_chars"),
@@ -180,14 +218,24 @@ async def main() -> None:
                 white_v_min=app_cfg.get("white_v_min"),
                 floating_gaussian_c=app_cfg.get("floating_gaussian_c"),
                 floating_mean_c=app_cfg.get("floating_mean_c"),
-                calibration_profile_active=bool(app_cfg.get("active_calibration_profile_id")),
+                calibration_profile_active=bool(
+                    app_cfg.get("active_calibration_profile_id")
+                ),
                 src_language=app_cfg.get("src_language"),
                 tgt_language=app_cfg.get("tgt_language"),
             )
         except Exception as exc:
             pipeline = None
-            log_error(PREFIX_SYS, "073", f"Pipeline bootstrap failed: {type(exc).__name__}: {exc}", "Pipeline baslatilamadi.")
-            bridge.send("pipeline_unavailable", {"message": str(exc), "error_type": type(exc).__name__})
+            log_error(
+                PREFIX_SYS,
+                "073",
+                f"Pipeline bootstrap failed: {type(exc).__name__}: {exc}",
+                "Pipeline baslatilamadi.",
+            )
+            bridge.send(
+                "pipeline_unavailable",
+                {"message": str(exc), "error_type": type(exc).__name__},
+            )
 
         if pipeline is not None:
             bridge.attach_worker(pipeline)
@@ -195,15 +243,30 @@ async def main() -> None:
             try:
                 bridge.attach_native_overlay(native_overlay)
             except Exception as exc:
-                log_error(PREFIX_SYS, "018", f"Overlay attach failed: {type(exc).__name__}: {exc}", "Overlay baglanamadi.")
-                bridge.send("overlay_unavailable", {"message": str(exc), "error_type": type(exc).__name__})
+                log_error(
+                    PREFIX_SYS,
+                    "018",
+                    f"Overlay attach failed: {type(exc).__name__}: {exc}",
+                    "Overlay baglanamadi.",
+                )
+                bridge.send(
+                    "overlay_unavailable",
+                    {"message": str(exc), "error_type": type(exc).__name__},
+                )
 
         await bridge_task
     except Exception as exc:
         print(f"[HATA] Sunucu baslatilamadi: {exc}")
-        log_error(PREFIX_SYS, "073", f"[Sistem Koprusu] -> BASLATILAMADI | Hata: {type(exc).__name__}: {exc}", "Sunucu baslatilamadi.")
+        log_error(
+            PREFIX_SYS,
+            "073",
+            f"[Sistem Koprusu] -> BASLATILAMADI | Hata: {type(exc).__name__}: {exc}",
+            "Sunucu baslatilamadi.",
+        )
     finally:
-        logger.info(f"[{PREFIX_SYS}-074] [Sistem Cekirdegi] -> KAPANIS ISTENDI | Temizlik basliyor...")
+        logger.info(
+            f"[{PREFIX_SYS}-074] [Sistem Cekirdegi] -> KAPANIS ISTENDI | Temizlik basliyor..."
+        )
         import psutil
 
         current_proc = psutil.Process()

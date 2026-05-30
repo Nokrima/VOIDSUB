@@ -23,20 +23,20 @@ class OCRDiagnostics:
         self.root = Path(DIAGNOSTICS_DIR)
         self.max_folders = 50
         self.max_age_days = 7
-        self.max_mb = 100 # Maximum 100MB
+        self.max_mb = 100  # Maximum 100MB
         if self.enabled:
             self._cleanup_old_diagnostics()
 
     def _cleanup_old_diagnostics(self) -> None:
         if not self.root.exists():
             return
-            
+
         now = time.time()
         try:
             dirs = [d for d in self.root.iterdir() if d.is_dir()]
         except Exception:
             return
-            
+
         valid_dirs = []
         for d in dirs:
             try:
@@ -50,8 +50,8 @@ class OCRDiagnostics:
 
         if len(valid_dirs) > self.max_folders:
             valid_dirs.sort(key=lambda x: x.stat().st_mtime)
-            to_delete = valid_dirs[:-self.max_folders]
-            valid_dirs = valid_dirs[-self.max_folders:]
+            to_delete = valid_dirs[: -self.max_folders]
+            valid_dirs = valid_dirs[-self.max_folders :]
             for d in to_delete:
                 try:
                     shutil.rmtree(d)
@@ -60,7 +60,7 @@ class OCRDiagnostics:
 
         # Boyut Limiti Temizligi
         def get_dir_size(path: Path) -> int:
-            return sum(f.stat().st_size for f in path.rglob('*') if f.is_file())
+            return sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
 
         valid_dirs.sort(key=lambda x: x.stat().st_mtime)
         total_size = sum(get_dir_size(d) for d in valid_dirs)
@@ -75,21 +75,31 @@ class OCRDiagnostics:
             except Exception as e:
                 self.logger.error(f"[DIAG] Klasor silinirken hata: {e}")
 
-    def record(self, phase: str, engine: str, scene_mode: str, frame: np.ndarray, processed: np.ndarray, text: str, score: int, metadata: dict[str, Any] | None = None) -> None:
+    def record(
+        self,
+        phase: str,
+        engine: str,
+        scene_mode: str,
+        frame: np.ndarray,
+        processed: np.ndarray,
+        text: str,
+        score: int,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
         if not self.enabled:
             return
         timestamp = time.strftime("%Y%m%d-%H%M%S")
         target = self.root / f"{timestamp}-{phase}-{engine}-{scene_mode}"
         target.mkdir(parents=True, exist_ok=True)
         try:
-            target.chmod(0o700) # Sadece gecerli kullanici (Gizlilik)
+            target.chmod(0o700)  # Sadece gecerli kullanici (Gizlilik)
         except Exception:
             pass
         frame_path = target / "frame.png"
         frame_tmp = frame_path.with_suffix(".png.tmp")
         cv2.imwrite(str(frame_tmp), frame)
         os.replace(frame_tmp, frame_path)
-        
+
         processed_path = target / "processed.png"
         processed_tmp = processed_path.with_suffix(".png.tmp")
         cv2.imwrite(str(processed_tmp), processed)

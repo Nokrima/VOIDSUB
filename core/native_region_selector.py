@@ -31,11 +31,18 @@ class NativeRegionSelector:
         )
         self.root.after(10, self.root.focus_set)
 
-        self.canvas = tk.Canvas(self.root, cursor="cross", bg="black", highlightthickness=0)
+        self.canvas = tk.Canvas(
+            self.root, cursor="cross", bg="black", highlightthickness=0
+        )
         self.canvas.pack(fill=tk.BOTH, expand=True)
 
         self._label("Tarama Alanı", 0.05, ("Segoe UI", 12, "bold"), "#E5EEF9")
-        self._label("Metnin olduğu alanı sol tıklayıp sürükleyerek seç.", 0.08, ("Segoe UI", 11), "#D4E0EF")
+        self._label(
+            "Metnin olduğu alanı sol tıklayıp sürükleyerek seç.",
+            0.08,
+            ("Segoe UI", 11),
+            "#D4E0EF",
+        )
         self._label("İptal için sağ tık veya ESC", 0.103, ("Segoe UI", 10), "#92A4BC")
 
         self.canvas.bind("<ButtonPress-1>", self.on_press)
@@ -94,8 +101,22 @@ class NativeRegionSelector:
     def run(self) -> None:
         self.root.mainloop()
 
-    def _label(self, text: str, rely: float, font: tuple[str, int, str] | tuple[str, int], color: str) -> None:
-        tk.Label(self.root, text=text, font=font, bg="black", fg=color, padx=18, pady=10 if rely == 0.05 else 0).place(relx=0.5, rely=rely, anchor="center")
+    def _label(
+        self,
+        text: str,
+        rely: float,
+        font: tuple[str, int, str] | tuple[str, int],
+        color: str,
+    ) -> None:
+        tk.Label(
+            self.root,
+            text=text,
+            font=font,
+            bg="black",
+            fg=color,
+            padx=18,
+            pady=10 if rely == 0.05 else 0,
+        ).place(relx=0.5, rely=rely, anchor="center")
 
     def _virtual_bounds(self) -> dict[str, int]:
         user32 = ctypes.windll.user32
@@ -106,7 +127,9 @@ class NativeRegionSelector:
             "height": int(user32.GetSystemMetrics(SM_CYVIRTUALSCREEN)),
         }
 
-    def _capture_window_anchor(self, left: int, top: int, width: int, height: int) -> dict | None:
+    def _capture_window_anchor(
+        self, left: int, top: int, width: int, height: int
+    ) -> dict | None:
         user32 = ctypes.windll.user32
         kernel32 = ctypes.windll.kernel32
         point = ctypes.wintypes.POINT()
@@ -124,7 +147,12 @@ class NativeRegionSelector:
         window_height = int(rect.bottom - rect.top)
         if window_width <= 0 or window_height <= 0:
             return None
-        if left < window_left or top < window_top or left + width > rect.right or top + height > rect.bottom:
+        if (
+            left < window_left
+            or top < window_top
+            or left + width > rect.right
+            or top + height > rect.bottom
+        ):
             return None
         title_buffer = ctypes.create_unicode_buffer(512)
         user32.GetWindowTextW(hwnd, title_buffer, len(title_buffer))

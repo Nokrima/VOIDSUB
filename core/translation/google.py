@@ -2,10 +2,12 @@
 Bulut Çevirmeni (GoogleTranslationEngine): İnternet üzerinden çeviri yapan ana motorumuz.
 V1 İyileştirmesi: Sadece kendi işini yapar. Hata anında Offline'a geçme (fallback) işi artık Pipeline'dadır.
 """
+
 import time
 from core.translation.base import TranslationEngine
 from core.translation.cache import TranslationCache
 from core.errors import get_logger, PREFIX_TRL
+
 
 class GoogleTranslationEngine(TranslationEngine):
     # DEĞİŞTİRME: Motor başlatılırken hafıza deposunu (cache) mecburi olarak teslim alır.
@@ -13,7 +15,7 @@ class GoogleTranslationEngine(TranslationEngine):
         self.logger = get_logger()
         self.cache = cache
         self._is_ready = True
-        
+
     @property
     def name(self) -> str:
         return "🌐 Google Translate"
@@ -37,12 +39,15 @@ class GoogleTranslationEngine(TranslationEngine):
         # KURAL 03: Çıplak except yasak, hatayı Kara Kutu'ya yaz.
         retries = 2
         delay = 0.4
-        
+
         try:
             from deep_translator import GoogleTranslator
+
             translator = GoogleTranslator(source=src, target=tgt)
         except Exception as e:
-            self.logger.error(f"[{PREFIX_TRL}-001] deep_translator moduelue yuklenemedi: {e}")
+            self.logger.error(
+                f"[{PREFIX_TRL}-001] deep_translator moduelue yuklenemedi: {e}"
+            )
             return text, "error"
 
         for attempt in range(retries + 1):
@@ -50,15 +55,21 @@ class GoogleTranslationEngine(TranslationEngine):
                 translated = translator.translate(text)
                 if translated:
                     # Başarılı çeviriyi hemen depoya kaydet ki bir daha sormayalım
-                    self.cache.put(cache_key, translated, confidence=1.0, source="google")
+                    self.cache.put(
+                        cache_key, translated, confidence=1.0, source="google"
+                    )
                     return translated, "google"
             except Exception as e:
                 if attempt < retries:
-                    self.logger.warning(f"[{PREFIX_TRL}-002] Google yanit vermedi, tekrar deneniyor ({attempt+1}/{retries}): {e}")
+                    self.logger.warning(
+                        f"[{PREFIX_TRL}-002] Google yanit vermedi, tekrar deneniyor ({attempt + 1}/{retries}): {e}"
+                    )
                     time.sleep(delay)
                 else:
-                    self.logger.error(f"[{PREFIX_TRL}-003] Google Çeviri tamamen çöktü: {e}")
-                    
+                    self.logger.error(
+                        f"[{PREFIX_TRL}-003] Google Çeviri tamamen çöktü: {e}"
+                    )
+
         return text, "error"
 
     def is_available(self) -> bool:

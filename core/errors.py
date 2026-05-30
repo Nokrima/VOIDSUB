@@ -1,4 +1,5 @@
 """Merkezi log, hata kodu ve UI log yayini yardimcilari."""
+
 from __future__ import annotations
 
 import logging
@@ -10,7 +11,7 @@ import sys
 import threading
 import traceback
 
-from config.defaults import DOCS_DIR, USER_DATA_DIR, LOG_BACKUP_COUNT, LOG_FILE, LOG_MAX_BYTES
+from config.defaults import DOCS_DIR, LOG_BACKUP_COUNT, LOG_FILE, LOG_MAX_BYTES
 
 PREFIX_OCR = "OCR"
 PREFIX_TRL = "TRL"
@@ -28,12 +29,14 @@ _file_handler: logging.Handler | None = None
 _active_pipeline_state = "Bilinmiyor"
 _last_active_module = "Bilinmiyor"
 
+
 def update_crash_context(module: str | None = None, state: str | None = None) -> None:
     global _last_active_module, _active_pipeline_state
     if module is not None:
         _last_active_module = module
     if state is not None:
         _active_pipeline_state = state
+
 
 LOG_LEVELS = {
     "debug": logging.DEBUG,
@@ -52,14 +55,18 @@ class BridgeLogHandler(logging.Handler):
 
         try:
             message = record.getMessage()
-            match = re.match(r"\[(?P<prefix>[A-Z]+)(?:-(?P<code>\d+))?\]\s*(?P<message>.*)", message)
+            match = re.match(
+                r"\[(?P<prefix>[A-Z]+)(?:-(?P<code>\d+))?\]\s*(?P<message>.*)", message
+            )
             prefix = match.group("prefix") if match else PREFIX_SYS
             code = match.group("code") if match else None
             clean_message = match.group("message") if match else message
             _bridge_emitter(
                 "log_entry",
                 {
-                    "timestamp": datetime.fromtimestamp(record.created).strftime("%H:%M:%S"),
+                    "timestamp": datetime.fromtimestamp(record.created).strftime(
+                        "%H:%M:%S"
+                    ),
                     "level": record.levelname,
                     "prefix": prefix,
                     "code": f"{prefix}-{code}" if code else prefix,
@@ -67,7 +74,9 @@ class BridgeLogHandler(logging.Handler):
                 },
             )
         except Exception as exc:
-            logging.getLogger("VoidSubCoreInternal").error("[SYS-001] [Log İletimi] -> İLETİM BAŞARISIZ | Hata: %s", exc)
+            logging.getLogger("VoidSubCoreInternal").error(
+                "[SYS-001] [Log İletimi] -> İLETİM BAŞARISIZ | Hata: %s", exc
+            )
             return
 
 
@@ -162,6 +171,7 @@ def set_bridge_emitter(emitter) -> None:
     global _bridge_emitter
     _bridge_emitter = emitter
 
+
 def emit_bridge_event(event: str, data: dict) -> None:
     """Merkezi uzerinden frontend'e ozel olay gonderir."""
     if _bridge_emitter:
@@ -175,41 +185,52 @@ def _get_hardware_snapshot() -> str:
     snapshot = "--- Donanım ve Sistem Durumu ---\n"
     try:
         import psutil
+
         process = psutil.Process()
         ram_percent = process.memory_percent()
         ram_mb = process.memory_info().rss / (1024 * 1024)
         snapshot += f"RAM Kullanımı: %{ram_percent:.1f} ({ram_mb:.1f} MB)\n"
     except Exception:
         snapshot += "RAM Kullanımı: Ölçülemedi (psutil yok veya hata)\n"
-        
+
     try:
         import subprocess
+
         cflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
         result = subprocess.run(
-            ["nvidia-smi", "--query-gpu=utilization.gpu,memory.used", "--format=csv,noheader,nounits"],
-            capture_output=True, text=True, timeout=1.0, check=False, creationflags=cflags
+            [
+                "nvidia-smi",
+                "--query-gpu=utilization.gpu,memory.used",
+                "--format=csv,noheader,nounits",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=1.0,
+            check=False,
+            creationflags=cflags,
         )
         if result.returncode == 0:
-            lines = result.stdout.strip().split('\n')
+            lines = result.stdout.strip().split("\n")
             if lines:
-                parts = lines[0].split(',')
+                parts = lines[0].split(",")
                 if len(parts) >= 2:
                     snapshot += f"VRAM Kullanımı: {parts[1].strip()} MB (GPU Util: %{parts[0].strip()})\n"
         else:
             snapshot += "VRAM Kullanımı: NVIDIA GPU bulunamadı.\n"
     except Exception:
         snapshot += "VRAM Kullanımı: Ölçülemedi (nvidia-smi hatası)\n"
-        
+
     snapshot += f"Aktif Pipeline Durumu: {_active_pipeline_state}\n"
     snapshot += f"Son Çalışan Modül: {_last_active_module}\n"
     return snapshot
+
 
 def _crash_handler(exc_type, exc_value, exc_traceback) -> None:
     """Yakalanamayan olumcul hatalari (Sessiz cokmeleri) loglar."""
     if issubclass(exc_type, KeyboardInterrupt):
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
         return
-    
+
     crash_log_path = DOCS_DIR / "logs" / "fatal_crash.log"
     try:
         crash_log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -217,9 +238,13 @@ def _crash_handler(exc_type, exc_value, exc_traceback) -> None:
             f.write(f"\n--- FATAL CRASH @ {datetime.now().isoformat()} ---\n")
             f.write(_get_hardware_snapshot())
             f.write("\n--- Traceback ---\n")
-            f.write("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+            f.write(
+                "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+            )
             f.write("-" * 50 + "\n")
-        get_logger().critical(f"[{PREFIX_SYS}-999] [Sistem Çekirdeği] -> ÖLÜMCÜL ÇÖKME (FATAL CRASH) | Dosya: {crash_log_path}")
+        get_logger().critical(
+            f"[{PREFIX_SYS}-999] [Sistem Çekirdeği] -> ÖLÜMCÜL ÇÖKME (FATAL CRASH) | Dosya: {crash_log_path}"
+        )
     except Exception:
         pass
     finally:
@@ -233,19 +258,22 @@ def _thread_crash_handler(args) -> None:
 
 def _async_exception_handler(loop, context) -> None:
     """Async event loop icindeki hatalari yakalar."""
-    exc = context.get('exception')
-    msg = context.get('message', 'Bilinmeyen async hatası')
-    
+    exc = context.get("exception")
+    msg = context.get("message", "Bilinmeyen async hatası")
+
     if _bridge_emitter:
         try:
             _bridge_emitter("async_error", {"message": f"Kritik Hata: {msg}"})
-            _bridge_emitter("log_entry", {
-                "timestamp": datetime.now().strftime("%H:%M:%S"),
-                "level": "WARNING",
-                "prefix": PREFIX_SYS,
-                "code": f"{PREFIX_SYS}-998",
-                "message": f"Async Hatası: {msg}",
-            })
+            _bridge_emitter(
+                "log_entry",
+                {
+                    "timestamp": datetime.now().strftime("%H:%M:%S"),
+                    "level": "WARNING",
+                    "prefix": PREFIX_SYS,
+                    "code": f"{PREFIX_SYS}-998",
+                    "message": f"Async Hatası: {msg}",
+                },
+            )
         except Exception:
             pass
 
@@ -258,9 +286,15 @@ def _async_exception_handler(loop, context) -> None:
             f.write(f"\nMessage: {msg}\n")
             if exc:
                 f.write("\n--- Traceback ---\n")
-                f.write("".join(traceback.format_exception(type(exc), exc, exc.__traceback__)))
+                f.write(
+                    "".join(
+                        traceback.format_exception(type(exc), exc, exc.__traceback__)
+                    )
+                )
             f.write("-" * 50 + "\n")
-        get_logger().critical(f"[{PREFIX_SYS}-998] [Sistem Çekirdeği] -> ASYNC ÇÖKME | Dosya: {crash_log_path}")
+        get_logger().critical(
+            f"[{PREFIX_SYS}-998] [Sistem Çekirdeği] -> ASYNC ÇÖKME | Dosya: {crash_log_path}"
+        )
     except Exception:
         pass
 
@@ -271,8 +305,8 @@ def setup_crash_handler() -> None:
     threading.excepthook = _thread_crash_handler
     try:
         import asyncio
+
         loop = asyncio.get_running_loop()
         loop.set_exception_handler(_async_exception_handler)
     except RuntimeError:
         pass
-

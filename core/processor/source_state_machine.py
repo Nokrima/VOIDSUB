@@ -43,7 +43,12 @@ class DirtyMemoryEntry:
 
 
 class SourceStateMachine:
-    def __init__(self, hold_window_ms: int = 1600, memory_ttl_ms: int = 180000, memory_limit: int = 24) -> None:
+    def __init__(
+        self,
+        hold_window_ms: int = 1600,
+        memory_ttl_ms: int = 180000,
+        memory_limit: int = 24,
+    ) -> None:
         self.hold_window_ms = max(300, int(hold_window_ms))
         self.memory_ttl_ms = max(10000, int(memory_ttl_ms))
         self.memory_limit = max(8, int(memory_limit))
@@ -74,7 +79,9 @@ class SourceStateMachine:
         self.recent_dirty_family_order: deque[str] = deque()
         self.recent_dirty_families: dict[str, DirtyMemoryEntry] = {}
 
-    def consider(self, text: str, analysis: TextAnalysisResult, *, now: float | None = None) -> SourceDecision:
+    def consider(
+        self, text: str, analysis: TextAnalysisResult, *, now: float | None = None
+    ) -> SourceDecision:
         now = float(now if now is not None else time.monotonic())
         family = _normalize_family(text)
         current_health = analysis["health_score"]
@@ -85,7 +92,9 @@ class SourceStateMachine:
         tip2_suspect = analysis["tip2_suspect"]
         memory_entry, memory_similarity = self._find_dirty_memory_match(family, now)
         memory_hit = memory_entry is not None
-        memory_age_ms = ((now - memory_entry.seen_at) * 1000.0) if memory_entry is not None else 0.0
+        memory_age_ms = (
+            ((now - memory_entry.seen_at) * 1000.0) if memory_entry is not None else 0.0
+        )
         memory_reason = ""
 
         if not family:
@@ -117,11 +126,29 @@ class SourceStateMachine:
 
         if self.pending_family and family == self.pending_family:
             similarity = SequenceMatcher(a=self.pending_family, b=family).ratio()
-            self._refresh_pending(text, family, current_health, current_recognized, current_suspicious, current_broken, now)
+            self._refresh_pending(
+                text,
+                family,
+                current_health,
+                current_recognized,
+                current_suspicious,
+                current_broken,
+                now,
+            )
             self.confirm_count += 1
             if tip2_suspect and self.confirm_count < 2:
                 self.state = "CONFIRMING"
-                return SourceDecision(False, self.state, "tip2_confirming_wait", similarity, False, None, memory_hit, memory_age_ms, memory_reason)
+                return SourceDecision(
+                    False,
+                    self.state,
+                    "tip2_confirming_wait",
+                    similarity,
+                    False,
+                    None,
+                    memory_hit,
+                    memory_age_ms,
+                    memory_reason,
+                )
             selected = self.pending_text or text
             self._accept(
                 selected,
@@ -144,33 +171,113 @@ class SourceStateMachine:
                 analysis["connected_noise_runs"],
                 now,
             )
-            return SourceDecision(True, self.state, "tip2_confirmed_best", similarity, False, selected, memory_hit, memory_age_ms, memory_reason)
+            return SourceDecision(
+                True,
+                self.state,
+                "tip2_confirmed_best",
+                similarity,
+                False,
+                selected,
+                memory_hit,
+                memory_age_ms,
+                memory_reason,
+            )
 
         if not self.last_family:
             if tip2_suspect:
                 self._remember_pending(
-                    text, family, current_health, current_recognized, current_suspicious, current_broken, now
+                    text,
+                    family,
+                    current_health,
+                    current_recognized,
+                    current_suspicious,
+                    current_broken,
+                    now,
                 )
                 self.state = "CONFIRMING"
-                return SourceDecision(False, self.state, "tip2_hold_first_sighting", 1.0, True, None, memory_hit, memory_age_ms, memory_reason)
-            self._accept(text, family, current_health, current_recognized, current_suspicious, current_broken, current_connected_noise, now)
+                return SourceDecision(
+                    False,
+                    self.state,
+                    "tip2_hold_first_sighting",
+                    1.0,
+                    True,
+                    None,
+                    memory_hit,
+                    memory_age_ms,
+                    memory_reason,
+                )
+            self._accept(
+                text,
+                family,
+                current_health,
+                current_recognized,
+                current_suspicious,
+                current_broken,
+                current_connected_noise,
+                now,
+            )
             self.state = "NEW_SOURCE"
             self._clear_dirty_family(family)
-            return SourceDecision(True, self.state, "new_source", 1.0, True, text, memory_hit, memory_age_ms, memory_reason)
+            return SourceDecision(
+                True,
+                self.state,
+                "new_source",
+                1.0,
+                True,
+                text,
+                memory_hit,
+                memory_age_ms,
+                memory_reason,
+            )
 
         similarity = SequenceMatcher(a=self.last_family, b=family).ratio()
         family_changed = not self._is_same_family(self.last_family, family, similarity)
         if family_changed:
             if tip2_suspect:
                 self._remember_pending(
-                    text, family, current_health, current_recognized, current_suspicious, current_broken, now
+                    text,
+                    family,
+                    current_health,
+                    current_recognized,
+                    current_suspicious,
+                    current_broken,
+                    now,
                 )
                 self.state = "CONFIRMING"
-                return SourceDecision(False, self.state, "tip2_hold_family_change", similarity, True, None, memory_hit, memory_age_ms, memory_reason)
-            self._accept(text, family, current_health, current_recognized, current_suspicious, current_broken, current_connected_noise, now)
+                return SourceDecision(
+                    False,
+                    self.state,
+                    "tip2_hold_family_change",
+                    similarity,
+                    True,
+                    None,
+                    memory_hit,
+                    memory_age_ms,
+                    memory_reason,
+                )
+            self._accept(
+                text,
+                family,
+                current_health,
+                current_recognized,
+                current_suspicious,
+                current_broken,
+                current_connected_noise,
+                now,
+            )
             self.state = "NEW_SOURCE"
             self._clear_dirty_family(family)
-            return SourceDecision(True, self.state, "family_changed", similarity, True, text, memory_hit, memory_age_ms, memory_reason)
+            return SourceDecision(
+                True,
+                self.state,
+                "family_changed",
+                similarity,
+                True,
+                text,
+                memory_hit,
+                memory_age_ms,
+                memory_reason,
+            )
 
         self.last_seen_at = now
         self.confirm_count += 1
@@ -185,7 +292,17 @@ class SourceStateMachine:
             family=family,
         ):
             self.state = "HELD"
-            return SourceDecision(False, self.state, "protected_previous_better_source", similarity, False, None, memory_hit, memory_age_ms, memory_reason)
+            return SourceDecision(
+                False,
+                self.state,
+                "protected_previous_better_source",
+                similarity,
+                False,
+                None,
+                memory_hit,
+                memory_age_ms,
+                memory_reason,
+            )
 
         if self._is_dirtier_variant(
             current_health=current_health,
@@ -207,24 +324,94 @@ class SourceStateMachine:
                 current_connected_noise,
                 now,
             )
-            return SourceDecision(False, self.state, "dirtier_variant", similarity, False, None, memory_hit, memory_age_ms, memory_reason)
+            return SourceDecision(
+                False,
+                self.state,
+                "dirtier_variant",
+                similarity,
+                False,
+                None,
+                memory_hit,
+                memory_age_ms,
+                memory_reason,
+            )
 
         if family == self.last_family:
-            if self._is_meaningful_upgrade(family, current_health, current_recognized, current_broken):
-                self._accept(text, family, current_health, current_recognized, current_suspicious, current_broken, current_connected_noise, now)
+            if self._is_meaningful_upgrade(
+                family, current_health, current_recognized, current_broken
+            ):
+                self._accept(
+                    text,
+                    family,
+                    current_health,
+                    current_recognized,
+                    current_suspicious,
+                    current_broken,
+                    current_connected_noise,
+                    now,
+                )
                 self.state = "HELD"
                 self._clear_dirty_family(family)
-                return SourceDecision(True, self.state, "meaningful_upgrade", similarity, False, text, memory_hit, memory_age_ms, memory_reason)
+                return SourceDecision(
+                    True,
+                    self.state,
+                    "meaningful_upgrade",
+                    similarity,
+                    False,
+                    text,
+                    memory_hit,
+                    memory_age_ms,
+                    memory_reason,
+                )
             if self._within_hold_window(now):
                 self.state = "SLEEPING"
-                return SourceDecision(False, self.state, "same_family_hold", similarity, False, None, memory_hit, memory_age_ms, memory_reason)
+                return SourceDecision(
+                    False,
+                    self.state,
+                    "same_family_hold",
+                    similarity,
+                    False,
+                    None,
+                    memory_hit,
+                    memory_age_ms,
+                    memory_reason,
+                )
             self.state = "HELD"
-            return SourceDecision(False, self.state, "same_family_idle", similarity, False, None, memory_hit, memory_age_ms, memory_reason)
+            return SourceDecision(
+                False,
+                self.state,
+                "same_family_idle",
+                similarity,
+                False,
+                None,
+                memory_hit,
+                memory_age_ms,
+                memory_reason,
+            )
 
-        self._accept(text, family, current_health, current_recognized, current_suspicious, current_broken, current_connected_noise, now)
+        self._accept(
+            text,
+            family,
+            current_health,
+            current_recognized,
+            current_suspicious,
+            current_broken,
+            current_connected_noise,
+            now,
+        )
         self.state = "CONFIRMING"
         self._clear_dirty_family(family)
-        return SourceDecision(True, self.state, "family_refresh", similarity, False, text, memory_hit, memory_age_ms, memory_reason)
+        return SourceDecision(
+            True,
+            self.state,
+            "family_refresh",
+            similarity,
+            False,
+            text,
+            memory_hit,
+            memory_age_ms,
+            memory_reason,
+        )
 
     def _within_hold_window(self, now: float) -> bool:
         return ((now - self.last_emit_at) * 1000.0) < self.hold_window_ms
@@ -282,10 +469,16 @@ class SourceStateMachine:
         now: float,
     ) -> None:
         if family != self.pending_family:
-            self._remember_pending(text, family, health, recognized, suspicious, broken, now)
+            self._remember_pending(
+                text, family, health, recognized, suspicious, broken, now
+            )
             return
         better = False
-        if health >= self.pending_health + 6 and recognized >= self.pending_recognized and broken <= self.pending_broken:
+        if (
+            health >= self.pending_health + 6
+            and recognized >= self.pending_recognized
+            and broken <= self.pending_broken
+        ):
             better = True
         elif recognized > self.pending_recognized and broken <= self.pending_broken:
             better = True
@@ -353,12 +546,16 @@ class SourceStateMachine:
             if entry is None:
                 self.recent_dirty_family_order.popleft()
                 continue
-            if (now - entry.seen_at) <= ttl_seconds and len(self.recent_dirty_families) <= self.memory_limit:
+            if (now - entry.seen_at) <= ttl_seconds and len(
+                self.recent_dirty_families
+            ) <= self.memory_limit:
                 break
             self.recent_dirty_family_order.popleft()
             self.recent_dirty_families.pop(head, None)
 
-    def _find_dirty_memory_match(self, family: str, now: float) -> tuple[DirtyMemoryEntry | None, float]:
+    def _find_dirty_memory_match(
+        self, family: str, now: float
+    ) -> tuple[DirtyMemoryEntry | None, float]:
         self._prune_dirty_memory(now)
         best_entry: DirtyMemoryEntry | None = None
         best_similarity = 0.0
@@ -385,7 +582,11 @@ class SourceStateMachine:
     ) -> bool:
         if similarity < 0.86:
             return False
-        if current_broken == 0 and current_suspicious == 0 and current_connected_noise == 0:
+        if (
+            current_broken == 0
+            and current_suspicious == 0
+            and current_connected_noise == 0
+        ):
             return False
         improved = (
             current_health >= entry.health + 10
@@ -395,9 +596,15 @@ class SourceStateMachine:
         )
         if improved:
             return False
-        if current_health <= entry.health + 4 and current_suspicious >= entry.suspicious:
+        if (
+            current_health <= entry.health + 4
+            and current_suspicious >= entry.suspicious
+        ):
             return True
-        if current_broken >= entry.broken and current_connected_noise >= entry.connected_noise_runs:
+        if (
+            current_broken >= entry.broken
+            and current_connected_noise >= entry.connected_noise_runs
+        ):
             return True
         return False
 
@@ -427,13 +634,24 @@ class SourceStateMachine:
         if similarity < 0.72:
             return False
         if current_health + 6 < self.last_health:
-            if current_recognized <= self.last_recognized and current_suspicious >= self.last_suspicious:
+            if (
+                current_recognized <= self.last_recognized
+                and current_suspicious >= self.last_suspicious
+            ):
                 return True
             if current_broken > self.last_broken:
                 return True
-        if family == self.last_family and current_health <= self.last_health - 4 and current_broken > self.last_broken:
+        if (
+            family == self.last_family
+            and current_health <= self.last_health - 4
+            and current_broken > self.last_broken
+        ):
             return True
-        if family == self.last_family and current_connected_noise > self.last_connected_noise and current_health <= self.last_health:
+        if (
+            family == self.last_family
+            and current_connected_noise > self.last_connected_noise
+            and current_health <= self.last_health
+        ):
             return True
         return False
 
@@ -466,9 +684,15 @@ class SourceStateMachine:
             return True
         return False
 
-    def _is_meaningful_upgrade(self, family: str, health: int, recognized: int, broken: int) -> bool:
+    def _is_meaningful_upgrade(
+        self, family: str, health: int, recognized: int, broken: int
+    ) -> bool:
         if family == self.last_family:
-            if health >= self.last_health + 8 and recognized >= self.last_recognized and broken <= self.last_broken:
+            if (
+                health >= self.last_health + 8
+                and recognized >= self.last_recognized
+                and broken <= self.last_broken
+            ):
                 return True
             return False
         if self.last_family in family and len(family) >= len(self.last_family) + 8:

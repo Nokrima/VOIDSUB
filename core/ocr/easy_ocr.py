@@ -2,6 +2,7 @@
 GPU Canavarı (EasyOCREngine): Derin öğrenme tabanlı, ağır ama güçlü OCR motoru.
 VoidSub iyileştirmesi: derlemeler için taşınabilir worker (subprocess) mimarisi eklendi.
 """
+
 from __future__ import annotations
 
 import base64
@@ -38,13 +39,13 @@ class EasyOCREngine(OCREngine):
         return "EasyOCR GPU" if self.use_gpu else "EasyOCR CPU"
 
     def _get_plugin_python(self) -> Path | None:
-        app_data = Path(os.environ.get('LOCALAPPDATA', 'C:/')) / 'VoidSub'
-        python_exe = app_data / 'plugins' / 'easyocr' / 'python.exe'
+        app_data = Path(os.environ.get("LOCALAPPDATA", "C:/")) / "VoidSub"
+        python_exe = app_data / "plugins" / "easyocr" / "python.exe"
         return python_exe if python_exe.exists() else None
 
     def start(self) -> bool:
         self.start_error = None
-        
+
         # 1. Eğer eklenti varsa WORKER modunda başlat (Nuitka için ZORUNLU)
         if self.plugin_python:
             return self._start_worker_mode()
@@ -63,14 +64,20 @@ class EasyOCREngine(OCREngine):
             if not self.plugin_python:
                 self.start_error = "plugin_python None."
                 return False
-                
+
             worker_script = self.plugin_python.parent / "easyocr-worker.py"
             if not worker_script.exists():
                 self.start_error = "easyocr-worker.py bulunamadı!"
                 return False
 
-            self.logger.info(f"[{PREFIX_OCR}-032] EasyOCR Worker başlatılıyor: {self.plugin_python}")
-            cflags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if sys.platform == "win32" else 0
+            self.logger.info(
+                f"[{PREFIX_OCR}-032] EasyOCR Worker başlatılıyor: {self.plugin_python}"
+            )
+            cflags = (
+                getattr(subprocess, "CREATE_NO_WINDOW", 0)
+                if sys.platform == "win32"
+                else 0
+            )
             self.worker_proc = subprocess.Popen(
                 [str(self.plugin_python), str(worker_script)],
                 stdin=subprocess.PIPE,
@@ -78,27 +85,33 @@ class EasyOCREngine(OCREngine):
                 stderr=subprocess.PIPE,
                 text=True,
                 encoding="utf-8",
-                creationflags=cflags
+                creationflags=cflags,
             )
-            
+
             # Stderr'i okuyup loglamak ve buffer'i temiz tutmak (Deadlock engelleme)
             def stderr_reader(proc):
-                for line in iter(proc.stderr.readline, ''):
+                for line in iter(proc.stderr.readline, ""):
                     if line:
                         self.logger.warning(f"[{PREFIX_OCR}-WRK-ERR] {line.strip()}")
                 proc.stderr.close()
 
             # Stdout'u kuyruga almak (Timeout desteklemek icin)
             def stdout_reader(proc, q):
-                for line in iter(proc.stdout.readline, ''):
+                for line in iter(proc.stdout.readline, ""):
                     q.put(line)
 
-            threading.Thread(target=stderr_reader, args=(self.worker_proc,), daemon=True).start()
-            threading.Thread(target=stdout_reader, args=(self.worker_proc, self._stdout_q), daemon=True).start()
+            threading.Thread(
+                target=stderr_reader, args=(self.worker_proc,), daemon=True
+            ).start()
+            threading.Thread(
+                target=stdout_reader,
+                args=(self.worker_proc, self._stdout_q),
+                daemon=True,
+            ).start()
 
             # GPU kontrolünü worker'dan almak zordur, şimdilik varsayılan true/false atayabiliriz
             # (Worker kodu gpu=torch.cuda.is_available() yapıyor)
-            self.use_gpu = True 
+            self.use_gpu = True
             self._is_ready = True
             self.logger.info(f"[{PREFIX_OCR}-047] EasyOCR Worker hazır.")
             return True
@@ -111,8 +124,11 @@ class EasyOCREngine(OCREngine):
         try:
             import torch
             import easyocr  # pyright: ignore[reportMissingImports]
+
             self.use_gpu = torch.cuda.is_available()
-            self.logger.info(f"[{PREFIX_OCR}-032] EasyOCR Native {self.lang_list} dilleriyle yükleniyor (GPU: {self.use_gpu})")
+            self.logger.info(
+                f"[{PREFIX_OCR}-032] EasyOCR Native {self.lang_list} dilleriyle yükleniyor (GPU: {self.use_gpu})"
+            )
             self.reader = easyocr.Reader(self.lang_list, gpu=self.use_gpu)
             self._is_ready = True
             return True
@@ -135,38 +151,46 @@ class EasyOCREngine(OCREngine):
 
     def _read_worker_mode(self, image: np.ndarray) -> list[tuple]:
         try:
-            ok, encoded = cv2.imencode('.png', image)
+            ok, encoded = cv2.imencode(".png", image)
             if not ok:
                 return []
-            img_b64 = base64.b64encode(encoded.tobytes()).decode('ascii')
+            img_b64 = base64.b64encode(encoded.tobytes()).decode("ascii")
             payload = json.dumps({"command": "read", "image": img_b64}) + "\n"
             proc = self.worker_proc
             if not proc:
                 return []
-            
+
             stdin = proc.stdin
             if stdin:
                 stdin.write(payload)
                 stdin.flush()
-            
+
             try:
                 response_line = self._stdout_q.get(timeout=15.0)
             except queue.Empty:
-                self.logger.error(f"[{PREFIX_OCR}-034] EasyOCR Worker yanit vermedi (Timeout). Yeniden baslatiliyor...")
+                self.logger.error(
+                    f"[{PREFIX_OCR}-034] EasyOCR Worker yanit vermedi (Timeout). Yeniden baslatiliyor..."
+                )
                 self.stop()
                 return []
-                
+
             if not response_line:
                 return []
-                
+
             response = json.loads(response_line)
             if response.get("status") == "ok":
-                return [(item[0], item[1], item[2]) for item in response.get("data", [])]
+                return [
+                    (item[0], item[1], item[2]) for item in response.get("data", [])
+                ]
             else:
-                self.logger.error(f"[{PREFIX_OCR}-034] EasyOCR Worker Hatası: {response.get('message')}")
+                self.logger.error(
+                    f"[{PREFIX_OCR}-034] EasyOCR Worker Hatası: {response.get('message')}"
+                )
                 return []
         except Exception as exc:
-            self.logger.error(f"[{PREFIX_OCR}-034] EasyOCR Worker iletişim hatası: {exc}")
+            self.logger.error(
+                f"[{PREFIX_OCR}-034] EasyOCR Worker iletişim hatası: {exc}"
+            )
             return []
 
     def _read_native_mode(self, image: np.ndarray) -> list[tuple]:
@@ -174,7 +198,9 @@ class EasyOCREngine(OCREngine):
             results = self.reader.readtext(image, detail=1)
             return [(bbox, text, int(prob * 100)) for bbox, text, prob in results]
         except Exception as exc:
-            self.logger.error(f"[{PREFIX_OCR}-034] EasyOCR okuma sırasında çöktü: {exc}")
+            self.logger.error(
+                f"[{PREFIX_OCR}-034] EasyOCR okuma sırasında çöktü: {exc}"
+            )
             return []
 
     def stop(self) -> None:
@@ -186,18 +212,19 @@ class EasyOCREngine(OCREngine):
             except Exception:
                 pass
             self.worker_proc = None
-            
+
         # Kuyrugu temizle
         while not self._stdout_q.empty():
             try:
                 self._stdout_q.get_nowait()
             except queue.Empty:
                 break
-            
+
         self.reader = None
         if self.use_gpu and not self.is_compiled:
             try:
                 import torch
+
                 torch.cuda.empty_cache()
             except ImportError:
                 pass
@@ -230,21 +257,22 @@ class EasyOCREngine(OCREngine):
             "gpu_ok": self.use_gpu,
             "ram_ok": True,
         }
-        
+
         if self.plugin_python:
             status["available"] = True
             return status
-            
+
         if self.is_compiled:
             status["reason"] = "EasyOCR Eklentisi eksik. Ayarlardan indirin."
             return status
-            
+
         try:
             import easyocr  # pyright: ignore[reportMissingImports]  # noqa: F401
+
             status["available"] = True
             if not self.use_gpu:
                 status["reason"] = "GPU yok. CPU modu aşırı yavaş çalışacaktır."
         except ImportError:
             status["reason"] = "PyTorch veya EasyOCR kütüphaneleri eksik."
-            
+
         return status

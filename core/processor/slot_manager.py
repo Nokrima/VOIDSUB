@@ -10,9 +10,29 @@ from core.processor.types import TextAnalysisResult
 class SlotManager:
     _MINIMUM_UPGRADE_QUALITY = 55
     _OPEN_ENDED_WORDS = {
-        "with", "and", "or", "but", "that", "the", "a", "an",
-        "to", "for", "of", "in", "on", "at", "by", "from",
-        "which", "who", "as", "so", "yet", "nor", "because",
+        "with",
+        "and",
+        "or",
+        "but",
+        "that",
+        "the",
+        "a",
+        "an",
+        "to",
+        "for",
+        "of",
+        "in",
+        "on",
+        "at",
+        "by",
+        "from",
+        "which",
+        "who",
+        "as",
+        "so",
+        "yet",
+        "nor",
+        "because",
     }
 
     def __init__(self) -> None:
@@ -74,12 +94,12 @@ class SlotManager:
         base = 1
         if self._slot_length < 20 and self._slot_line_count == 1:
             base = 2
-            
+
         if self._slot_is_open_ended:
-            # Cümle "and, but" gibi bağlaçlarla veya yarım bitiyorsa cümlenin tamamlanmasını 
+            # Cümle "and, but" gibi bağlaçlarla veya yarım bitiyorsa cümlenin tamamlanmasını
             # beklemek için sadece +1 kare bekleme ekliyoruz (eskisi gibi 5 kare değil).
             return base + 1
-            
+
         return base
 
     def get_slot_debug(self) -> dict[str, int | bool]:
@@ -117,7 +137,9 @@ class SlotManager:
         cleaned = re.sub(r"[^\w\s]", "", cleaned, flags=re.UNICODE)
         return cleaned.strip()
 
-    def _open_new_slot(self, text: str, normalized: str, quality: int, analysis: TextAnalysisResult) -> None:
+    def _open_new_slot(
+        self, text: str, normalized: str, quality: int, analysis: TextAnalysisResult
+    ) -> None:
         self._slot_text = text
         self._slot_normalized = normalized
         self._slot_quality = int(quality)
@@ -161,7 +183,9 @@ class SlotManager:
         similarity = SequenceMatcher(a=norm_slot, b=norm_new).ratio()
         return similarity >= 0.82
 
-    def _is_upgrade(self, text: str, normalized: str, quality: int, analysis: TextAnalysisResult) -> bool:
+    def _is_upgrade(
+        self, text: str, normalized: str, quality: int, analysis: TextAnalysisResult
+    ) -> bool:
         normalized_length = len(normalized)
         if int(quality) < self._MINIMUM_UPGRADE_QUALITY:
             return False
@@ -175,23 +199,58 @@ class SlotManager:
             return False
         if candidate_complete and not self._slot_is_complete:
             return True
-        if self._is_tail_completion_upgrade(text, candidate_health, candidate_recognized, candidate_suspicious, candidate_broken):
+        if self._is_tail_completion_upgrade(
+            text,
+            candidate_health,
+            candidate_recognized,
+            candidate_suspicious,
+            candidate_broken,
+        ):
             return True
-        if candidate_recognized >= self._slot_recognized + 2 and candidate_broken <= self._slot_broken and candidate_suspicious <= self._slot_suspicious:
+        if (
+            candidate_recognized >= self._slot_recognized + 2
+            and candidate_broken <= self._slot_broken
+            and candidate_suspicious <= self._slot_suspicious
+        ):
             return True
-        if candidate_recognized > self._slot_recognized and candidate_health >= self._slot_health and candidate_broken <= self._slot_broken:
+        if (
+            candidate_recognized > self._slot_recognized
+            and candidate_health >= self._slot_health
+            and candidate_broken <= self._slot_broken
+        ):
             return True
-        if normalized_length > len(self._slot_normalized) + 2 and candidate_health >= self._slot_health:
+        if (
+            normalized_length > len(self._slot_normalized) + 2
+            and candidate_health >= self._slot_health
+        ):
             return True
-        if normalized_length > len(self._slot_normalized) and candidate_broken < self._slot_broken:
+        if (
+            normalized_length > len(self._slot_normalized)
+            and candidate_broken < self._slot_broken
+        ):
             return True
-        if normalized_length >= len(self._slot_normalized) and candidate_suspicious < self._slot_suspicious:
+        if (
+            normalized_length >= len(self._slot_normalized)
+            and candidate_suspicious < self._slot_suspicious
+        ):
             return True
-        if normalized_length >= len(self._slot_normalized) and candidate_health >= self._slot_health + 6:
+        if (
+            normalized_length >= len(self._slot_normalized)
+            and candidate_health >= self._slot_health + 6
+        ):
             return True
-        if normalized_length >= len(self._slot_normalized) and candidate_broken == self._slot_broken and candidate_complete and not candidate_open_ended and self._slot_is_open_ended:
+        if (
+            normalized_length >= len(self._slot_normalized)
+            and candidate_broken == self._slot_broken
+            and candidate_complete
+            and not candidate_open_ended
+            and self._slot_is_open_ended
+        ):
             return True
-        if abs(normalized_length - len(self._slot_normalized)) <= 4 and int(quality) > self._slot_quality + 5:
+        if (
+            abs(normalized_length - len(self._slot_normalized)) <= 4
+            and int(quality) > self._slot_quality + 5
+        ):
             return True
         if normalized_length <= len(self._slot_normalized):
             return False
@@ -206,7 +265,9 @@ class SlotManager:
         candidate_broken: int,
     ) -> bool:
         candidate_words = re.findall(r"\w+", str(text or "").strip(), flags=re.UNICODE)
-        slot_words = re.findall(r"\w+", str(self._slot_text or "").strip(), flags=re.UNICODE)
+        slot_words = re.findall(
+            r"\w+", str(self._slot_text or "").strip(), flags=re.UNICODE
+        )
         if len(candidate_words) < 3 or len(slot_words) < 3:
             return False
         candidate_tail = candidate_words[-2:]
@@ -219,7 +280,10 @@ class SlotManager:
             return False
         if candidate_health + 4 < self._slot_health:
             return False
-        if candidate_broken > self._slot_broken or candidate_suspicious > self._slot_suspicious:
+        if (
+            candidate_broken > self._slot_broken
+            or candidate_suspicious > self._slot_suspicious
+        ):
             return False
         if candidate_recognized + 1 < self._slot_recognized:
             return False

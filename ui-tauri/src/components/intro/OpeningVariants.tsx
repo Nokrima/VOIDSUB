@@ -1,12 +1,12 @@
-import React from 'react';
+import React from "react";
 
 const palette = {
-  border: 'rgba(148,163,184,0.14)',
-  green: '#2ecb83',
-  violet: '#9b8cff',
+  border: "rgba(148,163,184,0.14)",
+  green: "#2ecb83",
+  violet: "#9b8cff",
 };
 
-export type OpeningVariantKey = 'defaultMode' | 'profileMode';
+export type OpeningVariantKey = "defaultMode" | "profileMode";
 
 export type OpeningVariant = {
   key: OpeningVariantKey;
@@ -19,20 +19,20 @@ export type OpeningVariant = {
 
 export const openingVariants: OpeningVariant[] = [
   {
-    key: 'defaultMode',
+    key: "defaultMode",
     id: 1,
-    name: 'Varsayılan Mod',
-    note: 'Kullanıcı tüm ayarları varsayılan bıraktığında görülecek teknik açılış.',
+    name: "Varsayılan Mod",
+    note: "Kullanıcı tüm ayarları varsayılan bıraktığında görülecek teknik açılış.",
     accent: palette.green,
-    bg: 'linear-gradient(180deg, rgba(12,16,24,0.98), rgba(19,25,37,0.96))',
+    bg: "linear-gradient(180deg, rgba(12,16,24,0.98), rgba(19,25,37,0.96))",
   },
   {
-    key: 'profileMode',
+    key: "profileMode",
     id: 2,
-    name: 'Kişisel Profil',
-    note: 'Ayarlar kaydedildikten sonra görülen profil odaklı karşılama.',
+    name: "Kişisel Profil",
+    note: "Ayarlar kaydedildikten sonra görülen profil odaklı karşılama.",
     accent: palette.violet,
-    bg: 'linear-gradient(180deg, rgba(12,16,24,0.98), rgba(27,35,50,0.92))',
+    bg: "linear-gradient(180deg, rgba(12,16,24,0.98), rgba(27,35,50,0.92))",
   },
 ];
 

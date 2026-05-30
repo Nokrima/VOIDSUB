@@ -14,9 +14,17 @@ def normalize_text(text: Any) -> str:
     return re.sub(r"\s+", " ", cleaned).strip()
 
 
-def group_by_line(boxes: list[dict[str, Any]], y_tolerance: int = 12) -> list[list[dict[str, Any]]]:
+def group_by_line(
+    boxes: list[dict[str, Any]], y_tolerance: int = 12
+) -> list[list[dict[str, Any]]]:
     if boxes:
-        heights = [max(1.0, float(item.get("y2", item["cy"])) - float(item.get("y1", item["cy"]))) for item in boxes]
+        heights = [
+            max(
+                1.0,
+                float(item.get("y2", item["cy"])) - float(item.get("y1", item["cy"])),
+            )
+            for item in boxes
+        ]
         median_height = sorted(heights)[len(heights) // 2]
         y_tolerance = max(y_tolerance, int(min(26.0, max(10.0, median_height * 0.65))))
     groups: list[list[dict[str, Any]]] = []
@@ -30,14 +38,20 @@ def group_by_line(boxes: list[dict[str, Any]], y_tolerance: int = 12) -> list[li
     return sorted(groups, key=lambda group: min(item["cy"] for item in group))
 
 
-def detect_speaker_label(line_boxes: list[dict[str, Any]]) -> tuple[str | None, list[dict[str, Any]]]:
+def detect_speaker_label(
+    line_boxes: list[dict[str, Any]],
+) -> tuple[str | None, list[dict[str, Any]]]:
     if line_boxes and re.match(r"^[A-Za-z\u00C0-\u017E]+:$", line_boxes[0]["text"]):
         return line_boxes[0]["text"], line_boxes[1:]
     return None, line_boxes
 
 
 def _entry(result: Any, fallback_y: int) -> dict[str, Any] | None:
-    text = normalize_text(result.get("text") if isinstance(result, dict) else (result[1] if len(result) > 1 else ""))
+    text = normalize_text(
+        result.get("text")
+        if isinstance(result, dict)
+        else (result[1] if len(result) > 1 else "")
+    )
     if not text:
         return None
     bbox = result.get("bbox") if isinstance(result, dict) else result[0]
@@ -46,11 +60,19 @@ def _entry(result: Any, fallback_y: int) -> dict[str, Any] | None:
     elif isinstance(bbox, list) and bbox:
         xs = [float(p[0]) for p in bbox if isinstance(p, (list, tuple)) and len(p) >= 2]
         ys = [float(p[1]) for p in bbox if isinstance(p, (list, tuple)) and len(p) >= 2]
-        x1, y1, x2, y2 = (min(xs), min(ys), max(xs), max(ys)) if xs and ys else (0.0, float(fallback_y), 0.0, float(fallback_y))
+        x1, y1, x2, y2 = (
+            (min(xs), min(ys), max(xs), max(ys))
+            if xs and ys
+            else (0.0, float(fallback_y), 0.0, float(fallback_y))
+        )
     else:
         x1, y1, x2, y2 = 0.0, float(fallback_y), 0.0, float(fallback_y)
     confidence = 0.0
-    if not isinstance(result, dict) and len(result) > 2 and isinstance(result[2], (int, float)):
+    if (
+        not isinstance(result, dict)
+        and len(result) > 2
+        and isinstance(result[2], (int, float))
+    ):
         confidence = max(0.0, min(1.0, float(result[2]) / 100.0))
     return {
         "text": text,
@@ -146,21 +168,31 @@ def _split_line_blocks(line_boxes: list[dict[str, Any]]) -> list[dict[str, Any]]
                 "text": block_text,
                 "x1": min(float(item["x1"]) for item in block),
                 "x2": max(float(item["x2"]) for item in block),
-                "cx": (min(float(item["x1"]) for item in block) + max(float(item["x2"]) for item in block)) / 2,
+                "cx": (
+                    min(float(item["x1"]) for item in block)
+                    + max(float(item["x2"]) for item in block)
+                )
+                / 2,
                 "y1": min(float(item["y1"]) for item in block),
                 "y2": max(float(item["y2"]) for item in block),
                 "cy": sum(float(item["cy"]) for item in block) / len(block),
-                "confidence": sum(float(item.get("confidence", 0.0)) for item in block) / max(len(block), 1),
+                "confidence": sum(float(item.get("confidence", 0.0)) for item in block)
+                / max(len(block), 1),
             }
         )
     return merged_blocks
 
 
 def _horizontal_overlap_ratio(a: dict[str, Any], b: dict[str, Any]) -> float:
-    overlap = max(0.0, min(float(a["x2"]), float(b["x2"])) - max(float(a["x1"]), float(b["x1"])))
+    overlap = max(
+        0.0, min(float(a["x2"]), float(b["x2"])) - max(float(a["x1"]), float(b["x1"]))
+    )
     if overlap <= 0:
         return 0.0
-    span = min(max(1.0, float(a["x2"]) - float(a["x1"])), max(1.0, float(b["x2"]) - float(b["x1"])))
+    span = min(
+        max(1.0, float(a["x2"]) - float(a["x1"])),
+        max(1.0, float(b["x2"]) - float(b["x1"])),
+    )
     return overlap / span
 
 
@@ -168,7 +200,9 @@ def _block_score(block: dict[str, Any]) -> float:
     text = normalize_text(str(block.get("text", "")))
     alpha_count = sum(char.isalpha() for char in text)
     digit_count = sum(char.isdigit() for char in text)
-    punctuation_count = sum((not char.isalnum()) and (not char.isspace()) for char in text)
+    punctuation_count = sum(
+        (not char.isalnum()) and (not char.isspace()) for char in text
+    )
     alpha_ratio = alpha_count / max(len(text), 1)
     confidence = float(block.get("confidence", 0.0))
     score = len(text) * 0.55 + alpha_count * 0.7 + confidence * 12.0
@@ -181,7 +215,9 @@ def _block_score(block: dict[str, Any]) -> float:
     return score
 
 
-def _select_dominant_block_family(lines: list[list[dict[str, Any]]], region: Any) -> set[tuple[int, int]]:
+def _select_dominant_block_family(
+    lines: list[list[dict[str, Any]]], region: Any
+) -> set[tuple[int, int]]:
     families: list[dict[str, Any]] = []
     line_width = float(region.get("width", 0)) if isinstance(region, dict) else 0.0
     for line_index, blocks in enumerate(lines):
@@ -190,7 +226,9 @@ def _select_dominant_block_family(lines: list[list[dict[str, Any]]], region: Any
             for family in families:
                 overlap = _horizontal_overlap_ratio(block, family)
                 center_delta = abs(float(block["cx"]) - float(family["cx"]))
-                if overlap >= 0.35 or center_delta <= max(42.0, float(family["width"]) * 0.45):
+                if overlap >= 0.35 or center_delta <= max(
+                    42.0, float(family["width"]) * 0.45
+                ):
                     matched_family = family
                     break
             if matched_family is None:
@@ -203,10 +241,18 @@ def _select_dominant_block_family(lines: list[list[dict[str, Any]]], region: Any
                 }
                 families.append(matched_family)
             matched_family["members"].append((line_index, block_index, block))
-            matched_family["cx"] = sum(float(member[2]["cx"]) for member in matched_family["members"]) / len(matched_family["members"])
-            matched_family["x1"] = min(float(member[2]["x1"]) for member in matched_family["members"])
-            matched_family["x2"] = max(float(member[2]["x2"]) for member in matched_family["members"])
-            matched_family["width"] = max(1.0, float(matched_family["x2"]) - float(matched_family["x1"]))
+            matched_family["cx"] = sum(
+                float(member[2]["cx"]) for member in matched_family["members"]
+            ) / len(matched_family["members"])
+            matched_family["x1"] = min(
+                float(member[2]["x1"]) for member in matched_family["members"]
+            )
+            matched_family["x2"] = max(
+                float(member[2]["x2"]) for member in matched_family["members"]
+            )
+            matched_family["width"] = max(
+                1.0, float(matched_family["x2"]) - float(matched_family["x1"])
+            )
 
     if not families:
         return set()
@@ -220,16 +266,23 @@ def _select_dominant_block_family(lines: list[list[dict[str, Any]]], region: Any
         return score
 
     best_family = max(families, key=family_score)
-    selected = {(line_index, block_index) for line_index, block_index, _ in best_family["members"]}
+    selected = {
+        (line_index, block_index)
+        for line_index, block_index, _ in best_family["members"]
+    }
 
     # Ayni satirdaki konusmaci etiketi bloklarini geri bagla.
     for line_index, blocks in enumerate(lines):
-        line_selected = [index for current_line, index in selected if current_line == line_index]
+        line_selected = [
+            index for current_line, index in selected if current_line == line_index
+        ]
         if not line_selected:
             continue
         first_selected = min(line_selected)
         for block_index, block in enumerate(blocks[:first_selected]):
-            if re.match(r"^[A-Za-z\u00C0-\u017E.']+:$", str(block.get("text", "")).strip()):
+            if re.match(
+                r"^[A-Za-z\u00C0-\u017E.']+:$", str(block.get("text", "")).strip()
+            ):
                 selected.add((line_index, block_index))
     return selected
 
@@ -237,11 +290,17 @@ def _select_dominant_block_family(lines: list[list[dict[str, Any]]], region: Any
 def build_detected_text(ocr_results: list[Any], scene_mode: str, region: Any) -> str:
     _ = scene_mode
     _ = region
-    boxes = [entry for index, result in enumerate(ocr_results) if (entry := _entry(result, index * 14)) is not None]
+    boxes = [
+        entry
+        for index, result in enumerate(ocr_results)
+        if (entry := _entry(result, index * 14)) is not None
+    ]
     if not boxes:
         return ""
     lines: list[str] = []
-    grouped_lines = [sorted(line, key=lambda item: item["x1"]) for line in group_by_line(boxes)]
+    grouped_lines = [
+        sorted(line, key=lambda item: item["x1"]) for line in group_by_line(boxes)
+    ]
 
     for line in grouped_lines:
         ordered = sorted(line, key=lambda item: item["x1"])
@@ -255,4 +314,3 @@ def build_detected_text(ocr_results: list[Any], scene_mode: str, region: Any) ->
             lines.append(body)
     lines = _dedupe_lines([line for line in lines if line])
     return "\n".join(lines).strip()
-

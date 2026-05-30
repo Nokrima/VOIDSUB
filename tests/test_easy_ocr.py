@@ -1,10 +1,7 @@
-import json
 import queue
-import subprocess
 from unittest.mock import MagicMock, patch
 
 import numpy as np
-import pytest  # pyright: ignore[reportMissingImports]
 
 from core.ocr.easy_ocr import EasyOCREngine
 
@@ -67,14 +64,14 @@ def test_easyocr_worker_stop():
 @patch("core.ocr.easy_ocr.threading.Thread")
 def test_easyocr_worker_start(mock_thread, mock_popen):
     engine = EasyOCREngine()
-    
+
     # Mock plugin_python path so _start_worker_mode succeeds
     mock_path = MagicMock()
     mock_path.parent.__truediv__.return_value.exists.return_value = True
     engine.plugin_python = mock_path
-    
+
     result = engine._start_worker_mode()
-    
+
     assert result is True
     assert engine._is_ready is True
     assert engine.use_gpu is True

@@ -1,10 +1,7 @@
 import asyncio
-import json
 import multiprocessing as mp
 import queue
 import re
-import subprocess
-import sys
 import threading
 import time
 import unicodedata
@@ -20,6 +17,7 @@ from core.ocr.base import OCREngine
 def _get_winrt_languages() -> list[str]:
     try:
         from winrt.windows.media.ocr import OcrEngine
+
         return [lang.language_tag for lang in OcrEngine.available_recognizer_languages]
     except Exception:
         return []
@@ -43,7 +41,9 @@ def _winocr_worker(
 
         engine = OcrEngine.try_create_from_language(Language(language_tag))
         if not engine:
-            error_queue.put(f"[{PREFIX_OCR}-001] Windows OCR dil paketi eksik: {language_tag}")
+            error_queue.put(
+                f"[{PREFIX_OCR}-001] Windows OCR dil paketi eksik: {language_tag}"
+            )
             ready_event.set()
             return
 
@@ -80,7 +80,9 @@ def _winocr_worker(
         error_queue.put(f"[{PREFIX_OCR}-002] WinRT (Windows API) paketi bulunamadi.")
         ready_event.set()
     except Exception as exc:
-        error_queue.put(f"[{PREFIX_OCR}-046] Windows OCR worker failed: {type(exc).__name__}: {exc}")
+        error_queue.put(
+            f"[{PREFIX_OCR}-046] Windows OCR worker failed: {type(exc).__name__}: {exc}"
+        )
         ready_event.set()
     finally:
         pending = asyncio.all_tasks(loop)
@@ -127,7 +129,13 @@ class WindowsOCREngine(OCREngine):
 
         self.process = mp.Process(
             target=_winocr_worker,
-            args=(self.task_queue, self.result_queue, self.error_queue, self.ready_event, self.language_tag),
+            args=(
+                self.task_queue,
+                self.result_queue,
+                self.error_queue,
+                self.ready_event,
+                self.language_tag,
+            ),
             name="winocr-worker",
             daemon=True,
         )
@@ -141,16 +149,25 @@ class WindowsOCREngine(OCREngine):
             return False
 
         if not self.process.is_alive():
-            self.logger.error(f"[{PREFIX_OCR}-043] Windows OCR start failed: worker process died silently")
+            self.logger.error(
+                f"[{PREFIX_OCR}-043] Windows OCR start failed: worker process died silently"
+            )
             self.stop()
             return False
 
         self._is_ready = True
-        self.logger.info(f"[{PREFIX_OCR}-044] Windows OCR ready: language_tag={self.language_tag}")
+        self.logger.info(
+            f"[{PREFIX_OCR}-044] Windows OCR ready: language_tag={self.language_tag}"
+        )
         return True
 
     def read(self, image: np.ndarray) -> list[tuple]:
-        if not self._is_ready or self.process is None or self.task_queue is None or self.result_queue is None:
+        if (
+            not self._is_ready
+            or self.process is None
+            or self.task_queue is None
+            or self.result_queue is None
+        ):
             return []
 
         if not self.read_lock.acquire(timeout=2.6):
@@ -165,8 +182,13 @@ class WindowsOCREngine(OCREngine):
             if not result.get("success"):
                 message = result.get("error")
                 now = time.monotonic()
-                if message != self.last_error_message or now - self.last_error_time >= 2.0:
-                    self.logger.error(f"[{PREFIX_OCR}-003] Okuma sırasında hata: {message}")
+                if (
+                    message != self.last_error_message
+                    or now - self.last_error_time >= 2.0
+                ):
+                    self.logger.error(
+                        f"[{PREFIX_OCR}-003] Okuma sırasında hata: {message}"
+                    )
                     self.last_error_message = message
                     self.last_error_time = now
                 return []
@@ -185,7 +207,9 @@ class WindowsOCREngine(OCREngine):
             message = str(exc)
             now = time.monotonic()
             if message != self.last_error_message or now - self.last_error_time >= 2.0:
-                self.logger.error(f"[{PREFIX_OCR}-003] Okuma sırasında IPC hatası: {message}")
+                self.logger.error(
+                    f"[{PREFIX_OCR}-003] Okuma sırasında IPC hatası: {message}"
+                )
                 self.last_error_message = message
                 self.last_error_time = now
             return []
@@ -219,7 +243,9 @@ class WindowsOCREngine(OCREngine):
         if not has_kanji:
             return unique
 
-        filtered = [line for line in unique if not self._is_probable_reading_line(str(line[1]))]
+        filtered = [
+            line for line in unique if not self._is_probable_reading_line(str(line[1]))
+        ]
         return filtered or unique
 
     def _kanji_count(self, text: str) -> int:
@@ -301,7 +327,7 @@ class WindowsOCREngine(OCREngine):
             "gpu_ok": True,
             "ram_ok": True,
         }
-        
+
         available = _get_winrt_languages()
         if not available:
             status["available"] = False
@@ -309,10 +335,11 @@ class WindowsOCREngine(OCREngine):
             return status
 
         check_tag = self.language_tag if self.language_tag else available[0]
-        
+
         try:
             from winrt.windows.globalization import Language
             from winrt.windows.media.ocr import OcrEngine
+
             engine = OcrEngine.try_create_from_language(Language(check_tag))
             if engine is not None:
                 status["available"] = True
@@ -322,4 +349,3 @@ class WindowsOCREngine(OCREngine):
             status["reason"] = f"Windows API (WinRT) eksik veya uyumsuz: {e}"
 
         return status
-

@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { onEvent, wsClient } from './websocket';
+import { useEffect } from "react";
+import { onEvent, wsClient } from "./websocket";
 
 export interface TranslationPreview {
   original_text: string;
@@ -7,7 +7,7 @@ export interface TranslationPreview {
 }
 
 export interface OverlaySettingsState {
-  mode: 'waterfall' | 'jump' | 'fixed';
+  mode: "waterfall" | "jump" | "fixed";
   font_family: string;
   font_size: number;
   font_color: string;
@@ -21,7 +21,7 @@ export interface OcrFrameStat {
   scene_selected: string;
   detected_scene: string;
   quality: number;
-  result: 'accepted' | 'rejected' | 'no_text';
+  result: "accepted" | "rejected" | "no_text";
   reason: string;
   signal: number;
   variant: string;
@@ -54,7 +54,15 @@ export interface AppSettings {
 export interface HardwareResult {
   recommended_engine: string;
   available_engines: string[];
-  engine_details?: Record<string, { available: boolean; reason: string; repair_available?: boolean; repair_kind?: string | null }>;
+  engine_details?: Record<
+    string,
+    {
+      available: boolean;
+      reason: string;
+      repair_available?: boolean;
+      repair_kind?: string | null;
+    }
+  >;
   cpu: { name: string; cores: number; threads: number };
   gpu: { available: boolean; name: string };
   ram_gb: number;
@@ -65,11 +73,11 @@ export interface HardwareResult {
 export interface OfflineStatusResult {
   available: boolean;
   busy?: boolean;
-  selected_model?: 'opus_mt_en_tr' | 'nllb';
+  selected_model?: "opus_mt_en_tr" | "nllb";
   models_ready?: Record<string, boolean>;
   active_install_model?: string | null;
   active_model?: string | null;
-  active_action?: 'install' | 'remove' | null;
+  active_action?: "install" | "remove" | null;
   queued_models?: string[];
   state?: string;
   percent?: number;
@@ -122,11 +130,12 @@ export interface AppWebSocketBindings {
 }
 
 export const translationReasonMessage = (reason: unknown) => {
-  const code = String(reason ?? '').trim();
+  const code = String(reason ?? "").trim();
   if (!code) return null;
   const knownMessages: Record<string, string> = {
-    engine_unavailable: 'Seçili motor başlatılamadı. Farklı bir motor seçip tekrar deneyin.',
-    region_required: 'Çevrilecek alan seçimi yapılmadı.',
+    engine_unavailable:
+      "Seçili motor başlatılamadı. Farklı bir motor seçip tekrar deneyin.",
+    region_required: "Çevrilecek alan seçimi yapılmadı.",
   };
   return knownMessages[code] ?? code;
 };
@@ -135,52 +144,114 @@ export function useAppWebSocket(bindings: AppWebSocketBindings) {
   useEffect(() => {
     wsClient.connect();
 
-    const unsubscribeSettings = onEvent('app_settings', (data) => bindings.onSettings((data as any).settings as AppSettings));
-    const unsubscribeSettingsLegacy = onEvent('app_settings_loaded', (data) => bindings.onSettings(data as AppSettings));
-    
-    const unsubscribeHello = onEvent('hello', (data) => {
+    const unsubscribeSettings = onEvent("app_settings", (data) =>
+      bindings.onSettings((data as any).settings as AppSettings),
+    );
+    const unsubscribeSettingsLegacy = onEvent("app_settings_loaded", (data) =>
+      bindings.onSettings(data as AppSettings),
+    );
+
+    const unsubscribeHello = onEvent("hello", (data) => {
       const payload = data as Record<string, any>;
       if (payload && payload.hw_info) {
         bindings.onHardware(payload.hw_info as HardwareResult);
       }
     });
-    const unsubscribeHardwareLegacy = onEvent('hardware_result', bindings.onHardware);
-    
-    const unsubscribeOverlaySettings = onEvent('overlay_settings_loaded', bindings.onOverlaySettings);
-    const unsubscribeOfflineStatus = onEvent('offline_model_status', bindings.onOfflineStatus);
-    const unsubscribeTranslation = onEvent('new_translation', (data) => bindings.onTranslation(data as TranslationPreview));
-    const unsubscribeTranslationState = onEvent('translation_state', bindings.onTranslationState);
-    const unsubscribeEngineDenied = onEvent('engine_change_denied', bindings.onEngineDenied);
-    const unsubscribeSettingsSaveFailed = onEvent('settings_save_failed', bindings.onSettingsSaveFailed);
-    const unsubscribeEngineRepair = onEvent('engine_repair_result', bindings.onEngineRepair);
-    const unsubscribeOfflineError = onEvent('offline_model_error', bindings.onOfflineError);
-    const unsubscribeOfflineComplete = onEvent('offline_model_complete', bindings.onOfflineComplete);
-    const unsubscribeTranslationFallback = onEvent('translation_engine_fallback', bindings.onTranslationFallback);
-    const unsubscribeOcrRuntimeFallback = onEvent('ocr_engine_runtime_fallback', bindings.onOcrRuntimeFallback);
-    const unsubscribeFrameStat = onEvent('ocr_frame_stat', (data) => bindings.onFrameStat(data as OcrFrameStat));
-    const unsubscribeRegionSelected = onEvent('region_selected', bindings.onRegionSelected);
-    const unsubscribeRegionCancelled = onEvent('region_selection_cancelled', bindings.onRegionCancelled);
-    const unsubscribeRegionFailed = onEvent('region_selection_failed', bindings.onRegionFailed);
-    const unsubscribeAsyncError = onEvent('async_error', bindings.onAsyncError);
+    const unsubscribeHardwareLegacy = onEvent(
+      "hardware_result",
+      bindings.onHardware,
+    );
 
-    const unsubscribeCalibrationSelected = onEvent('calibration_region_selected', (payload) => bindings.onCalibrationRegionSelected?.(payload));
-    const unsubscribeCalibrationCancelled = onEvent('calibration_region_cancelled', () => bindings.onCalibrationRegionCancelled?.());
-    const unsubscribeCalibrationFailed = onEvent('calibration_region_failed', (payload) => bindings.onCalibrationRegionFailed?.(payload));
+    const unsubscribeOverlaySettings = onEvent(
+      "overlay_settings_loaded",
+      bindings.onOverlaySettings,
+    );
+    const unsubscribeOfflineStatus = onEvent(
+      "offline_model_status",
+      bindings.onOfflineStatus,
+    );
+    const unsubscribeTranslation = onEvent("new_translation", (data) =>
+      bindings.onTranslation(data as TranslationPreview),
+    );
+    const unsubscribeTranslationState = onEvent(
+      "translation_state",
+      bindings.onTranslationState,
+    );
+    const unsubscribeEngineDenied = onEvent(
+      "engine_change_denied",
+      bindings.onEngineDenied,
+    );
+    const unsubscribeSettingsSaveFailed = onEvent(
+      "settings_save_failed",
+      bindings.onSettingsSaveFailed,
+    );
+    const unsubscribeEngineRepair = onEvent(
+      "engine_repair_result",
+      bindings.onEngineRepair,
+    );
+    const unsubscribeOfflineError = onEvent(
+      "offline_model_error",
+      bindings.onOfflineError,
+    );
+    const unsubscribeOfflineComplete = onEvent(
+      "offline_model_complete",
+      bindings.onOfflineComplete,
+    );
+    const unsubscribeTranslationFallback = onEvent(
+      "translation_engine_fallback",
+      bindings.onTranslationFallback,
+    );
+    const unsubscribeOcrRuntimeFallback = onEvent(
+      "ocr_engine_runtime_fallback",
+      bindings.onOcrRuntimeFallback,
+    );
+    const unsubscribeFrameStat = onEvent("ocr_frame_stat", (data) =>
+      bindings.onFrameStat(data as OcrFrameStat),
+    );
+    const unsubscribeRegionSelected = onEvent(
+      "region_selected",
+      bindings.onRegionSelected,
+    );
+    const unsubscribeRegionCancelled = onEvent(
+      "region_selection_cancelled",
+      bindings.onRegionCancelled,
+    );
+    const unsubscribeRegionFailed = onEvent(
+      "region_selection_failed",
+      bindings.onRegionFailed,
+    );
+    const unsubscribeAsyncError = onEvent("async_error", bindings.onAsyncError);
 
-    const unsubscribeNativeRegionSelection = onEvent('native_region_selection', (payload: any) => {
-      const status = payload.status;
-      if (status === 'completed') {
-        bindings.onRegionSelected(payload);
-      } else if (status === 'cancelled') {
-        bindings.onRegionCancelled();
-      } else if (status === 'failed') {
-        bindings.onRegionFailed(payload);
-      }
-    });
+    const unsubscribeCalibrationSelected = onEvent(
+      "calibration_region_selected",
+      (payload) => bindings.onCalibrationRegionSelected?.(payload),
+    );
+    const unsubscribeCalibrationCancelled = onEvent(
+      "calibration_region_cancelled",
+      () => bindings.onCalibrationRegionCancelled?.(),
+    );
+    const unsubscribeCalibrationFailed = onEvent(
+      "calibration_region_failed",
+      (payload) => bindings.onCalibrationRegionFailed?.(payload),
+    );
 
-    wsClient.send('get_settings');
-    wsClient.send('get_hardware');
-    wsClient.send('get_offline_status');
+    const unsubscribeNativeRegionSelection = onEvent(
+      "native_region_selection",
+      (payload: any) => {
+        const status = payload.status;
+        if (status === "completed") {
+          bindings.onRegionSelected(payload);
+        } else if (status === "cancelled") {
+          bindings.onRegionCancelled();
+        } else if (status === "failed") {
+          bindings.onRegionFailed(payload);
+        }
+      },
+    );
+
+    wsClient.send("get_settings");
+    wsClient.send("get_hardware");
+    wsClient.send("get_offline_status");
 
     return () => {
       unsubscribeSettings();

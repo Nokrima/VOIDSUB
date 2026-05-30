@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 
 /**
  * Panel geçiş hook'u.
@@ -12,27 +12,27 @@ import { useEffect, useState } from 'react';
  */
 export function usePanelTransition(activePanel: string) {
   const [displayPanel, setDisplayPanel] = useState(activePanel);
-  const [phase, setPhase] = useState<'idle' | 'out' | 'in'>('idle');
+  const [phase, setPhase] = useState<"idle" | "out" | "in">("idle");
 
   useEffect(() => {
     if (activePanel === displayPanel) {
       return;
     }
 
-    const isCanvasPanel = (panel: string) => panel.startsWith('canvas');
+    const isCanvasPanel = (panel: string) => panel.startsWith("canvas");
     if (isCanvasPanel(activePanel) && isCanvasPanel(displayPanel)) {
       setDisplayPanel(activePanel);
-      setPhase('in');
-      const t = window.setTimeout(() => setPhase('idle'), 180);
+      setPhase("in");
+      const t = window.setTimeout(() => setPhase("idle"), 180);
       return () => window.clearTimeout(t);
     }
 
-    setPhase('out');
+    setPhase("out");
     const t1 = window.setTimeout(() => {
       setDisplayPanel(activePanel);
-      setPhase('in');
+      setPhase("in");
     }, 120);
-    const t2 = window.setTimeout(() => setPhase('idle'), 240);
+    const t2 = window.setTimeout(() => setPhase("idle"), 240);
 
     return () => {
       window.clearTimeout(t1);

@@ -1,4 +1,5 @@
 """session_recorder - OCR pipeline oturumunu kaydeder ve raporlar."""
+
 from __future__ import annotations
 
 import datetime
@@ -58,7 +59,9 @@ class SessionRecorder:
 
     def start_session(self, pipeline: Any) -> None:
         if self._active:
-            logger.warning(f"[{PREFIX_SYS}-801] Debug oturumu zaten devam ediyor, yoksayildi.")
+            logger.warning(
+                f"[{PREFIX_SYS}-801] Debug oturumu zaten devam ediyor, yoksayildi."
+            )
             return
         self._pipeline = pipeline
         self._index_counter = 0
@@ -96,7 +99,16 @@ class SessionRecorder:
         extra: dict | None = None,
     ) -> None:
         if self._original_record:
-            self._original_record(decision, engine, scene_mode, raw_frame, processed_frame, text, quality, extra)
+            self._original_record(
+                decision,
+                engine,
+                scene_mode,
+                raw_frame,
+                processed_frame,
+                text,
+                quality,
+                extra,
+            )
 
         if not self._active:
             return
